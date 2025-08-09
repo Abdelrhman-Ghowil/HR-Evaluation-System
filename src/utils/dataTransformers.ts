@@ -87,13 +87,7 @@ export const validateEvaluationData = (evaluation: EvaluationInput): string[] =>
   if (!evaluation.id?.trim()) errors.push('Evaluation ID is required');
   if (!evaluation.type?.trim()) errors.push('Evaluation type is required');
   if (!evaluation.period?.trim()) errors.push('Evaluation period is required');
-  if (!evaluation.date) errors.push('Evaluation date is required');
   if (!evaluation.status) errors.push('Evaluation status is required');
-  
-  // Validate date format
-  if (evaluation.date && isNaN(Date.parse(evaluation.date))) {
-    errors.push('Invalid date format');
-  }
   
   return errors;
 };
@@ -119,11 +113,15 @@ export const safeTransformData = <T, R>(
 };
 
 /**
- * Formats date for display
+ * Formats date for display in dd/mm/yyyy format
  */
 export const formatDate = (dateString: string): string => {
   try {
-    return new Date(dateString).toLocaleDateString();
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   } catch {
     return 'Invalid Date';
   }
@@ -136,6 +134,56 @@ export const formatPhoneNumber = (phone: string, countryCode?: string): string =
   const cleanPhone = phone?.replace(/[^0-9]/g, '') || '';
   const code = countryCode || '+1';
   return `${code} ${cleanPhone}`;
+};
+
+/**
+ * Parses a full phone number into country code and phone number
+ * Assumes format like "+966123456789" or "966123456789"
+ */
+export const parsePhoneNumber = (fullPhone: string): { countryCode: string; phone: string } => {
+  if (!fullPhone) {
+    return { countryCode: '+1', phone: '' };
+  }
+
+  // Remove any non-digit characters except +
+  const cleaned = fullPhone.replace(/[^+0-9]/g, '');
+  
+  // If it starts with +, extract country code
+  if (cleaned.startsWith('+')) {
+    // Common country codes and their lengths
+    const countryCodePatterns = [
+      { code: '+966', length: 4 }, // Saudi Arabia
+      { code: '+20', length: 3 },  // Egypt
+      { code: '+1', length: 2 },   // US/Canada
+      { code: '+44', length: 3 },  // UK
+      { code: '+971', length: 4 }, // UAE
+    ];
+    
+    for (const pattern of countryCodePatterns) {
+      if (cleaned.startsWith(pattern.code)) {
+        return {
+          countryCode: pattern.code,
+          phone: cleaned.substring(pattern.length)
+        };
+      }
+    }
+    
+    // Fallback: assume first 2-4 digits are country code
+    const countryCode = cleaned.substring(0, Math.min(4, cleaned.length - 7));
+    const phone = cleaned.substring(countryCode.length);
+    return { countryCode, phone };
+  }
+  
+  // If no +, try to detect common country codes
+  if (cleaned.startsWith('966')) {
+    return { countryCode: '+966', phone: cleaned.substring(3) };
+  }
+  if (cleaned.startsWith('20')) {
+    return { countryCode: '+20', phone: cleaned.substring(2) };
+  }
+  
+  // Default to +1 if no country code detected
+  return { countryCode: '+1', phone: cleaned };
 };
 
 /**

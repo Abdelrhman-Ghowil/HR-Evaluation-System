@@ -8,7 +8,7 @@ export interface Employee {
   email: string;
   phone: string;
   hire_date: string;
-  status: 'active' | 'inactive';
+  status: 'Active' | 'Inactive';
 }
 
 export interface EmployeeInput {
@@ -20,9 +20,9 @@ export interface EmployeeInput {
   avatar: string;
   department: string;
   position: string;
-  role: 'Admin' | 'HR' | 'HOD' | 'LM' | 'Employee';
-  managerialWeight: 'Supervisory' | 'Middle Management' | 'IC';
-  status: 'active' | 'inactive';
+  role: 'Admin' | 'HR' | 'Head-of-Dept' | 'Line Manager' | 'Employee';
+  managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management';
+  status: 'Active' | 'Inactive';
   companyName: string;
   joinDate: string;
 }
@@ -76,7 +76,7 @@ export interface Competency {
 export interface Reviewer {
   id: string;
   name: string;
-  role: 'LM' | 'HOD' | 'HR';
+  role: 'Line Manager' | 'Head-of-Dept' | 'HR';
 }
 
 // Utility types for form handling

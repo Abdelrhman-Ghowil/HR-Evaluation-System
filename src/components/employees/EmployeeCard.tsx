@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { formatDate } from '@/utils/dataTransformers';
 
 interface Employee {
   id: string;
@@ -21,8 +22,8 @@ interface Employee {
   avatar: string;
   department: string;
   position: string;
-  role: 'Admin' | 'HR' | 'HOD' | 'LM' | 'Employee';
-  managerialWeight: 'Supervisory' | 'Middle Management' | 'IC';
+  role: 'Admin' | 'HR' | 'Head-of-Dept' | 'Line Manager' | 'Employee';
+  managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management';
   status: 'active' | 'inactive' | 'default_active';
   companyName: string;
   joinDate: string;
@@ -90,7 +91,7 @@ const EmployeeCard = ({ employee, onViewProfile }: EmployeeCardProps) => {
             </div>
           )}
           <div className="text-xs text-gray-500">
-            Joined: {new Date(employee.joinDate).toLocaleDateString()}
+            Joined: {formatDate(employee.joinDate)}
           </div>
         </div>
       </CardContent>

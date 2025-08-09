@@ -21,7 +21,7 @@ interface Employee {
   email: string;
   phone: string;
   hire_date: string;
-  status: 'active' | 'inactive';
+  status: 'Active' | 'Inactive';
 }
 
 interface Evaluation {

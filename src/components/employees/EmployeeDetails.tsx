@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,9 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Calendar, User, BarChart3, FileText, Target, Plus, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, User, BarChart3, FileText, Target, Plus, Edit, Trash2, Loader2 } from 'lucide-react';
 import EvaluationDetails from './EvaluationDetails';
 import { EmployeeInput, EvaluationInput } from '../../types/shared';
+import { useEvaluations } from '../../hooks/useApi';
+import { ApiEvaluationResponse } from '../../types/api';
 import { 
   transformEmployeeForEvaluation, 
   transformEvaluationForDetails, 
@@ -29,14 +31,13 @@ interface NewEvaluation {
   year: number;
   quarter?: number;
   reviewer_id: string;
-  date: string;
   status: 'Draft';
 }
 
 interface Reviewer {
   id: string;
   name: string;
-  role: 'LM' | 'HOD' | 'HR';
+  role: 'Line Manager' | 'Head-of-Dept' | 'HR';
 }
 
 interface EmployeeDetailsProps {
@@ -53,18 +54,107 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     type: 'Quarterly',
     year: new Date().getFullYear(),
     reviewer_id: '',
-    date: new Date().toISOString().split('T')[0],
     status: 'Draft'
   });
-  const [evaluationList, setEvaluationList] = useState<EvaluationInput[]>([]);
+
+  // Fetch evaluations from API
+  console.log('Fetching evaluations for employee ID:', employee.id);
+  const { data: evaluationsData, isLoading: evaluationsLoading, error: evaluationsError } = useEvaluations({
+    employee_id: employee.id
+  });
+  
+  console.log('Evaluations loading:', evaluationsLoading);
+  console.log('Evaluations error:', evaluationsError);
+  console.log('Full evaluationsData object:', JSON.stringify(evaluationsData, null, 2));
+
+  // Transform API data to match the expected format
+  const transformApiEvaluation = (apiEval: ApiEvaluationResponse): EvaluationInput => {
+    console.log('Transforming API evaluation:', apiEval);
+    
+    // Parse score safely
+    let score: number | undefined;
+    if (apiEval.score) {
+      const parsedScore = parseFloat(apiEval.score);
+      score = isNaN(parsedScore) ? undefined : parsedScore;
+    }
+    
+    const transformed = {
+      id: apiEval.evaluation_id,
+      type: apiEval.type,
+      period: apiEval.period,
+      status: apiEval.status,
+      score: score,
+      reviewer: apiEval.reviewer,
+      date: new Date(apiEval.created_at).toISOString().split('T')[0]
+    };
+    
+    console.log('Transformed evaluation:', transformed);
+    return transformed;
+  };
+
+  // Get evaluation list from API data
+  const evaluationList = useMemo(() => {
+    console.log('=== EVALUATION DATA DEBUG ===');
+    console.log('Raw evaluationsData:', evaluationsData);
+    console.log('evaluationsData type:', typeof evaluationsData);
+    console.log('evaluationsData.results:', evaluationsData?.results);
+    console.log('evaluationsData.results type:', typeof evaluationsData?.results);
+    console.log('evaluationsData.results length:', evaluationsData?.results?.length);
+    
+    // Handle different possible response structures
+    let dataToTransform: ApiEvaluationResponse[] = [];
+    
+    if (evaluationsData?.results && Array.isArray(evaluationsData.results)) {
+      dataToTransform = evaluationsData.results;
+    } else if (Array.isArray(evaluationsData)) {
+      // Handle case where API returns array directly
+      dataToTransform = evaluationsData;
+    } else if (evaluationsData && typeof evaluationsData === 'object') {
+      // Handle case where API returns object with data property
+      if (evaluationsData.data && Array.isArray(evaluationsData.data)) {
+        dataToTransform = evaluationsData.data;
+      }
+    }
+    
+    console.log('Data to transform:', dataToTransform);
+    console.log('Data to transform length:', dataToTransform.length);
+    
+    if (!dataToTransform || dataToTransform.length === 0) {
+       console.log('No evaluation data to transform');
+       
+       // Temporary: Add mock data for testing if no API data is available
+       console.log('Adding temporary mock data for testing...');
+       const mockEvaluation: EvaluationInput = {
+         id: 'mock-1',
+         type: 'Quarterly',
+         period: '2024 Q1',
+         status: 'Completed',
+         score: 85,
+         reviewer: 'John Manager',
+         date: '2024-03-15'
+       };
+       return [mockEvaluation];
+     }
+    
+    try {
+      const transformed = dataToTransform.map(transformApiEvaluation);
+      console.log('Transformed evaluations:', transformed);
+      console.log('Transformed evaluations length:', transformed.length);
+      return transformed;
+    } catch (error) {
+      console.error('Error transforming evaluations:', error);
+      console.error('Error details:', error);
+      return [];
+    }
+  }, [evaluationsData]);
 
   // Mock reviewers data - in real app, this would come from API
   const reviewers: Reviewer[] = [
-    { id: '1', name: 'Michael Chen', role: 'LM' },
-    { id: '2', name: 'Emily Rodriguez', role: 'HOD' },
-    { id: '3', name: 'Sarah Johnson', role: 'HR' },
-    { id: '4', name: 'David Kim', role: 'LM' },
-    { id: '5', name: 'Lisa Wang', role: 'HOD' }
+    { id: '1', name: 'Michael Chen', role: 'Line Manager' },
+  { id: '2', name: 'Emily Rodriguez', role: 'Head-of-Dept' },
+  { id: '3', name: 'Sarah Johnson', role: 'HR' },
+  { id: '4', name: 'David Kim', role: 'Line Manager' },
+  { id: '5', name: 'Lisa Wang', role: 'Head-of-Dept' }
   ];
 
   // Generate year options (current year ± 3)
@@ -79,7 +169,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     const records: Partial<EvaluationInput>[] = [];
     const baseRecord = {
       reviewer: reviewers.find(r => r.id === newEvaluation.reviewer_id)?.name || '',
-      date: newEvaluation.date,
+      date: new Date().toISOString().split('T')[0],
       status: 'Draft' as const,
       type: newEvaluation.type
     };
@@ -126,21 +216,14 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const handleCreateEvaluation = () => {
     const records = generateEvaluationRecords();
     console.log('Creating evaluation records:', records);
-    // In real app, this would make API calls to create the evaluations
-    
-    // Add new records to evaluation list
-    const newRecords = records.map(record => ({
-      ...record,
-      id: record.id || `${Date.now()}-${Math.random()}`
-    })) as EvaluationInput[];
-    setEvaluationList(prev => [...prev, ...newRecords]);
+    // TODO: Implement API call to create evaluations
+    // This would use useCreateEvaluation hook and call the API
     
     // Reset form and close modal
     setNewEvaluation({
       type: 'Quarterly',
       year: new Date().getFullYear(),
       reviewer_id: '',
-      date: new Date().toISOString().split('T')[0],
       status: 'Draft'
     });
     setIsAddEvaluationOpen(false);
@@ -154,17 +237,18 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const handleUpdateEvaluation = () => {
     if (!editingEvaluation) return;
 
-    setEvaluationList(prev =>
-      prev.map(evaluation =>
-        evaluation.id === editingEvaluation.id ? editingEvaluation : evaluation
-      )
-    );
+    // TODO: Implement API call to update evaluation
+    // This would use useUpdateEvaluation hook and call the API
+    console.log('Updating evaluation:', editingEvaluation);
+    
     setIsEditEvaluationOpen(false);
     setEditingEvaluation(null);
   };
 
   const handleDeleteEvaluation = (evaluationId: string) => {
-    setEvaluationList(prev => prev.filter(evaluation => evaluation.id !== evaluationId));
+    // TODO: Implement API call to delete evaluation
+    // This would use useDeleteEvaluation hook and call the API
+    console.log('Deleting evaluation:', evaluationId);
   };
 
   const isFormValid = () => {
@@ -198,8 +282,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     // Basic field validation
     const hasRequiredFields = editingEvaluation.type && 
                              editingEvaluation.period && 
-                             editingEvaluation.reviewer_id && 
-                             editingEvaluation.date;
+                             editingEvaluation.reviewer_id;
     
     if (!hasRequiredFields) return false;
     
@@ -212,46 +295,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     return true;
   };
 
-  // Initialize evaluation list with mock data
-  React.useEffect(() => {
-    const initialEvaluations: EvaluationInput[] = [
-      {
-        id: '1',
-        type: 'Annual Review',
-        status: 'Completed',
-        score: 8.5,
-        date: '2024-06-15',
-        reviewer: 'Michael Chen',
-        period: '2024'
-      },
-      {
-        id: '2',
-        type: 'Quarterly Review',
-        status: 'Completed',
-        score: 7.8,
-        date: '2024-03-20',
-        reviewer: 'Emily Rodriguez',
-        period: 'Q1 2024'
-      },
-      {
-        id: '3',
-        type: 'Mid-Year Review',
-        status: 'Employee Review',
-        date: '2024-07-01',
-        reviewer: 'Michael Chen',
-        period: 'Mid 2024'
-      },
-      {
-        id: '4',
-        type: 'Optional Review',
-        status: 'Draft',
-        date: '2024-08-15',
-        reviewer: 'Sarah Johnson',
-        period: '2024-Q3'
-      }
-    ];
-    setEvaluationList(initialEvaluations);
-  }, []);
+
 
   if (selectedEvaluation) {
     // Transform employee data with error handling
@@ -339,9 +383,9 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
               <p className="text-lg text-gray-600">{employee.position}</p>
               <p className="text-sm text-gray-500 mb-2">{employee.companyName}</p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <Badge variant={employee.status === 'active' ? 'default' : 'secondary'}>
+                {/* <Badge variant={employee.status === 'Active' ? 'Active' : 'Inactive'}>
                   {employee.status}
-                </Badge>
+                </Badge> */}
                 <Badge variant="outline" className="bg-blue-50 text-blue-700">
                   {employee.role}
                 </Badge>
@@ -373,9 +417,9 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
               </a>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">Managerial Weight</p>
+              <p className="text-sm font-medium text-gray-500">Managerial Level</p>
               <Badge variant="outline" className="w-fit">
-                {employee.managerialWeight}
+                {employee.managerialLevel}
               </Badge>
             </div>
             <div>
@@ -495,17 +539,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                     </Select>
                   </div>
 
-                  {/* Date */}
-                  <div className="space-y-2">
-                    <Label htmlFor="date">Date</Label>
-                    <Input
-                      type="date"
-                      value={newEvaluation.date}
-                      onChange={(e) => 
-                        setNewEvaluation(prev => ({ ...prev, date: e.target.value }))
-                      }
-                    />
-                  </div>
+
 
                   {/* Info about what will be created */}
                   <div className="bg-blue-50 p-3 rounded-lg">
@@ -544,7 +578,24 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {evaluationList.map((evaluation) => (
+            {evaluationsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                <span className="ml-2 text-gray-600">Loading evaluations...</span>
+              </div>
+            ) : evaluationsError ? (
+              <div className="text-center py-8">
+                <p className="text-red-600">Failed to load evaluations</p>
+                <p className="text-sm text-gray-500 mt-1">{evaluationsError.message}</p>
+              </div>
+            ) : evaluationList.length === 0 ? (
+              <div className="text-center py-8">
+                <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No evaluations found</p>
+                <p className="text-sm text-gray-500 mt-1">Add an evaluation to get started</p>
+              </div>
+            ) : (
+              evaluationList.map((evaluation) => (
               <Card 
                 key={evaluation.id} 
                 className="hover:shadow-md transition-all duration-200 border-l-4 border-l-blue-500"
@@ -594,7 +645,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                       <div className="text-right space-y-1">
                         <div className="flex items-center text-sm text-gray-600">
                           <Calendar className="h-4 w-4 mr-1" />
-                          {new Date(evaluation.date).toLocaleDateString()}
+                          {formatDate(evaluation.date)}
                         </div>
                         <div className="flex items-center text-sm text-gray-600">
                           <User className="h-4 w-4 mr-1" />
@@ -630,7 +681,8 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            ))
+            )}
           </div>
         </CardContent>
       </Card>
@@ -815,7 +867,7 @@ const reviewer = reviewers.find(r => r.id === value);
                  {!editingEvaluation.type && <li>• Evaluation type is required</li>}
                  {!editingEvaluation.period && <li>• Period is required</li>}
                  {!editingEvaluation.reviewer_id && <li>• Reviewer selection is required</li>}
-                 {!editingEvaluation.date && <li>• Date is required</li>}
+
                  {(() => {
                    const originalEvaluation = evaluationList.find(e => e.id === editingEvaluation.id);
                    if (originalEvaluation && !isValidStatusTransition(originalEvaluation.status, editingEvaluation.status)) {

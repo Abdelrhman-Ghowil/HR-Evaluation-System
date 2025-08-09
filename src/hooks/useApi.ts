@@ -15,6 +15,7 @@ import {
   CreateDepartmentRequest,
   UpdateDepartmentRequest,
   ApiEvaluation,
+  ApiEvaluationResponse,
   CreateEvaluationRequest,
   UpdateEvaluationRequest,
   PaginatedResponse,
@@ -278,7 +279,7 @@ export const useUpdateDepartment = (options?: UseMutationOptions<ApiDepartment, 
 // Evaluation Hooks
 export const useEvaluations = (
   params?: EvaluationQueryParams,
-  options?: UseQueryOptions<PaginatedResponse<ApiEvaluation>, ApiError>
+  options?: UseQueryOptions<PaginatedResponse<ApiEvaluationResponse>, ApiError>
 ) => {
   return useQuery({
     queryKey: [...queryKeys.evaluations, params],

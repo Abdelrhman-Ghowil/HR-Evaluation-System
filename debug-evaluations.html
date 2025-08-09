@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Evaluations</title>
+</head>
+<body>
+    <h1>Evaluation Debug Test</h1>
+    <div id="debug-info">
+        <h2>Debug Information:</h2>
+        <p>This page is for debugging the evaluation display issue.</p>
+        <p>Please check the browser console for detailed logs when you navigate to an employee's details page.</p>
+        <p>The console logs will show:</p>
+        <ul>
+            <li>Employee ID being used for the API call</li>
+            <li>Loading and error states</li>
+            <li>Raw API response data</li>
+            <li>Data transformation process</li>
+            <li>Final evaluation list</li>
+        </ul>
+        
+        <h3>Expected API Response Structure:</h3>
+        <pre>
+{
+  "count": number,
+  "next": string | null,
+  "previous": string | null,
+  "results": [
+    {
+      "evaluation_id": "string",
+      "employee": "string",
+      "employee_id": "string",
+      "type": "Annual" | "Quarterly" | "Optional",
+      "status": "Draft" | "Pending HoD Approval" | ...,
+      "score": "string",
+      "reviewer": "string",
+      "reviewer_id": "string",
+      "period": "string",
+      "created_at": "string",
+      "updated_at": "string"
+    }
+  ]
+}
+        </pre>
+        
+        <h3>Troubleshooting Steps:</h3>
+        <ol>
+            <li>Open browser developer tools (F12)</li>
+            <li>Go to Console tab</li>
+            <li>Navigate to an employee's details page</li>
+            <li>Look for console logs starting with "=== EVALUATION DATA DEBUG ==="</li>
+            <li>Check if the API response matches the expected structure above</li>
+            <li>Verify that the employee_id parameter is being sent correctly</li>
+        </ol>
+    </div>
+</body>
+</html>

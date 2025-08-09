@@ -7,12 +7,14 @@ import {
   UpdateUserRequest,
   ApiEmployee,
   CreateEmployeeRequest,
+  UpdateEmployeeRequest,
   ApiCompany,
   CreateCompanyRequest,
   ApiDepartment,
   CreateDepartmentRequest,
   UpdateDepartmentRequest,
   ApiEvaluation,
+  ApiEvaluationResponse,
   CreateEvaluationRequest,
   UpdateEvaluationRequest,
   ApiResponse,
@@ -25,7 +27,7 @@ import {
 } from '../types/api';
 
 // Base API configuration
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://hr-eval-sys-git-feature-template-2e0b89-mohs-projects-85795635.vercel.app/';
 const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT || '10000', 10);
 
 class ApiService {
@@ -115,10 +117,11 @@ class ApiService {
   // Error handling
   private handleError(error: Error | { response?: { data?: { message?: string; error?: string; details?: unknown }; status: number }; request?: unknown; code?: string }): ApiError {
     console.error('Full API Error Details:', {
-      message: error.message,
-      code: (error as any).code,
-      response: error.response,
-      request: error.request ? 'Request made but no response' : 'No request made'
+      message: (error as Error).message,
+      code: (error as unknown as { code?: string }).code,
+      response: error.response?.data || 'No response data', 
+      request: error.request as unknown as { code?: string } ? 'Request made but no response' : 'No request made',
+      details: error.response?.data?.details || 'No details provided'
     });
 
     if (error.response) {
@@ -126,12 +129,12 @@ class ApiService {
       const errorMessage = error.response.data?.message || error.response.data?.error || `Server error (${error.response.status})`;
       return {
         message: errorMessage,
-        status: error.response.status,
-        details: error.response.data?.details,
+        status: error.response?.status || 0,
+        details: error.response?.data?.details,
       };
-    } else if (error.request) {
+    } else if (error.request as unknown as { code?: string } ) {
       // Request was made but no response received
-      const errorCode = (error as any).code;
+      const errorCode = (error as unknown as { code?: string }).code;
       let networkMessage = 'Network error - please check your connection';
       
       if (errorCode === 'ENOTFOUND') {
@@ -151,7 +154,7 @@ class ApiService {
     } else {
       // Something else happened in setting up the request
       return {
-        message: error.message || 'An unexpected error occurred',
+        message: (error as Error).message || 'An unexpected error occurred',
         status: 0,
       };
     }
@@ -264,7 +267,7 @@ class ApiService {
     return response.data;
   }
 
-  async updateEmployee(employeeId: string, employeeData: Partial<CreateEmployeeRequest>): Promise<ApiEmployee> {
+  async updateEmployee(employeeId: string, employeeData: UpdateEmployeeRequest): Promise<ApiEmployee> {
     const response: AxiosResponse<ApiEmployee> = await this.api.patch(`/api/employees/${employeeId}/`, employeeData);
     return response.data;
   }
@@ -275,6 +278,7 @@ class ApiService {
 
   // Company methods
   async getCompanies(): Promise<PaginatedResponse<ApiCompany>> {
+    const queryParams = new URLSearchParams();
     const response: AxiosResponse<PaginatedResponse<ApiCompany>> = await this.api.get('/api/org/companies/');
     return response.data;
   }
@@ -300,9 +304,13 @@ class ApiService {
 
   // Department methods
   async getDepartments(params?: DepartmentQueryParams): Promise<PaginatedResponse<ApiDepartment>> {
-    const response: AxiosResponse<PaginatedResponse<ApiDepartment>> = await this.api.get('/api/org/departments/', {
-      params,
-    });
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) queryParams.append(key, value.toString());
+      });
+    }
+    const response: AxiosResponse<PaginatedResponse<ApiDepartment>> = await this.api.get(`/api/org/departments/?${queryParams}`);
     return response.data;
   }
 
@@ -326,8 +334,8 @@ class ApiService {
   }
 
   // Evaluation methods
-  async getEvaluations(params?: EvaluationQueryParams): Promise<PaginatedResponse<ApiEvaluation>> {
-    const response: AxiosResponse<PaginatedResponse<ApiEvaluation>> = await this.api.get('/api/evaluations/', {
+  async getEvaluations(params?: EvaluationQueryParams): Promise<PaginatedResponse<ApiEvaluationResponse>> {
+    const response: AxiosResponse<PaginatedResponse<ApiEvaluationResponse>> = await this.api.get('/api/evaluations/', {
       params,
     });
     return response.data;
@@ -369,7 +377,7 @@ class ApiService {
   }
 
   // Test API connectivity
-  async testConnection(): Promise<{ success: boolean; message: string; details?: any }> {
+  async testConnection(): Promise<{ success: boolean; message: string; details?: unknown }> {
     try {
       console.log('Testing API connection to:', this.api.defaults.baseURL);
       // Use a valid API endpoint instead of root URL to avoid 404 errors
@@ -379,6 +387,7 @@ class ApiService {
         message: 'API connection successful',
         details: { status: response.status, url: this.api.defaults.baseURL }
       };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       // If the endpoint requires authentication, that's still a successful connection
       if (error.response?.status === 401) {

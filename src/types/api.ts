@@ -26,7 +26,7 @@ export interface ApiUser {
   avatar?: string;
 }
 
-export type UserRole = 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP';
+export type UserRole = 'Admin' | 'HR' | 'Head-of-Dept' | 'Line Manager' | 'Employee';
 
 // User Management Types
 export interface CreateUserRequest {
@@ -57,29 +57,70 @@ export interface UpdateUserRequest {
 
 // Employee Types
 export interface ApiEmployee {
-  id: string;
-  user_id: string;
-  company: string;
-  managerial_level: ManagerialLevel;
-  status: EmployeeStatus;
+  employee_id: string;
+  name: string;
+  email: string;
+  phone: string;
+  avatar: string;
+  role: string;
+  position: string;
+  managerial_level: string;
+  status: string;
+  company_name: string;
+  department: string[];
   join_date: string;
-  user: ApiUser;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  company_id: string;
 }
 
-export type ManagerialLevel = 'IC' | 'SUPERVISORY' | 'MIDDLE';
-export type EmployeeStatus = 'ACTIVE' | 'INACTIVE';
+export type ManagerialLevel = 'Individual Contributor' | 'Supervisory' | 'Middle Management';
+export type EmployeeStatus = 'Active' | 'Inactive';
 
 export interface CreateEmployeeRequest {
-  user_id: string;
-  company: string;
-  managerial_level: ManagerialLevel;
-  status: EmployeeStatus;
+  user_data: {
+    username: string;
+    email: string;
+    password: string;
+    role: string;
+    name: string;
+    avatar?: string;
+    first_name: string;
+    last_name: string;
+    title?: string;
+    phone?: string;
+  };
+  company_id: string;
+  departments_ids: string[];
+  managerial_level: string;
+  status: string;
   join_date: string;
+}
+
+export interface UpdateEmployeeRequest {
+  user_data?: {
+    username?: string;
+    email?: string;
+    password?: string;
+    role?: string;
+    name?: string;
+    avatar?: string;
+    first_name?: string;
+    last_name?: string;
+    title?: string;
+    phone?: string;
+  };
+  company_id?: string;
+  departments_ids?: string[];
+  managerial_level?: string;
+  status?: string;
+  join_date?: string;
 }
 
 // Company Types
 export interface ApiCompany {
-  id: string;
+  company_id: string;
   name: string;
   industry?: string;
   size?: CompanySize;
@@ -103,7 +144,7 @@ export interface CreateCompanyRequest {
 
 // Department Types
 export interface ApiDepartment {
-  id: string;
+  department_id: string;
   name: string;
   employee_count?: number;
   company: string;
@@ -114,8 +155,8 @@ export interface ApiDepartment {
 
 export interface CreateDepartmentRequest {
   name: string;
-  employee_count?: number;
-  company: string;
+  company_id: string;
+  manager?: string;
 }
 
 export interface UpdateDepartmentRequest {
@@ -138,15 +179,30 @@ export interface ApiEvaluation {
   updated_at: string;
 }
 
-export type EvaluationType = 'ANNUAL' | 'QUARTERLY' | 'MONTHLY' | 'PROBATION';
+// Extended evaluation interface that matches the actual API response
+export interface ApiEvaluationResponse {
+  evaluation_id: string;
+  employee: string;
+  employee_id: string;
+  type: EvaluationType;
+  status: EvaluationStatus;
+  score: string;
+  reviewer: string;
+  reviewer_id: string;
+  period: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type EvaluationType = 'Annual' | 'Quarterly' | 'Optional';
 export type EvaluationStatus = 
-  | 'DRAFT' 
-  | 'PENDING_HOD' 
-  | 'PENDING_HR' 
-  | 'EMPLOYEE_REVIEW' 
-  | 'APPROVED' 
-  | 'REJECTED' 
-  | 'COMPLETED';
+  | 'Draft' 
+  | 'Pending HoD Approval' 
+  | 'Pending HR Approval' 
+  | 'Employee Review' 
+  | 'Approved' 
+  | 'Rejected' 
+  | 'Completed';
 
 export interface CreateEvaluationRequest {
   employee_id: string;
@@ -210,7 +266,7 @@ export interface ApiError {
 // Request Configuration
 export interface RequestConfig {
   headers?: Record<string, string>;
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
 }
 
 // Auth Headers

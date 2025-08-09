@@ -24,6 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard', name: 'Dashboard', icon: Home, roles: ['admin', 'hr', 'manager', 'employee'] },
     { id: 'employees', name: 'Employees', icon: Users, roles: ['admin', 'hr', 'manager'] },
     { id: 'evaluations', name: 'Evaluations', icon: BarChart3, roles: ['admin', 'hr', 'manager', 'employee'] },
+    { id: 'companies', name: 'Companies', icon: Building, roles: ['admin', 'hr'] },
     { id: 'departments', name: 'Departments', icon: Building, roles: ['admin', 'hr'] },
     { id: 'admin', name: 'Admin Tools', icon: Settings, roles: ['admin'] },
   ];
