@@ -22,7 +22,7 @@ interface Employee {
   avatar: string;
   department: string;
   position: string;
-  role: 'Admin' | 'HR' | 'Head-of-Dept' | 'Line Manager' | 'Employee';
+  role: 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP';
   managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management';
   status: 'active' | 'inactive' | 'default_active';
   companyName: string;

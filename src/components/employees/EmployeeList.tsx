@@ -26,7 +26,7 @@ interface Employee {
   avatar: string;
   department: string;
   position: string;
-  role: 'Admin' | 'HR' | 'Head-of-Dept' | 'Line Manager' | 'Employee';
+  role: 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP';
   managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management';
   status: 'Active' | 'Inactive';
   companyName: string;
@@ -58,7 +58,7 @@ const EmployeeList = () => {
     department: '',
     departmentId: '',
     position: '',
-    role: 'Employee' ,
+    role: 'EMP' ,
     managerialLevel: 'Individual Contributor',
     status: 'Active' ,
     companyName: 'Ninja',
@@ -85,7 +85,7 @@ const EmployeeList = () => {
       department: '',
       departmentId: '',
       position: '',
-      role: 'Employee',
+      role: 'EMP',
       managerialLevel: 'Individual Contributor',
       status: 'Active',
       companyName: 'Ninja',
@@ -142,7 +142,7 @@ const EmployeeList = () => {
       avatar: apiEmployee.avatar || '/placeholder.svg',
       department: apiEmployee.department.length > 0 ? apiEmployee.department[0] : '',
       position: apiEmployee.position,
-      role: apiEmployee.role as 'Admin' | 'HR' | 'Head-of-Dept' | 'Line Manager' | 'Employee',
+      role: apiEmployee.role as 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP',
       managerialLevel: apiEmployee.managerial_level as 'Individual Contributor' | 'Supervisory' | 'Middle Management',
       status: apiEmployee.status as 'Active' | 'Inactive',
       companyName: apiEmployee.company_name,
@@ -242,7 +242,7 @@ const EmployeeList = () => {
       avatar: '/placeholder.svg',
       department: 'Engineering',
       position: 'Senior Developer',
-      role: 'Employee',
+      role: 'EMP',
       managerialLevel: 'Individual Contributor',
       status: 'Active',
       companyName: 'Ninja',
@@ -276,7 +276,7 @@ const EmployeeList = () => {
       avatar: '/placeholder.svg',
       department: 'Sales',
       position: 'Sales Manager',
-      role: 'Line Manager',
+      role: 'LM',
       managerialLevel: 'Supervisory',
       status: 'Active',
       companyName: 'Ninja',
@@ -293,7 +293,7 @@ const EmployeeList = () => {
       avatar: '/placeholder.svg',
       department: 'Engineering',
       position: 'Frontend Developer',
-      role: 'Employee',
+      role: 'EMP',
       managerialLevel: 'Individual Contributor',
       status: 'Active',
       companyName: 'Ninja',
@@ -310,7 +310,7 @@ const EmployeeList = () => {
       avatar: '/placeholder.svg',
       department: 'Marketing',
       position: 'Marketing Specialist',
-      role: 'Employee',
+      role: 'EMP',
       managerialLevel: 'Individual Contributor',
       status: 'Inactive',
       companyName: 'Ninja',
@@ -606,7 +606,7 @@ const EmployeeList = () => {
           department: '',
           departmentId: '',
           position: '',
-          role: 'Employee' as const,
+          role: 'EMP' as const,
           managerialLevel: 'Individual Contributor' as const,
           status: 'Active' as const,
           companyName: 'Ninja',
@@ -676,7 +676,7 @@ const EmployeeList = () => {
           avatar: rowData['Profile Image'] || rowData['Avatar'] || '',
           department: departmentName,
           position: rowData['Position'] || '',
-          role: (rowData['Role'] || 'Employee') as 'Admin' | 'HR' | 'Head-of-Dept' | 'Line Manager' | 'Employee',
+          role: (rowData['Role'] || 'EMP') as 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP',
           managerialLevel: (rowData['Managerial Level'] || 'Individual Contributor') as 'Individual Contributor' | 'Supervisory' | 'Middle Management',
           companyName: companyName,
           status: (rowData['Status'] || 'Active') as 'Active' | 'Inactive',
@@ -1406,7 +1406,7 @@ const EmployeeList = () => {
                     <Label htmlFor="edit-role" className="text-sm font-medium">Role *</Label>
                     <Select 
                       value={editingEmployee.role}
-                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, role: value as 'Admin' | 'HR' | 'Head-of-Dept' | 'Line Manager' | 'Employee' } : null)}>
+                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, role: value as 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP' } : null)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>

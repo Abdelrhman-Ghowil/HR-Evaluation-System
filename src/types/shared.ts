@@ -1,7 +1,7 @@
 // Shared type definitions for the HR Evaluation system
 
 export interface Employee {
-  id: number;
+  id: string;
   name: string;
   position: string;
   department: string;
@@ -20,7 +20,7 @@ export interface EmployeeInput {
   avatar: string;
   department: string;
   position: string;
-  role: 'Admin' | 'HR' | 'Head-of-Dept' | 'Line Manager' | 'Employee';
+  role: 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP';
   managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management';
   status: 'Active' | 'Inactive';
   companyName: string;
@@ -28,8 +28,8 @@ export interface EmployeeInput {
 }
 
 export interface Evaluation {
-  id: number;
-  employee_id: number;
+  id: string;
+  employee_id: string;
   type: string;
   period: string;
   status: 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed';
@@ -51,8 +51,8 @@ export interface EvaluationInput {
 
 export interface Objective {
   id: number;
-  employee_id: number;
-  evaluation_id: number;
+  employee_id: string;
+  evaluation_id: string;
   title: string;
   description: string;
   target: number;
@@ -63,8 +63,8 @@ export interface Objective {
 
 export interface Competency {
   id: number;
-  employee_id: number;
-  evaluation_id: number;
+  employee_id: string;
+  evaluation_id: string;
   name: string;
   category: 'Core' | 'Leadership' | 'Functional';
   required_level: number;
@@ -76,7 +76,7 @@ export interface Competency {
 export interface Reviewer {
   id: string;
   name: string;
-  role: 'Line Manager' | 'Head-of-Dept' | 'HR';
+  role: 'LM' | 'HOD' | 'HR';
 }
 
 // Utility types for form handling

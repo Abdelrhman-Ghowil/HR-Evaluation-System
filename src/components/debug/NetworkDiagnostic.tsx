@@ -67,7 +67,7 @@ export const NetworkDiagnostic: React.FC = () => {
         'Login Test',
         true,
         'Login successful',
-        { userId: loginResult.user.id, role: loginResult.user.role }
+        { userId: loginResult.user.user_id, role: loginResult.user.role }
       );
     } catch (error: unknown) {
       addResult(

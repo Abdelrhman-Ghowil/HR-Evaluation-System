@@ -15,9 +15,12 @@ import {
   CreateDepartmentRequest,
   UpdateDepartmentRequest,
   ApiEvaluation,
-  ApiEvaluationResponse,
   CreateEvaluationRequest,
   UpdateEvaluationRequest,
+  ApiObjective,
+  ApiCompetency,
+  CreateCompetencyRequest,
+  UpdateCompetencyRequest,
   PaginatedResponse,
   EmployeeQueryParams,
   DepartmentQueryParams,
@@ -27,6 +30,8 @@ import {
 
 // Query Keys
 export const queryKeys = {
+  users: ['users'] as const,
+  user: (id: string) => ['users', id] as const,
   employees: ['employees'] as const,
   employee: (id: string) => ['employees', id] as const,
   companies: ['companies'] as const,
@@ -35,7 +40,8 @@ export const queryKeys = {
   department: (id: string) => ['departments', id] as const,
   evaluations: ['evaluations'] as const,
   evaluation: (id: string) => ['evaluations', id] as const,
-  user: (id: string) => ['users', id] as const,
+  objectives: (evaluationId: string) => ['objectives', evaluationId] as const,
+  competencies: (evaluationId: string) => ['competencies', evaluationId] as const,
 };
 
 // Authentication Hooks
@@ -99,6 +105,15 @@ export const useUpdateUser = (options?: UseMutationOptions<ApiUser, ApiError, { 
     onError: (error: ApiError) => {
       toast.error(error.message || 'Failed to update user');
     },
+    ...options,
+  });
+};
+
+export const useUsers = (options?: UseQueryOptions<ApiUser[], ApiError>) => {
+  return useQuery({
+    queryKey: queryKeys.users,
+    queryFn: () => apiService.getUsers(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
     ...options,
   });
 };
@@ -279,7 +294,7 @@ export const useUpdateDepartment = (options?: UseMutationOptions<ApiDepartment, 
 // Evaluation Hooks
 export const useEvaluations = (
   params?: EvaluationQueryParams,
-  options?: UseQueryOptions<PaginatedResponse<ApiEvaluationResponse>, ApiError>
+  options?: UseQueryOptions<PaginatedResponse<ApiEvaluation>, ApiError>
 ) => {
   return useQuery({
     queryKey: [...queryKeys.evaluations, params],
@@ -346,6 +361,138 @@ export const useDeleteEvaluation = (options?: UseMutationOptions<void, ApiError,
     },
     onError: (error: ApiError) => {
       toast.error(error.message || 'Failed to delete evaluation');
+    },
+    ...options,
+  });
+};
+
+// Objective hooks
+export const useObjectives = (
+  evaluationId: string,
+  options?: UseQueryOptions<ApiObjective[], ApiError>
+) => {
+  return useQuery({
+    queryKey: queryKeys.objectives(evaluationId),
+    queryFn: () => apiService.getObjectives(evaluationId),
+    enabled: !!evaluationId,
+    staleTime: 2 * 60 * 1000,
+    ...options,
+  });
+};
+
+export const useCreateObjective = (options?: UseMutationOptions<ApiObjective, ApiError, Omit<ApiObjective, 'objective_id' | 'created_at' | 'updated_at'>>) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (objectiveData: Omit<ApiObjective, 'objective_id' | 'created_at' | 'updated_at'>) => apiService.createObjective(objectiveData),
+    onSuccess: (data) => {
+      toast.success('Objective created successfully!');
+      if (data.evaluation_id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.objectives(data.evaluation_id) });
+      }
+    },
+    onError: (error: ApiError) => {
+      toast.error(error.message || 'Failed to create objective');
+    },
+    ...options,
+  });
+};
+
+export const useUpdateObjective = (options?: UseMutationOptions<ApiObjective, ApiError, { objectiveId: string; objectiveData: Partial<ApiObjective> }>) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ objectiveId, objectiveData }) => apiService.updateObjective(objectiveId, objectiveData),
+    onSuccess: (data, variables) => {
+      toast.success('Objective updated successfully!');
+      if (data.evaluation_id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.objectives(data.evaluation_id) });
+      }
+    },
+    onError: (error: ApiError) => {
+      toast.error(error.message || 'Failed to update objective');
+    },
+    ...options,
+  });
+};
+
+export const useDeleteObjective = (options?: UseMutationOptions<void, ApiError, { objectiveId: string; evaluationId: string }>) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ objectiveId }) => apiService.deleteObjective(objectiveId),
+    onSuccess: (_, variables) => {
+      toast.success('Objective deleted successfully!');
+      queryClient.invalidateQueries({ queryKey: queryKeys.objectives(variables.evaluationId) });
+    },
+    onError: (error: ApiError) => {
+      toast.error(error.message || 'Failed to delete objective');
+    },
+    ...options,
+  });
+};
+
+// Competency hooks
+export const useCompetencies = (
+  evaluationId: string,
+  options?: UseQueryOptions<ApiCompetency[], ApiError>
+) => {
+  return useQuery({
+    queryKey: queryKeys.competencies(evaluationId),
+    queryFn: () => apiService.getCompetencies(evaluationId),
+    enabled: !!evaluationId,
+    staleTime: 2 * 60 * 1000,
+    ...options,
+  });
+};
+
+export const useCreateCompetency = (options?: UseMutationOptions<ApiCompetency, ApiError, CreateCompetencyRequest>) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (competencyData: CreateCompetencyRequest) => apiService.createCompetency(competencyData),
+    onSuccess: (data) => {
+      toast.success('Competency created successfully!');
+      if (data.evaluation_id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.competencies(data.evaluation_id) });
+      }
+    },
+    onError: (error: ApiError) => {
+      toast.error(error.message || 'Failed to create competency');
+    },
+    ...options,
+  });
+};
+
+export const useUpdateCompetency = (options?: UseMutationOptions<ApiCompetency, ApiError, { competencyId: string; competencyData: UpdateCompetencyRequest }>) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ competencyId, competencyData }) => apiService.updateCompetency(competencyId, competencyData),
+    onSuccess: (data, variables) => {
+      toast.success('Competency updated successfully!');
+      if (data.evaluation_id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.competencies(data.evaluation_id) });
+      }
+    },
+    onError: (error: ApiError) => {
+      toast.error(error.message || 'Failed to update competency');
+    },
+    ...options,
+  });
+};
+
+export const useDeleteCompetency = (options?: UseMutationOptions<void, ApiError, { competencyId: string; evaluationId: string }>) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ competencyId }) => apiService.deleteCompetency(competencyId),
+    onSuccess: (_, variables) => {
+      toast.success('Competency deleted successfully!');
+      queryClient.invalidateQueries({ queryKey: queryKeys.competencies(variables.evaluationId) });
+    },
+    onError: (error: ApiError) => {
+      toast.error(error.message || 'Failed to delete competency');
     },
     ...options,
   });

@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
@@ -19,6 +20,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 shadow-sm">
@@ -90,7 +92,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/profile')}>
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </DropdownMenuItem>

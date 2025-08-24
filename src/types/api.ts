@@ -14,19 +14,20 @@ export interface LoginResponse {
 }
 
 export interface ApiUser {
-  id: string;
+  user_id: string;
   username: string;
   email: string;
+  password?: string;
   first_name: string;
   last_name: string;
   name: string;
   phone?: string;
   role: UserRole;
-  title?: string;
+  position?: string;
   avatar?: string;
 }
 
-export type UserRole = 'Admin' | 'HR' | 'Head-of-Dept' | 'Line Manager' | 'Employee';
+export type UserRole = 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP';
 
 // User Management Types
 export interface CreateUserRequest {
@@ -221,17 +222,20 @@ export interface UpdateEvaluationRequest {
 
 // Objective Types
 export interface ApiObjective {
-  id: string;
+  objective_id: string;
   evaluation_id: string;
+  employee_id: string;
   title: string;
   description: string;
+  target: number;
+  achieved: number;
   weight: number;
-  target?: number;
-  achieved?: number;
-  status?: ObjectiveStatus;
+  status: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export type ObjectiveStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+export type ObjectiveStatus = 'Not started' | 'In-progress' | 'Completed';
 
 export interface CreateObjectiveRequest {
   title: string;
@@ -239,6 +243,43 @@ export interface CreateObjectiveRequest {
   weight: number;
   target?: number;
   achieved?: number;
+}
+
+// Competency Types
+export interface ApiCompetency {
+  competence_id: string;
+  employee_id: string;
+  evaluation_id?: string;
+  name: string;
+  category: string;
+  required_level: number;
+  actual_level: number;
+  weight: number;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CompetencyCategory = 'Core' | 'Leadership' | 'Functional';
+
+export interface CreateCompetencyRequest {
+  employee_id: string;
+  evaluation_id?: string;
+  name: string;
+  category: string;
+  required_level: number;
+  actual_level: number;
+  weight: number;
+  description: string;
+}
+
+export interface UpdateCompetencyRequest {
+  name?: string;
+  category?: string;
+  required_level?: number;
+  actual_level?: number;
+  weight?: number;
+  description?: string;
 }
 
 // API Response Types
@@ -250,6 +291,8 @@ export interface ApiResponse<T> {
 }
 
 export interface PaginatedResponse<T> {
+  data(data: boolean): unknown;
+  data: boolean;
   count: number;
   next?: string;
   previous?: string;
@@ -298,4 +341,35 @@ export interface EvaluationQueryParams {
   period?: string;
   page?: number;
   page_size?: number;
+}
+
+// Weights Configuration Types
+export type WeightsConfigurationLevel = 'IC' | 'SUPERVISORY' | 'MIDDLE';
+
+export interface WeightsConfiguration {
+  level_name: string;
+  core_weight: number;
+  leadership_weight: number;
+  functional_weight: number;
+  competency_weight: number;
+  objective_weight: number;
+  scoring_rules?: ScoringRule[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ScoringRule {
+  min_score: number;
+  max_score: number;
+  grade: string;
+  description: string;
+}
+
+export interface UpdateWeightsConfigurationRequest {
+  core_weight: number;
+  leadership_weight: number;
+  functional_weight: number;
+  competency_weight: number;
+  objective_weight: number;
+  scoring_rules: ScoringRule[];
 }

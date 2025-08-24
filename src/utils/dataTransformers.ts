@@ -4,14 +4,30 @@ import { Employee, EmployeeInput, Evaluation, EvaluationInput } from '../types/s
 
 /**
  * Safely converts string ID to number with validation
+ * For UUID strings, we'll use a hash-based approach to generate a numeric ID
  */
 export const safeParseId = (id: string | number): number => {
   if (typeof id === 'number') return id;
+  
+  // First try to parse as integer (for backward compatibility)
   const parsed = parseInt(id, 10);
-  if (isNaN(parsed)) {
-    throw new Error(`Invalid ID format: ${id}`);
+  if (!isNaN(parsed)) {
+    return parsed;
   }
-  return parsed;
+  
+  // If it's a UUID or other string format, generate a hash-based numeric ID
+  if (typeof id === 'string' && id.trim()) {
+    // Simple hash function to convert string to number
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      const char = id.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash);
+  }
+  
+  throw new Error(`Invalid ID format: ${id}`);
 };
 
 /**
@@ -20,7 +36,7 @@ export const safeParseId = (id: string | number): number => {
 export const transformEmployeeForEvaluation = (employeeInput: EmployeeInput): Employee => {
   try {
     return {
-      id: safeParseId(employeeInput.id),
+      id: employeeInput.id, // Keep as string since we updated the Employee interface
       name: employeeInput.name,
       position: employeeInput.position,
       department: employeeInput.department,
@@ -38,10 +54,10 @@ export const transformEmployeeForEvaluation = (employeeInput: EmployeeInput): Em
 /**
  * Transforms EvaluationInput to Evaluation for EvaluationDetails component
  */
-export const transformEvaluationForDetails = (evaluationInput: EvaluationInput, employeeId: number): Evaluation => {
+export const transformEvaluationForDetails = (evaluationInput: EvaluationInput, employeeId: string): Evaluation => {
   try {
     return {
-      id: safeParseId(evaluationInput.id),
+      id: evaluationInput.id,
       employee_id: employeeId,
       type: evaluationInput.type,
       period: evaluationInput.period,

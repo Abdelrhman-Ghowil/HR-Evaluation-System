@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { Building2, Users, BarChart3, Building, Settings, Home, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Building2, Users, BarChart3, Building, Settings, Home, ChevronLeft, ChevronRight, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -23,9 +23,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const navigation = [
     { id: 'dashboard', name: 'Dashboard', icon: Home, roles: ['admin', 'hr', 'manager', 'employee'] },
     { id: 'employees', name: 'Employees', icon: Users, roles: ['admin', 'hr', 'manager'] },
-    { id: 'evaluations', name: 'Evaluations', icon: BarChart3, roles: ['admin', 'hr', 'manager', 'employee'] },
     { id: 'companies', name: 'Companies', icon: Building, roles: ['admin', 'hr'] },
     { id: 'departments', name: 'Departments', icon: Building, roles: ['admin', 'hr'] },
+    { id: 'profile', name: 'Profile', icon: User, roles: ['admin', 'hr', 'manager', 'employee'] },
     { id: 'admin', name: 'Admin Tools', icon: Settings, roles: ['admin'] },
   ];
 
@@ -123,7 +123,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {user.name}
               </p>
               <p className="text-xs text-gray-500 capitalize truncate">
-                {user.role} • {user.department}
+                {user.role}
               </p>
             </div>
           </div>

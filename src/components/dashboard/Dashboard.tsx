@@ -8,9 +8,12 @@ import EvaluationList from '../evaluations/EvaluationList';
 import CompanyList from '../companies/CompanyList';
 import DepartmentList from '../departments/DepartmentList';
 import AdminTools from '../admin/AdminTools';
+import WeightsConfiguration from '../admin/WeightsConfiguration';
+import UserManagement from '../admin/UserManagement';
 import DashboardHome from './DashboardHome';
+import ProfilePage from '../profile/ProfilePage';
 
-type ActiveView = 'dashboard' | 'employees' | 'evaluations' | 'companies' | 'departments' | 'admin';
+type ActiveView = 'dashboard' | 'employees' | 'evaluations' | 'companies' | 'departments' | 'admin' | 'weights-configuration' | 'user-management' | 'profile';
 
 const Dashboard = () => {
   const location = useLocation();
@@ -30,6 +33,12 @@ const Dashboard = () => {
         return 'departments';
       case '/admin':
         return 'admin';
+      case '/admin/weights-configuration':
+        return 'weights-configuration';
+      case '/admin/user-management':
+        return 'user-management';
+      case '/profile':
+        return 'profile';
       case '/dashboard':
       case '/':
       default:
@@ -42,6 +51,18 @@ const Dashboard = () => {
   const handleViewChange = (view: string) => {
     const path = view === 'dashboard' ? '/' : `/${view}`;
     navigate(path);
+  };
+
+  const handleNavigateToWeights = () => {
+    navigate('/admin/weights-configuration');
+  };
+
+  const handleNavigateToUserManagement = () => {
+    navigate('/admin/user-management');
+  };
+
+  const handleBackToAdmin = () => {
+    navigate('/admin');
   };
 
   const renderContent = () => {
@@ -57,7 +78,13 @@ const Dashboard = () => {
       case 'departments':
         return <DepartmentList />;
       case 'admin':
-        return <AdminTools />;
+        return <AdminTools onNavigateToWeights={handleNavigateToWeights} onNavigateToUserManagement={handleNavigateToUserManagement} />;
+      case 'weights-configuration':
+        return <WeightsConfiguration onBack={handleBackToAdmin} />;
+      case 'user-management':
+        return <UserManagement onBack={handleBackToAdmin} />;
+      case 'profile':
+        return <ProfilePage />;
       default:
         return <DashboardHome />;
     }
