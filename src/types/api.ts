@@ -25,6 +25,8 @@ export interface ApiUser {
   role: UserRole;
   position?: string;
   avatar?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type UserRole = 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP';
@@ -59,9 +61,13 @@ export interface UpdateUserRequest {
 // Employee Types
 export interface ApiEmployee {
   employee_id: string;
+  employee_code: string;
   name: string;
   email: string;
   phone: string;
+  country_code: string;
+  warnings: string[];
+  warnings_count: number;
   avatar: string;
   role: string;
   position: string;
@@ -69,11 +75,16 @@ export interface ApiEmployee {
   status: string;
   company_name: string;
   department: string[];
+  org_path: string;
+  direct_manager: string;
   join_date: string;
   created_at: string;
   updated_at: string;
   user_id: string;
   company_id: string;
+  job_type: string;
+  location: string;
+  branch: string;
 }
 
 export type ManagerialLevel = 'Individual Contributor' | 'Supervisory' | 'Middle Management';
@@ -92,11 +103,19 @@ export interface CreateEmployeeRequest {
     title?: string;
     phone?: string;
   };
+  employee_code: string;
+  country_code: string;
+  warnings?: string[];
   company_id: string;
   departments_ids: string[];
   managerial_level: string;
   status: string;
+  org_path?: string;
+  direct_manager?: string;
   join_date: string;
+  job_type: string;
+  location: string;
+  branch: string;
 }
 
 export interface UpdateEmployeeRequest {
@@ -112,11 +131,19 @@ export interface UpdateEmployeeRequest {
     title?: string;
     phone?: string;
   };
+  employee_code?: string;
+  country_code?: string;
+  warnings?: string[];
   company_id?: string;
   departments_ids?: string[];
   managerial_level?: string;
   status?: string;
+  org_path?: string;
+  direct_manager?: string;
   join_date?: string;
+  job_type?: string;
+  location?: string;
+  branch?: string;
 }
 
 // Company Types
@@ -138,8 +165,13 @@ export interface CreateCompanyRequest {
   name: string;
   industry?: string;
   size?: CompanySize;
-  description?: string;
-  website?: string;
+  address?: string;
+}
+
+export interface UpdateCompanyRequest {
+  name?: string;
+  industry?: string;
+  size?: CompanySize;
   address?: string;
 }
 
@@ -164,6 +196,33 @@ export interface UpdateDepartmentRequest {
   name?: string;
   employee_count?: number;
   manager?: string;
+}
+
+// Placement Types
+export interface ApiPlacement {
+  placement_id: string;
+  employee_id: string;
+  employee_name: string;
+  company_id: string;
+  company_name: string;
+  department_id: string;
+  department_name: string;
+  sub_department_id: string | null;
+  section_id: string | null;
+  sub_section_id: string | null;
+  sub_department_name: string | null;
+  section_name: string | null;
+  sub_section_name: string | null;
+  assigned_at: string;
+}
+
+export interface CreatePlacementRequest {
+  employee_id: string;
+  company_id: string;
+  department_id: string;
+  sub_department_id?: string;
+  section_id?: string;
+  sub_section_id?: string;
 }
 
 // Evaluation Types
@@ -238,11 +297,22 @@ export interface ApiObjective {
 export type ObjectiveStatus = 'Not started' | 'In-progress' | 'Completed';
 
 export interface CreateObjectiveRequest {
+  evaluation_id: string;
   title: string;
   description: string;
+  target: number;
+  achieved: number;
   weight: number;
+  status: string;
+}
+
+export interface UpdateObjectiveRequest {
+  title?: string;
+  description?: string;
   target?: number;
   achieved?: number;
+  weight?: number;
+  status?: string;
 }
 
 // Competency Types
@@ -291,8 +361,6 @@ export interface ApiResponse<T> {
 }
 
 export interface PaginatedResponse<T> {
-  data(data: boolean): unknown;
-  data: boolean;
   count: number;
   next?: string;
   previous?: string;
@@ -372,4 +440,89 @@ export interface UpdateWeightsConfigurationRequest {
   competency_weight: number;
   objective_weight: number;
   scoring_rules: ScoringRule[];
+}
+
+// Organizational Structure Types
+export interface ApiSubDepartment {
+  sub_department_id: string;
+  name: string;
+  employee_count: number;
+  manager: string;
+  department: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSubDepartmentRequest {
+  name: string;
+  department_id: string;
+  manager: string;
+}
+
+export interface UpdateSubDepartmentRequest {
+  name?: string;
+  department_id?: string;
+  manager?: string;
+}
+
+export interface ApiSection {
+  section_id: string;
+  name: string;
+  employee_count: number;
+  manager: string;
+  sub_department: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSectionRequest {
+  name: string;
+  sub_department_id: string;
+  manager?: string;
+}
+
+export interface UpdateSectionRequest {
+  name?: string;
+  sub_department_id?: string;
+  manager?: string;
+}
+
+export interface ApiSubSection {
+  sub_section_id: string;
+  name: string;
+  employee_count: number;
+  manager: string;
+  section: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSubSectionRequest {
+  name: string;
+  section_id: string;
+  manager_id?: string;
+}
+
+export interface UpdateSubSectionRequest {
+  name?: string;
+  section_id?: string;
+  manager_id?: string;
+}
+
+export interface SubDepartmentQueryParams {
+  department?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface SectionQueryParams {
+  sub_department?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface SubSectionQueryParams {
+  section?: string;
+  page?: number;
+  page_size?: number;
 }

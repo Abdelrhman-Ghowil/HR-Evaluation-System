@@ -179,8 +179,8 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
 
     try {
        if (editingObjective) {
-         // Update existing objective
-         const apiObjective: Partial<ApiObjective> = {
+         // Update existing objective using evaluation_id endpoint
+         const updateData = {
            title: objectiveForm.title!,
            description: objectiveForm.description!,
            target: objectiveForm.target!,
@@ -190,15 +190,15 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
          };
          await updateObjectiveMutation.mutateAsync({
            objectiveId: editingObjective.id,
-           objectiveData: apiObjective
+           evaluationId: evaluation.id,
+           objectiveData: updateData
          });
          // Explicitly refetch objectives to ensure UI updates immediately
          await refetchObjectives();
        } else {
          // Create new objective
-         const apiObjective: Omit<ApiObjective, 'objective_id' | 'created_at' | 'updated_at'> = {
+         const createData = {
            evaluation_id: evaluation.id,
-           employee_id: employee.id,
            title: objectiveForm.title!,
            description: objectiveForm.description!,
            target: objectiveForm.target!,
@@ -206,7 +206,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
            weight: objectiveForm.weight!,
            status: objectiveForm.status!
          };
-         await createObjectiveMutation.mutateAsync(apiObjective);
+         await createObjectiveMutation.mutateAsync(createData);
          // Explicitly refetch objectives to ensure UI updates immediately
          await refetchObjectives();
        }

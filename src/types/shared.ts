@@ -13,10 +13,13 @@ export interface Employee {
 
 export interface EmployeeInput {
   id: string;
+  employeeCode: string;
   name: string;
   email: string;
   phone: string;
-  countryCode?: string;
+  countryCode: string;
+  warnings: string[];
+  warningsCount: number;
   avatar: string;
   department: string;
   position: string;
@@ -24,7 +27,12 @@ export interface EmployeeInput {
   managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management';
   status: 'Active' | 'Inactive';
   companyName: string;
+  orgPath: string;
+  directManager: string;
   joinDate: string;
+  jobType: string;
+  location: string;
+  branch: string;
 }
 
 export interface Evaluation {

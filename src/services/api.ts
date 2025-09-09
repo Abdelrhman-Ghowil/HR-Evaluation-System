@@ -17,6 +17,8 @@ import {
   CreateEvaluationRequest,
   UpdateEvaluationRequest,
   ApiObjective,
+  CreateObjectiveRequest,
+  UpdateObjectiveRequest,
   ApiCompetency,
   CreateCompetencyRequest,
   UpdateCompetencyRequest,
@@ -29,7 +31,21 @@ import {
   EvaluationQueryParams,
   WeightsConfiguration,
   WeightsConfigurationLevel,
-  UpdateWeightsConfigurationRequest
+  UpdateWeightsConfigurationRequest,
+  ApiSubDepartment,
+  CreateSubDepartmentRequest,
+  UpdateSubDepartmentRequest,
+  SubDepartmentQueryParams,
+  ApiSection,
+  CreateSectionRequest,
+  UpdateSectionRequest,
+  SectionQueryParams,
+  ApiSubSection,
+  CreateSubSectionRequest,
+  UpdateSubSectionRequest,
+  SubSectionQueryParams,
+  ApiPlacement,
+  CreatePlacementRequest
 } from '../types/api';
 
 // Base API configuration
@@ -319,7 +335,25 @@ class ApiService {
   }
 
   async deleteCompany(companyId: string): Promise<void> {
-    await this.api.delete(`/api/org/companies/${companyId}/`);
+    await this.api.delete(`/companies/${companyId}`);
+  }
+
+  async importCompanies(file: File, dryRun: boolean = false): Promise<{ success: boolean; message: string; data?: any; errors?: any[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint = dryRun ? '/api/org/companies/import/?dry_run=true' : '/api/org/companies/import/';
+
+    try {
+      const response: AxiosResponse<{ success: boolean; message: string; data?: any; errors?: any[] }> = await this.api.post(endpoint, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
   }
 
   // Department methods
@@ -347,6 +381,87 @@ class ApiService {
 
   async deleteDepartment(departmentId: string): Promise<void> {
     await this.api.delete(`/api/org/departments/${departmentId}/`);
+  }
+
+  // Sub-Department methods
+  async getSubDepartments(params?: SubDepartmentQueryParams): Promise<PaginatedResponse<ApiSubDepartment>> {
+    const response: AxiosResponse<PaginatedResponse<ApiSubDepartment>> = await this.api.get('/api/org/sub-departments/', {
+      params,
+    });
+    return response.data;
+  }
+
+  async getSubDepartment(subDepartmentId: string): Promise<ApiSubDepartment> {
+    const response: AxiosResponse<ApiSubDepartment> = await this.api.get(`/api/org/sub-departments/${subDepartmentId}/`);
+    return response.data;
+  }
+
+  async createSubDepartment(subDepartmentData: CreateSubDepartmentRequest): Promise<ApiSubDepartment> {
+    const response: AxiosResponse<ApiSubDepartment> = await this.api.post('/api/org/sub-departments/', subDepartmentData);
+    return response.data;
+  }
+
+  async updateSubDepartment(subDepartmentId: string, subDepartmentData: UpdateSubDepartmentRequest): Promise<ApiSubDepartment> {
+    const response: AxiosResponse<ApiSubDepartment> = await this.api.patch(`/api/org/sub-departments/${subDepartmentId}/`, subDepartmentData);
+    return response.data;
+  }
+
+  async deleteSubDepartment(subDepartmentId: string): Promise<void> {
+    await this.api.delete(`/api/org/sub-departments/${subDepartmentId}/`);
+  }
+
+  // Section methods
+  async getSections(params?: SectionQueryParams): Promise<PaginatedResponse<ApiSection>> {
+    const response: AxiosResponse<PaginatedResponse<ApiSection>> = await this.api.get('/api/org/sections/', {
+      params,
+    });
+    return response.data;
+  }
+
+  async getSection(sectionId: string): Promise<ApiSection> {
+    const response: AxiosResponse<ApiSection> = await this.api.get(`/api/org/sections/${sectionId}/`);
+    return response.data;
+  }
+
+  async createSection(sectionData: CreateSectionRequest): Promise<ApiSection> {
+    const response: AxiosResponse<ApiSection> = await this.api.post('/api/org/sections/', sectionData);
+    return response.data;
+  }
+
+  async updateSection(sectionId: string, sectionData: UpdateSectionRequest): Promise<ApiSection> {
+    const response: AxiosResponse<ApiSection> = await this.api.patch(`/api/org/sections/${sectionId}/`, sectionData);
+    return response.data;
+  }
+
+  async deleteSection(sectionId: string): Promise<void> {
+    await this.api.delete(`/api/org/sections/${sectionId}/`);
+  }
+
+  // Sub-Section methods
+  async getSubSections(params?: SubSectionQueryParams): Promise<PaginatedResponse<ApiSubSection>> {
+    const response: AxiosResponse<PaginatedResponse<ApiSubSection>> = await this.api.get('/api/org/sub-sections/', {
+      params,
+    });
+    return response.data;
+  }
+
+  async getSubSection(subSectionId: string): Promise<ApiSubSection> {
+    const response: AxiosResponse<ApiSubSection> = await this.api.get(`/api/org/sub-sections/${subSectionId}/`);
+    return response.data;
+  }
+
+  async createSubSection(subSectionData: CreateSubSectionRequest): Promise<ApiSubSection> {
+    const response: AxiosResponse<ApiSubSection> = await this.api.post('/api/org/sub-sections/', subSectionData);
+    return response.data;
+  }
+
+  async updateSubSection(subSectionId: string, subSectionData: UpdateSubSectionRequest): Promise<ApiSubSection> {
+    const response: AxiosResponse<ApiSubSection> = await this.api.patch(`/api/org/sub-sections/${subSectionId}/`, subSectionData);
+    return response.data;
+  }
+
+  async deleteSubSection(subSectionId: string): Promise<void> {
+    await this.api.delete(`/api/org/sub-sections/${subSectionId}/`);
   }
 
   // Evaluation methods
@@ -378,29 +493,31 @@ class ApiService {
 
   // Objective methods
   async getObjectives(evaluationId: string): Promise<ApiObjective[]> {
-    const response = await this.api.get(`/api/objectives/?evaluation_id=${evaluationId}`);
+    const response: AxiosResponse<ApiObjective[] | PaginatedResponse<ApiObjective> | ApiResponse<ApiObjective[]>> = await this.api.get(`/api/objectives/?evaluation_id=${evaluationId}`);
     
-    // Check if response.data is an array or if it's wrapped in another structure
+    // Handle different response formats
     if (Array.isArray(response.data)) {
+      // Direct array response
       return response.data;
-    } else if (response.data && Array.isArray(response.data.results)) {
-      // Handle paginated response
+    } else if (response.data && 'results' in response.data && Array.isArray(response.data.results)) {
+      // Paginated response
       return response.data.results;
-    } else if (response.data && Array.isArray(response.data.data)) {
-      // Handle wrapped response
+    } else if (response.data && 'data' in response.data && Array.isArray(response.data.data)) {
+      // Wrapped response
       return response.data.data;
     } else {
-      // If no objectives found or unexpected structure, return empty array
+      // Unexpected format, return empty array
+      console.warn('Unexpected response format for objectives:', response.data);
       return [];
     }
   }
 
-  async createObjective(objectiveData: Omit<ApiObjective, 'objective_id' | 'created_at' | 'updated_at'>): Promise<ApiObjective> {
+  async createObjective(objectiveData: CreateObjectiveRequest): Promise<ApiObjective> {
     const response = await this.api.post('/api/objectives/', objectiveData);
     return response.data;
   }
 
-  async updateObjective(objectiveId: string, objectiveData: Partial<ApiObjective>): Promise<ApiObjective> {
+  async updateObjective(objectiveId: string, objectiveData: UpdateObjectiveRequest): Promise<ApiObjective> {
     const response = await this.api.patch(`/api/objectives/${objectiveId}/`, objectiveData);
     return response.data;
   }
@@ -508,6 +625,31 @@ class ApiService {
   async updateWeightsConfiguration(level: WeightsConfigurationLevel, configData: UpdateWeightsConfigurationRequest): Promise<WeightsConfiguration> {
     const response: AxiosResponse<WeightsConfiguration> = await this.api.put(`/api/weights-configuration/${level}`, configData);
     return response.data;
+  }
+
+  // Placement methods
+  async getPlacements(): Promise<ApiPlacement[]> {
+    const response: AxiosResponse<ApiPlacement[]> = await this.api.get('/api/org/placements/');
+    return response.data;
+  }
+
+  async getPlacement(placementId: string): Promise<ApiPlacement> {
+    const response: AxiosResponse<ApiPlacement> = await this.api.get(`/api/org/placements/${placementId}`);
+    return response.data;
+  }
+
+  async createPlacement(placementData: CreatePlacementRequest): Promise<ApiPlacement> {
+    const response: AxiosResponse<ApiPlacement> = await this.api.post('/api/org/placements/', placementData);
+    return response.data;
+  }
+
+  async updatePlacement(placementId: string, placementData: Partial<CreatePlacementRequest>): Promise<ApiPlacement> {
+    const response: AxiosResponse<ApiPlacement> = await this.api.put(`/api/org/placements/${placementId}`, placementData);
+    return response.data;
+  }
+
+  async deletePlacement(placementId: string): Promise<void> {
+    await this.api.delete(`/api/org/placements/${placementId}`);
   }
 }
 

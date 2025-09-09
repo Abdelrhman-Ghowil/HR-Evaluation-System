@@ -9,9 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, Plus, Edit, Mail, Phone, X, Search, Filter, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
+import { Users, Plus, Edit, Mail, Phone, X, Search, Filter, Trash2 } from 'lucide-react';
 import EmployeeDetails from './EmployeeDetails';
-import * as XLSX from 'xlsx';
 import { apiService } from '@/services/api';
 import { ApiEmployee, ApiDepartment, ApiCompany, UpdateEmployeeRequest } from '@/types/api';
 import { parsePhoneNumber, formatDate } from '@/utils/dataTransformers';
@@ -19,10 +18,13 @@ import { AnyARecord } from 'dns';
 
 interface Employee {
   id: string;
+  employeeCode: string;
   name: string;
   email: string;
   phone: string;
-  countryCode?: string;
+  countryCode: string;
+  warnings: string[];
+  warningsCount: number;
   avatar: string;
   department: string;
   position: string;
@@ -30,10 +32,15 @@ interface Employee {
   managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management';
   status: 'Active' | 'Inactive';
   companyName: string;
+  orgPath: string;
+  directManager: string;
   joinDate: string;
   company_id: string;
   departments_ids: string[];
   user_id: string;
+  jobType: string;
+  location: string;
+  branch: string;
 }
 
 const EmployeeList = () => {
@@ -54,6 +61,8 @@ const EmployeeList = () => {
     email: '',
     phone: '',
     countryCode: '+966',
+    employeeCode: '',
+    warnings: [] as string[],
     avatar: '',
     department: '',
     departmentId: '',
@@ -63,7 +72,12 @@ const EmployeeList = () => {
     status: 'Active' ,
     companyName: 'Ninja',
     companyId: '',
+    orgPath: '',
+    directManager: '',
     joinDate: new Date().toISOString().split('T')[0],
+    jobType: 'Full-time',
+    location: '',
+    branch: 'Office',
     username: '',
     password: 'Password123',
     firstName: '',
@@ -72,7 +86,7 @@ const EmployeeList = () => {
   });
 
   // Drag and drop state
-  const [isDragOver, setIsDragOver] = useState(false);
+
 
   // Clear auto-filled form data
   const clearAutoFilledData = () => {
@@ -81,6 +95,8 @@ const EmployeeList = () => {
       email: '',
       phone: '',
       countryCode: '+966',
+      employeeCode: '',
+      warnings: [] as string[],
       avatar: '',
       department: '',
       departmentId: '',
@@ -90,7 +106,12 @@ const EmployeeList = () => {
       status: 'Active',
       companyName: 'Ninja',
       companyId: '',
+      orgPath: '',
+      directManager: '',
       joinDate: new Date().toISOString().split('T')[0],
+      jobType: 'Full-time',
+      location: '',
+      branch: 'Office',
       username: '',
       password: 'Password123',
       firstName: '',
@@ -100,34 +121,9 @@ const EmployeeList = () => {
     setValidationErrors({});
   };
 
-  // Drag and drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      const file = files[0];
-      if (file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-          file.type === 'application/vnd.ms-excel') {
-        // Create a synthetic event to pass to handleExcelUpload
-        const syntheticEvent = {
-          target: { files: [file] }
-        } as unknown as React.ChangeEvent<HTMLInputElement>;
-        handleExcelUpload(syntheticEvent);
-      }
-    }
-  };
+
 
   // Transform API employee data to local Employee interface
   const transformApiEmployee = (apiEmployee: ApiEmployee): Employee => {
@@ -135,21 +131,29 @@ const EmployeeList = () => {
     
     return {
       id: apiEmployee.employee_id,
+      employeeCode: apiEmployee.employee_code,
       name: apiEmployee.name,
       email: apiEmployee.email,
       phone: phone,
-      countryCode: countryCode,
+      countryCode: apiEmployee.country_code || countryCode,
+      warnings: apiEmployee.warnings || [],
+      warningsCount: apiEmployee.warnings_count || 0,
       avatar: apiEmployee.avatar || '/placeholder.svg',
-      department: apiEmployee.department.length > 0 ? apiEmployee.department[0] : '',
+      department: apiEmployee.department && apiEmployee.department.length > 0 ? apiEmployee.department[0] : '',
       position: apiEmployee.position,
       role: apiEmployee.role as 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP',
       managerialLevel: apiEmployee.managerial_level as 'Individual Contributor' | 'Supervisory' | 'Middle Management',
       status: apiEmployee.status as 'Active' | 'Inactive',
       companyName: apiEmployee.company_name,
+      orgPath: apiEmployee.org_path || '',
+      directManager: apiEmployee.direct_manager || '',
       joinDate: apiEmployee.join_date,
       company_id: apiEmployee.company_id,
       departments_ids: [], // Will be populated from department names if needed
-      user_id: apiEmployee.user_id
+      user_id: apiEmployee.user_id,
+      jobType: apiEmployee.job_type || '',
+      location: apiEmployee.location || '',
+      branch: apiEmployee.branch || ''
     };
   };
 
@@ -486,6 +490,31 @@ const EmployeeList = () => {
           updateData.join_date = editingEmployee.joinDate;
         }
         
+        // Check new employee fields
+        if (editingEmployee.employeeCode !== originalEmployee.employeeCode) {
+          updateData.employee_code = editingEmployee.employeeCode;
+        }
+        
+        if (editingEmployee.orgPath !== originalEmployee.orgPath) {
+          updateData.org_path = editingEmployee.orgPath;
+        }
+        
+        if (editingEmployee.directManager !== originalEmployee.directManager) {
+          updateData.direct_manager = editingEmployee.directManager;
+        }
+        
+        if (editingEmployee.jobType !== originalEmployee.jobType) {
+          updateData.job_type = editingEmployee.jobType;
+        }
+        
+        if (editingEmployee.location !== originalEmployee.location) {
+          updateData.location = editingEmployee.location;
+        }
+        
+        if (editingEmployee.branch !== originalEmployee.branch) {
+          updateData.branch = editingEmployee.branch;
+        }
+        
         // Only make API call if there are changes
         if (Object.keys(updateData).length === 0) {
           console.log('No changes detected, skipping API call');
@@ -588,7 +617,15 @@ const EmployeeList = () => {
           departments_ids: newEmployee.departmentId ? [newEmployee.departmentId] : [],
           managerial_level: newEmployee.managerialLevel,
           status: newEmployee.status,
-          join_date: newEmployee.joinDate
+          join_date: newEmployee.joinDate,
+          employee_code: newEmployee.employeeCode,
+          country_code: newEmployee.countryCode,
+          warnings: newEmployee.warnings,
+          org_path: newEmployee.orgPath,
+          direct_manager: newEmployee.directManager,
+          job_type: newEmployee.jobType,
+          location: newEmployee.location,
+          branch: newEmployee.branch
         };
         
         await apiService.createEmployee(employeeData);
@@ -602,6 +639,8 @@ const EmployeeList = () => {
           email: '',
           phone: '',
           countryCode: '+966',
+          employeeCode: '',
+          warnings: [] as string[],
           avatar: '',
           department: '',
           departmentId: '',
@@ -611,7 +650,12 @@ const EmployeeList = () => {
           status: 'Active' as const,
           companyName: 'Ninja',
           companyId: '',
+          orgPath: '',
+          directManager: '',
           joinDate: new Date().toISOString().split('T')[0],
+          jobType: 'Full-time',
+          location: '',
+          branch: 'Office',
           username: '',
           password: 'Password123',
           firstName: '',
@@ -628,87 +672,7 @@ const EmployeeList = () => {
     }
   };
 
-  const handleExcelUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData: (string | number | undefined)[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-
-        if (jsonData.length < 2) {
-          alert('Excel file must contain at least a header row and one data row.');
-          return;
-        }
-
-        // Get the first row (headers) and first data row
-        const headers = jsonData[0];
-        const firstDataRow = jsonData[1];
-
-        // Create a mapping object from the first data row
-        const rowData: { [key: string]: string } = {};
-        headers.forEach((header: string, index: string | number) => {
-          rowData[header] = firstDataRow[index] || '';
-        });
-
-        // Map Excel columns to form fields
-        const fullName = rowData['Full Name'] || rowData['Name'] || '';
-        const nameParts = fullName.split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
-        
-        // Find department and company IDs from the loaded data
-        const departmentName = rowData['Department'] || '';
-        const companyName = rowData['Company Name'] || '';
-        const foundDepartment = departments.find(dept => dept.name.toLowerCase() === departmentName.toLowerCase());
-        const foundCompany = companies.find(comp => comp.name.toLowerCase() === companyName.toLowerCase());
-        
-        const mappedData = {
-          name: fullName,
-          email: rowData['Email Address'] || rowData['Email'] || '',
-          phone: rowData['Phone Number'] || rowData['Phone'] || '',
-          avatar: rowData['Profile Image'] || rowData['Avatar'] || '',
-          department: departmentName,
-          position: rowData['Position'] || '',
-          role: (rowData['Role'] || 'EMP') as 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP',
-          managerialLevel: (rowData['Managerial Level'] || 'Individual Contributor') as 'Individual Contributor' | 'Supervisory' | 'Middle Management',
-          companyName: companyName,
-          status: (rowData['Status'] || 'Active') as 'Active' | 'Inactive',
-          joinDate: rowData['Join Date'] ? new Date(rowData['Join Date']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          countryCode: '+966',
-          // New fields for API structure
-          username: rowData['Username'] || fullName.toLowerCase().replace(/\s+/g, ''),
-          firstName: rowData['First Name'] || firstName,
-          lastName: rowData['Last Name'] || lastName,
-          title: rowData['Title'] || rowData['Position'] || '',
-          password: rowData['Password'] || 'Password123',
-          departmentId: foundDepartment?.department_id || '',
-          companyId: foundCompany?.company_id || ''
-        };
-
-        // Update the form with the imported data
-        setNewEmployee(mappedData);
-        
-        // Clear any validation errors
-        setValidationErrors({});
-        
-        // Reset the file input
-        event.target.value = '';
-        
-        alert('Excel data imported successfully!');
-      } catch (error) {
-        console.error('Error reading Excel file:', error);
-        alert('Error reading Excel file. Please make sure it\'s a valid Excel file.');
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -752,64 +716,10 @@ const EmployeeList = () => {
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold">Add New Employee</DialogTitle>
-              <p className="text-sm text-gray-600">Fill in the employee details below or import from Excel</p>
+              <p className="text-sm text-gray-600">Fill in the employee details below</p>
             </DialogHeader>
             <div className="space-y-6 py-4">
-              {/* Excel Import Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium text-gray-900 border-b pb-2 flex-1">Import from Excel</h3>
-                </div>
-                <div 
-                  className={`bg-blue-50 border-2 border-dashed rounded-lg p-6 transition-colors ${
-                    isDragOver ? 'border-blue-400 bg-blue-100' : 'border-blue-200'
-                  }`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <div className="flex items-center space-x-4">
-                    <FileSpreadsheet className="h-8 w-8 text-blue-600" />
-                    <div className="flex-1">
-                      <h4 className="font-medium text-blue-900">Upload Excel File</h4>
-                      <p className="text-sm text-blue-700">Drag and drop an Excel file here or click to browse</p>
-                      <p className="text-xs text-blue-600 mt-1">
-                        Expected columns: Full Name, Email Address, Phone Number, Profile Image, Department, Position, Role, Managerial Level, Company Name, Status, Join Date
-                      </p>
-                    </div>
-                    <div className="flex flex-col space-y-2">
-                      <Input
-                        type="file"
-                        accept=".xlsx,.xls"
-                        onChange={handleExcelUpload}
-                        className="hidden"
-                        id="excel-upload"
-                      />
-                      <div className="flex space-x-2">
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          className="bg-white hover:bg-blue-50 cursor-pointer"
-                          onClick={() => document.getElementById('excel-upload')?.click()}
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Choose File
-                        </Button>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          className="bg-white hover:bg-red-50 text-red-600 border-red-200 hover:border-red-300"
-                          onClick={clearAutoFilledData}
-                          title="Clear auto-filled data"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
+
               {/* Personal Information Section */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Personal Information</h3>
@@ -1106,6 +1016,78 @@ const EmployeeList = () => {
                         <SelectItem value="Inactive">Inactive</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="employeeCode" className="text-sm font-medium">Employee Code</Label>
+                    <Input
+                      id="employeeCode"
+                      value={newEmployee.employeeCode || ''}
+                      onChange={(e) => setNewEmployee(prev => ({ ...prev, employeeCode: e.target.value }))}
+                      placeholder="Employee ID/Code"
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="jobType" className="text-sm font-medium">Job Type</Label>
+                    <Select 
+                      value={newEmployee.jobType} 
+                      onValueChange={(value) => setNewEmployee(prev => ({ ...prev, jobType: value }))}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select job type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Full-time">Full-time</SelectItem>
+                        <SelectItem value="Part-time">Part-time</SelectItem>
+                        <SelectItem value="Full-time Remote">Full-time Remote</SelectItem>
+                        <SelectItem value="Part-time Remote">Part-time Remote</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="location" className="text-sm font-medium">Location</Label>
+                    <Input
+                      id="location"
+                      value={newEmployee.location || ''}
+                      onChange={(e) => setNewEmployee(prev => ({ ...prev, location: e.target.value }))}
+                      placeholder="Work location"
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="branch" className="text-sm font-medium">Branch</Label>
+                    <Select 
+                      value={newEmployee.branch} 
+                      onValueChange={(value) => setNewEmployee(prev => ({ ...prev, branch: value }))}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select branch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Office">Office</SelectItem>
+                        <SelectItem value="Store">Store</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="orgPath" className="text-sm font-medium">Organization Path</Label>
+                    <Input
+                      id="orgPath"
+                      value={newEmployee.orgPath || ''}
+                      onChange={(e) => setNewEmployee(prev => ({ ...prev, orgPath: e.target.value }))}
+                      placeholder="Organizational hierarchy path"
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="directManager" className="text-sm font-medium">Direct Manager</Label>
+                    <Input
+                      id="directManager"
+                      value={newEmployee.directManager || ''}
+                      onChange={(e) => setNewEmployee(prev => ({ ...prev, directManager: e.target.value }))}
+                      placeholder="Manager's name"
+                      className="w-full"
+                    />
                   </div>
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="joinDate" className="text-sm font-medium">Join Date *</Label>
@@ -1481,6 +1463,78 @@ const EmployeeList = () => {
                     {editValidationErrors.joinDate && (
                       <p className="text-sm text-red-500">{editValidationErrors.joinDate}</p>
                     )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-employeeCode" className="text-sm font-medium">Employee Code</Label>
+                    <Input
+                      id="edit-employeeCode"
+                      value={editingEmployee.employeeCode || ''}
+                      onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, employeeCode: e.target.value } : null)}
+                      placeholder="Enter employee code"
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-jobType" className="text-sm font-medium">Job Type</Label>
+                    <Select 
+                      value={editingEmployee.jobType || 'Full-time'}
+                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, jobType: value } : null)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select job type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Full-time">Full-time</SelectItem>
+                        <SelectItem value="Part-time">Part-time</SelectItem>
+                        <SelectItem value="Full-time Remote">Full-time Remote</SelectItem>
+                        <SelectItem value="Part-time Remote">Part-time Remote</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-location" className="text-sm font-medium">Location</Label>
+                    <Input
+                      id="edit-location"
+                      value={editingEmployee.location || ''}
+                      onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, location: e.target.value } : null)}
+                      placeholder="Enter location"
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-branch" className="text-sm font-medium">Branch</Label>
+                    <Select 
+                      value={editingEmployee.branch || 'Office'}
+                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, branch: value } : null)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select branch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Office">Office</SelectItem>
+                        <SelectItem value="Store">Store</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-orgPath" className="text-sm font-medium">Organization Path</Label>
+                    <Input
+                      id="edit-orgPath"
+                      value={editingEmployee.orgPath || ''}
+                      onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, orgPath: e.target.value } : null)}
+                      placeholder="Enter organization path"
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-directManager" className="text-sm font-medium">Direct Manager</Label>
+                    <Input
+                      id="edit-directManager"
+                      value={editingEmployee.directManager || ''}
+                      onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, directManager: e.target.value } : null)}
+                      placeholder="Enter direct manager"
+                      className="w-full"
+                    />
                   </div>
                 </div>
               </div>

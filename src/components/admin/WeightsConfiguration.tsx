@@ -217,7 +217,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
             <div>
               <Label htmlFor="level">Level</Label>
               <Select value={selectedLevel} onValueChange={(value: WeightsConfigurationLevel) => setSelectedLevel(value)}>
-                <SelectTrigger>
+                <SelectTrigger id="level">
                   <SelectValue placeholder="Select a level" />
                 </SelectTrigger>
                 <SelectContent>

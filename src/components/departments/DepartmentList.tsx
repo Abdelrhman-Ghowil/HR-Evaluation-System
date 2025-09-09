@@ -6,11 +6,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building, Users, Plus } from 'lucide-react';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { Building, Users, Plus, Eye, Edit, Trash2 } from 'lucide-react';
 import { apiService } from '@/services/api';
-import { ApiDepartment, ApiCompany, CreateDepartmentRequest } from '@/types/api';
+import { ApiDepartment, ApiCompany, CreateDepartmentRequest, UpdateDepartmentRequest, ApiEmployee } from '@/types/api';
+import { useOrganizational } from '@/contexts/OrganizationalContext';
+import { useEmployees } from '@/hooks/useApi';
+import { useToast } from '@/hooks/use-toast';
 
-const DepartmentList = () => {
+interface DepartmentListProps {
+  onViewChange?: (view: string) => void;
+}
+
+const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
+  const { setDepartment } = useOrganizational();
+  const { toast } = useToast();
   const [departments, setDepartments] = useState<ApiDepartment[]>([]);
   const [companies, setCompanies] = useState<ApiCompany[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +33,16 @@ const DepartmentList = () => {
     company_id: '',
     manager: ''
   });
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState<ApiDepartment | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [departmentToDelete, setDepartmentToDelete] = useState<ApiDepartment | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Fetch employees for manager dropdown
+  const { data: employeesData } = useEmployees();
+  const employees = employeesData?.results || [];
 
   // Fetch departments from API
   const fetchDepartments = async () => {
@@ -149,6 +169,134 @@ const DepartmentList = () => {
     setIsAddModalOpen(open);
     if (!open) {
       setNewDepartment({ name: '', company_id: '', manager: '' });
+      setValidationErrors({});
+    }
+  };
+
+  // Handle edit department
+  const handleEditDepartment = (department: ApiDepartment) => {
+    // Convert empty manager to "no-manager" for the dropdown
+    const departmentForEdit = {
+      ...department,
+      manager: department.manager || 'no-manager'
+    };
+    setEditingDepartment(departmentForEdit);
+    setIsEditModalOpen(true);
+  };
+
+  // Handle update department
+  const handleUpdateDepartment = async () => {
+    if (!editingDepartment) return;
+
+    setIsUpdating(true);
+    setValidationErrors({});
+
+    try {
+      const updateData: UpdateDepartmentRequest = {
+        name: editingDepartment.name
+      };
+      
+      // Only include manager field if it's not 'no-manager'
+      if (editingDepartment.manager && editingDepartment.manager !== 'no-manager') {
+        updateData.manager = editingDepartment.manager;
+      }
+
+      const updatedDepartment = await apiService.updateDepartment(editingDepartment.department_id, updateData);
+      
+      // Update the department in the list
+      setDepartments(prev => prev.map(dept => 
+        dept.department_id === editingDepartment.department_id ? updatedDepartment : dept
+      ));
+      
+      // Close modal and reset state
+      setIsEditModalOpen(false);
+      setEditingDepartment(null);
+      
+      console.log('Department updated successfully:', updatedDepartment);
+    } catch (err: unknown) {
+      console.error('Error updating department:', err);
+      
+      // Handle specific API errors
+      if ((err as { details: unknown }).details && typeof (err as { details: unknown }).details === 'object') {
+        const apiErrors: {[key: string]: string} = {};
+        Object.keys((err as { details: unknown }).details).forEach(field => {
+          if (Array.isArray((err as { details: unknown }).details[field])) {
+            apiErrors[field] = (err as { details: unknown }).details[field][0];
+          } else {
+            apiErrors[field] = (err as { details: unknown }).details[field];
+          }
+        });
+        setValidationErrors(apiErrors);
+      } else {
+        const errorMessage = (err as { message: string }).message || 'Failed to update department. Please try again.';
+        setValidationErrors({ general: errorMessage });
+      }
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Handle delete department - open confirmation dialog
+  const handleDeleteDepartment = (department: ApiDepartment) => {
+    // Client-side validation: check if department has associated records
+    if (department.employee_count && department.employee_count > 0) {
+      toast({
+        title: "Cannot Delete Department",
+        description: `This department has ${department.employee_count} employee(s) assigned. Please reassign or remove employees before deleting.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setDepartmentToDelete(department);
+    setDeleteConfirmOpen(true);
+  };
+
+  // Confirm delete department
+  const confirmDeleteDepartment = async () => {
+    if (!departmentToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await apiService.deleteDepartment(departmentToDelete.department_id);
+      
+      // Remove the department from the list
+      setDepartments(prev => prev.filter(dept => dept.department_id !== departmentToDelete.department_id));
+      
+      toast({
+        title: "Success",
+        description: "Department deleted successfully",
+        variant: "default",
+      });
+      
+      console.log('Department deleted successfully:', departmentToDelete.name);
+    } catch (err: unknown) {
+      console.error('Error deleting department:', err);
+      const errorMessage = (err as { message: string }).message || 'Failed to delete department. Please try again.';
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmOpen(false);
+      setDepartmentToDelete(null);
+    }
+  };
+
+  // Cancel delete department
+  const cancelDeleteDepartment = () => {
+    setDeleteConfirmOpen(false);
+    setDepartmentToDelete(null);
+  };
+
+  // Reset edit form when modal closes
+  const handleEditModalClose = (open: boolean) => {
+    setIsEditModalOpen(open);
+    if (!open) {
+      setEditingDepartment(null);
       setValidationErrors({});
     }
   };
@@ -328,11 +476,170 @@ const DepartmentList = () => {
                   <p className="text-sm text-gray-600">Company</p>
                   <p className="font-medium text-gray-900">{department.company}</p>
                 </div>
+                <div className="pt-3 border-t space-y-2">
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 flex items-center gap-2"
+                      onClick={() => handleEditDepartment(department)}
+                    >
+                      <Edit className="h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => handleDeleteDepartment(department)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  </div>
+                  {onViewChange && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full flex items-center gap-2"
+                      onClick={() => {
+                        setDepartment(department);
+                        onViewChange('sub-departments');
+                      }}
+                    >
+                      <Eye className="h-4 w-4" />
+                      View Sub-Departments
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Edit Department Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={handleEditModalClose}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Department</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {validationErrors.general && (
+              <div className="text-red-600 text-sm bg-red-50 p-2 rounded">
+                {validationErrors.general}
+              </div>
+            )}
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-name" className="text-right">
+                Name
+              </Label>
+              <div className="col-span-3">
+                <Input
+                  id="edit-name"
+                  value={editingDepartment?.name || ''}
+                  onChange={(e) => setEditingDepartment(prev => 
+                    prev ? { ...prev, name: e.target.value } : null
+                  )}
+                  className={validationErrors.name ? 'border-red-500' : ''}
+                  placeholder="Enter department name"
+                />
+                {validationErrors.name && (
+                  <p className="text-red-600 text-sm mt-1">{validationErrors.name}</p>
+                )}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-company" className="text-right">
+                Company
+              </Label>
+              <div className="col-span-3">
+                <Select
+                  value={editingDepartment?.company || ''}
+                  onValueChange={(value) => setEditingDepartment(prev => 
+                    prev ? { ...prev, company: value } : null
+                  )}
+                >
+                  <SelectTrigger className={validationErrors.company ? 'border-red-500' : ''}>
+                    <SelectValue placeholder="Select a company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.company_id} value={company.name}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {validationErrors.company && (
+                  <p className="text-red-600 text-sm mt-1">{validationErrors.company}</p>
+                )}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-manager" className="text-right">
+                Manager
+              </Label>
+              <div className="col-span-3">
+                <Select
+                  value={editingDepartment?.manager || ''}
+                  onValueChange={(value) => setEditingDepartment(prev => 
+                    prev ? { ...prev, manager: value } : null
+                  )}
+                >
+                  <SelectTrigger className={validationErrors.manager ? 'border-red-500' : ''}>
+                    <SelectValue placeholder="Select a manager (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no-manager">No Manager</SelectItem>
+                    {employees.map((employee) => (
+                      <SelectItem key={employee.employee_id} value={employee.name}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {validationErrors.manager && (
+                  <p className="text-red-600 text-sm mt-1">{validationErrors.manager}</p>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-end space-x-2">
+            <Button 
+              variant="outline" 
+              onClick={() => handleEditModalClose(false)}
+              disabled={isUpdating}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpdateDepartment}
+              disabled={isUpdating || !editingDepartment?.name.trim()}
+            >
+              {isUpdating ? 'Updating...' : 'Update Department'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete Department"
+        description={`Are you sure you want to delete the department "${departmentToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete Department"
+        cancelText="Cancel"
+        onConfirm={confirmDeleteDepartment}
+        onCancel={cancelDeleteDepartment}
+        variant="destructive"
+        loading={isDeleting}
+      />
     </div>
   );
 };

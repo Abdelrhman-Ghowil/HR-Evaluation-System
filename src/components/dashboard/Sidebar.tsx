@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { Building2, Users, BarChart3, Building, Settings, Home, ChevronLeft, ChevronRight, User } from 'lucide-react';
+import { Building2, Users, BarChart3, Building, Settings, Home, ChevronLeft, ChevronRight, User, ChevronDown, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -19,14 +19,22 @@ const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse 
 }) => {
   const { user } = useAuth();
+  const [isDepartmentsOpen, setIsDepartmentsOpen] = useState(false);
 
   const navigation = [
     { id: 'dashboard', name: 'Dashboard', icon: Home, roles: ['admin', 'hr', 'manager', 'employee'] },
     { id: 'employees', name: 'Employees', icon: Users, roles: ['admin', 'hr', 'manager'] },
     { id: 'companies', name: 'Companies', icon: Building, roles: ['admin', 'hr'] },
-    { id: 'departments', name: 'Departments', icon: Building, roles: ['admin', 'hr'] },
+    { id: 'departments', name: 'Departments', icon: Building2, roles: ['admin', 'hr', 'manager'] },
+    { id: 'replacements', name: 'Replacements', icon: UserCheck, roles: ['admin', 'hr', 'manager'] },
     { id: 'profile', name: 'Profile', icon: User, roles: ['admin', 'hr', 'manager', 'employee'] },
     { id: 'admin', name: 'Admin Tools', icon: Settings, roles: ['admin'] },
+  ];
+
+  const departmentSubItems = [
+    { id: 'sub-departments', name: 'Sub-Departments', roles: ['admin', 'hr', 'manager'] },
+    { id: 'sections', name: 'Sections', roles: ['admin', 'hr', 'manager'] },
+    { id: 'sub-sections', name: 'Sub-Sections', roles: ['admin', 'hr', 'manager'] },
   ];
 
   const filteredNavigation = navigation.filter(item => 
@@ -62,7 +70,15 @@ const Sidebar: React.FC<SidebarProps> = ({
           variant="ghost"
           size="sm"
           onClick={onToggleCollapse}
-          className="p-1.5 h-auto"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onToggleCollapse();
+            }
+          }}
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!isCollapsed}
+          className="p-1.5 h-auto focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
         >
           {isCollapsed ? (
             <ChevronRight className="h-4 w-4" />
@@ -73,30 +89,93 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Navigation */}
-      <nav className="p-4 space-y-2">
-        {filteredNavigation.map((item) => {
+      <nav className="p-4 space-y-2" role="navigation" aria-label="Main navigation">
+        {filteredNavigation.map((item, index) => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
+          const isDepartments = item.id === 'departments';
           
           return (
-            <button
-              key={item.id}
-              onClick={() => onViewChange(item.id)}
-              className={cn(
-                "w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                isActive
-                  ? "bg-blue-50 text-blue-700 border border-blue-200"
-                  : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+            <div key={item.id}>
+              <button
+                onClick={() => {
+                  if (isDepartments) {
+                    setIsDepartmentsOpen(!isDepartmentsOpen);
+                  }
+                  onViewChange(item.id);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (isDepartments) {
+                      setIsDepartmentsOpen(!isDepartmentsOpen);
+                    }
+                    onViewChange(item.id);
+                  }
+                }}
+                tabIndex={0}
+                aria-label={`Navigate to ${item.name}`}
+                aria-expanded={isDepartments ? isDepartmentsOpen : undefined}
+                aria-haspopup={isDepartments ? 'true' : undefined}
+                className={cn(
+                  "w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                  isActive || (isDepartments && ['sub-departments', 'sections', 'sub-sections'].includes(activeView))
+                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <Icon className={cn(
+                  "h-5 w-5 flex-shrink-0",
+                  isActive || (isDepartments && ['sub-departments', 'sections', 'sub-sections'].includes(activeView)) ? "text-blue-600" : "text-gray-400"
+                )} />
+                {!isCollapsed && (
+                  <>
+                    <span className="truncate flex-1 text-left">{item.name}</span>
+                    {isDepartments && (
+                      <ChevronDown className={cn(
+                        "h-4 w-4 transition-transform duration-200",
+                        isDepartmentsOpen ? "rotate-180" : ""
+                      )} />
+                    )}
+                  </>
+                )}
+              </button>
+              
+              {/* Department Sub-items */}
+              {isDepartments && isDepartmentsOpen && !isCollapsed && user?.role && ['admin', 'hr', 'manager'].includes(user.role) && (
+                <div className="ml-8 mt-1 space-y-1" role="menu" aria-label="Department sub-menu">
+                  {departmentSubItems.filter(subItem => 
+                    user?.role && subItem.roles.includes(user.role)
+                  ).map((subItem) => {
+                    const isSubActive = activeView === subItem.id;
+                    
+                    return (
+                      <button
+                        key={subItem.id}
+                        onClick={() => onViewChange(subItem.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onViewChange(subItem.id);
+                          }
+                        }}
+                        tabIndex={0}
+                        role="menuitem"
+                        aria-label={`Navigate to ${subItem.name}`}
+                        className={cn(
+                          "w-full flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                          isSubActive
+                            ? "bg-blue-50 text-blue-700 border border-blue-200"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                        )}
+                      >
+                        <span className="truncate">{subItem.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
-            >
-              <Icon className={cn(
-                "h-5 w-5 flex-shrink-0",
-                isActive ? "text-blue-600" : "text-gray-400"
-              )} />
-              {!isCollapsed && (
-                <span className="truncate">{item.name}</span>
-              )}
-            </button>
+            </div>
           );
         })}
       </nav>

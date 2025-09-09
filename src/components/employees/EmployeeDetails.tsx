@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Calendar, User, BarChart3, FileText, Target, Plus, Edit, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, User, BarChart3, FileText, Target, Plus, Edit, Trash2, Loader2, Mail, Phone, MapPin, Building2, Users, Briefcase, Hash, Clock } from 'lucide-react';
 import EvaluationDetails from './EvaluationDetails';
 import { EmployeeInput, EvaluationInput } from '../../types/shared';
 import { useEvaluations, useCreateEvaluation, useUpdateEvaluation, useDeleteEvaluation, useUsers } from '../../hooks/useApi';
@@ -76,13 +76,15 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   console.log('Full evaluationsData object:', JSON.stringify(evaluationsData, null, 2));
 
   // Transform API data to match the expected format
-  const transformApiEvaluation = (apiEval: ApiEvaluation): EvaluationInput => {
-    console.log('Transforming API evaluation:', apiEval);
+  const transformApiEvaluation = (apiEval: any): EvaluationInput => {
+    // Handle both ApiEvaluation (id) and ApiEvaluationResponse (evaluation_id) formats
+    const evaluationId = apiEval.id || apiEval.evaluation_id;
     
     // Parse score safely
     let score: number | undefined;
     if (apiEval.score !== undefined) {
-      score = apiEval.score;
+      // Handle both number and string scores
+      score = typeof apiEval.score === 'string' ? parseFloat(apiEval.score) : apiEval.score;
     }
     
     // Parse reviewer_id safely
@@ -92,32 +94,22 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
       reviewer_id = isNaN(parsedReviewerId) ? undefined : parsedReviewerId;
     }
     
-    const transformed = {
-      id: apiEval.id,
+    return {
+      id: evaluationId,
       type: apiEval.type,
       period: apiEval.period,
       status: apiEval.status,
       score: score,
-      reviewer: reviewer_id ? 'Unknown' : undefined, // ApiEvaluation doesn't have reviewer name
+      reviewer: reviewer_id ? 'Unknown' : undefined,
       reviewer_id: reviewer_id,
       date: new Date(apiEval.created_at).toISOString().split('T')[0]
     };
-    
-    console.log('Transformed evaluation:', transformed);
-    return transformed;
   };
 
   // Get evaluation list from API data
   const evaluationList = useMemo(() => {
-    console.log('=== EVALUATION DATA DEBUG ===');
-    console.log('Raw evaluationsData:', evaluationsData);
-    console.log('evaluationsData type:', typeof evaluationsData);
-    console.log('evaluationsData.results:', evaluationsData?.results);
-    console.log('evaluationsData.results type:', typeof evaluationsData?.results);
-    console.log('evaluationsData.results length:', evaluationsData?.results?.length);
-    
     // Handle different possible response structures
-    let dataToTransform: ApiEvaluation[] = [];
+    let dataToTransform: any[] = [];
     
     if (evaluationsData?.results && Array.isArray(evaluationsData.results)) {
       dataToTransform = evaluationsData.results;
@@ -131,22 +123,14 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
       }
     }
     
-    console.log('Data to transform:', dataToTransform);
-    console.log('Data to transform length:', dataToTransform.length);
-    
     if (!dataToTransform || dataToTransform.length === 0) {
-       console.log('No evaluation data to transform');
        return [];
      }
     
     try {
-      const transformed = dataToTransform.map(transformApiEvaluation);
-      console.log('Transformed evaluations:', transformed);
-      console.log('Transformed evaluations length:', transformed.length);
-      return transformed;
+      return dataToTransform.map(transformApiEvaluation);
     } catch (error) {
       console.error('Error transforming evaluations:', error);
-      console.error('Error details:', error);
       return [];
     }
   }, [evaluationsData]);
@@ -425,62 +409,152 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
       </div>
 
       {/* Employee Info Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-4">
-            <Avatar className="h-16 w-16">
-              <AvatarImage src={employee.avatar} alt={employee.name} />
-              <AvatarFallback className="bg-blue-600 text-white text-xl">
-                {employee.name.split(' ').map(n => n[0]).join('')}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <CardTitle className="text-2xl">{employee.name}</CardTitle>
-              <p className="text-lg text-gray-600">{employee.position}</p>
-              <p className="text-sm text-gray-500 mb-2">{employee.companyName}</p>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                {/* <Badge variant={employee.status === 'Active' ? 'Active' : 'Inactive'}>
-                  {employee.status}
-                </Badge> */}
-                <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                  {employee.role}
-                </Badge>
-                <span className="text-sm text-gray-500">{employee.department}</span>
+      <Card className="overflow-hidden border-0 shadow-lg">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 pb-6">
+          <div className="flex items-start space-x-6">
+            <div className="relative">
+              <Avatar className="h-20 w-20 ring-4 ring-white shadow-lg">
+                <AvatarImage src={employee.avatar} alt={employee.name} />
+                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-2xl font-semibold">
+                  {employee.name.split(' ').map(n => n[0]).join('')}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full h-6 w-6 flex items-center justify-center">
+                <div className="bg-white rounded-full h-3 w-3"></div>
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between">
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="text-3xl font-bold text-gray-900 mb-2">{employee.name}</CardTitle>
+                  <p className="text-xl text-gray-700 font-medium mb-1">{employee.position}</p>
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Building2 className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm text-gray-600 font-medium">{employee.companyName}</span>
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center space-x-1">
+                      <Hash className="h-3 w-3 text-gray-500" />
+                      <span className="text-sm text-gray-600 font-mono">{employee.employeeCode}</span>
+                    </div>
+                    <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                      {employee.role}
+                    </Badge>
+                    <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+                      {employee.status}
+                    </Badge>
+                    <span className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded-md">{employee.department}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Email</p>
-              <a 
-                href={`mailto:${employee.email}`}
-                className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-              >
-                {employee.email}
-              </a>
+        <CardContent className="p-6">
+          {/* Contact Information Section */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <User className="h-5 w-5 mr-2 text-blue-500" />
+              Contact Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              <div className="flex items-center space-x-3 p-4 bg-blue-50 rounded-lg">
+                <Mail className="h-5 w-5 text-blue-500" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-700">Email Address</p>
+                  <a 
+                    href={`mailto:${employee.email}`}
+                    className="text-blue-600 hover:text-blue-800 hover:underline transition-colors font-medium truncate block"
+                  >
+                    {employee.email}
+                  </a>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg">
+                <Phone className="h-5 w-5 text-green-500" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-700">Phone Number</p>
+                  <a 
+                    href={generateWhatsAppUrl(employee.phone, employee.countryCode)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-600 hover:text-green-800 hover:underline transition-colors font-medium"
+                  >
+                    {formatPhoneNumber(employee.phone, employee.countryCode)}
+                  </a>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Phone</p>
-              <a 
-                href={generateWhatsAppUrl(employee.phone, employee.countryCode)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-green-600 hover:text-green-800 hover:underline transition-colors"
-              >
-                {formatPhoneNumber(employee.phone, employee.countryCode)}
-              </a>
+          </div>
+
+          {/* Work Information Section */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <Briefcase className="h-5 w-5 mr-2 text-purple-500" />
+              Work Information
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm font-medium text-gray-500 mb-1">Managerial Level</p>
+                <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-200">
+                  {employee.managerialLevel}
+                </Badge>
+              </div>
+              {employee.jobType && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-500 mb-1">Job Type</p>
+                  <div className="flex items-center space-x-2">
+                    <Briefcase className="h-4 w-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-900">{employee.jobType}</span>
+                  </div>
+                </div>
+              )}
+              {employee.location && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-500 mb-1">Location</p>
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="h-4 w-4 text-gray-600" />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">{employee.location}</span>
+                      {employee.branch && (
+                        <p className="text-xs text-gray-600">{employee.branch}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Managerial Level</p>
-              <Badge variant="outline" className="w-fit">
-                {employee.managerialLevel}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Join Date</p>
-              <p className="text-sm">{formatDate(employee.joinDate)}</p>
+          </div>
+
+          {/* Organization Information Section */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <Building2 className="h-5 w-5 mr-2 text-orange-500" />
+              Organization Details
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="p-4 bg-orange-50 rounded-lg">
+                <p className="text-sm font-medium text-gray-500 mb-1">Join Date</p>
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-4 w-4 text-orange-500" />
+                  <span className="text-sm font-medium text-gray-900">{formatDate(employee.joinDate)}</span>
+                </div>
+              </div>
+              {employee.orgPath && (
+                <div className="p-4 bg-orange-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-500 mb-1">Organization Path</p>
+                  <p className="text-sm text-gray-900 font-mono text-xs">{employee.orgPath}</p>
+                </div>
+              )}
+              {employee.directManager && (
+                <div className="p-4 bg-orange-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-500 mb-1">Direct Manager</p>
+                  <div className="flex items-center space-x-2">
+                    <Users className="h-4 w-4 text-orange-500" />
+                    <span className="text-sm font-medium text-gray-900">{employee.directManager}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
@@ -516,7 +590,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                         setNewEvaluation(prev => ({ ...prev, type: value, quarter: undefined }))
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id="type">
                         <SelectValue placeholder="Select evaluation type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -536,7 +610,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                         setNewEvaluation(prev => ({ ...prev, year: parseInt(value) }))
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id="year">
                         <SelectValue placeholder="Select year" />
                       </SelectTrigger>
                       <SelectContent>
@@ -559,7 +633,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                           setNewEvaluation(prev => ({ ...prev, quarter: parseInt(value) }))
                         }
                       >
-                        <SelectTrigger>
+                        <SelectTrigger id="quarter">
                           <SelectValue placeholder="Select quarter" />
                         </SelectTrigger>
                         <SelectContent>
@@ -793,7 +867,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                          status: value as 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed'
                        })}
                      >
-                       <SelectTrigger>
+                       <SelectTrigger id="edit-status">
                          <SelectValue />
                        </SelectTrigger>
                        <SelectContent>

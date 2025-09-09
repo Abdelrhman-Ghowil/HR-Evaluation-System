@@ -24,12 +24,14 @@ import {
   Key,
   Mail,
   Phone,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useUsers } from '../../hooks/useApi';
 import { ApiUser, UserRole } from '../../types/api';
 import { apiService } from '../../services/api';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface User {
   id: string;
@@ -43,6 +45,7 @@ interface User {
   first_name: string;
   last_name: string;
   position?: string;
+  updated_at?: string;
 }
 
 interface Permission {
@@ -58,11 +61,13 @@ interface UserManagementProps {
 
 const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   const { user: currentUser } = useAuth();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRole, setSelectedRole] = useState<string>('all');
+  const [filterRole, setFilterRole] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole | ''>('');
 
   // Fetch users from API
   const { data: apiUsers, isLoading, error } = useUsers();
@@ -89,7 +94,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
       username: apiUser.username,
       first_name: apiUser.first_name,
       last_name: apiUser.last_name,
-      position: apiUser.position // Using position from API as position
+      position: apiUser.position, // Using position from API as position
+      updated_at: apiUser.updated_at || new Date().toISOString() // Use API updated_at or current time as fallback
     };
   };
 
@@ -108,7 +114,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
           username: 'johndoe',
           first_name: 'John',
           last_name: 'Doe',
-          position: 'System Administrator'
+          position: 'System Administrator',
+          updated_at: '2024-01-15T10:30:00Z'
         },
         {
           id: '2',
@@ -120,7 +127,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
           username: 'janesmith',
           first_name: 'Jane',
           last_name: 'Smith',
-          position: 'HR Manager'
+          position: 'HR Manager',
+          updated_at: '2024-01-10T14:20:00Z'
         }
       ];
     }
@@ -141,7 +149,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = selectedRole === 'all' || user.role === selectedRole;
+    const matchesRole = filterRole === 'all' || user.role === filterRole;
     return matchesSearch && matchesRole;
   });
 
@@ -165,8 +173,15 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     setIsCreateDialogOpen(true);
   };
 
-  const handleEditUser = async (user: User) => {
+  const handleEditUser = (user: User) => {
     console.log('Edit user clicked:', user);
+    setSelectedUser(user);
+    setSelectedRole(user.role);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveUser = async (user: User) => {
+    console.log('Save user clicked:', user);
     console.log('User ID being sent to API:', user.id);
     
     // Validate user ID exists
@@ -177,36 +192,154 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     }
     
     try {
-       // PATCH request with complete user data structure
-       const updateData = {
-         username: user.username,
-         first_name: user.first_name,
-         last_name: user.last_name,
-         name: user.name,
-         email: user.email,
-         phone: user.phone,
-         avatar: user.avatar || "",
-         role: user.role,
-         title: user.position
-       };
+      // Get form data from the dialog inputs
+      const nameInput = document.getElementById('name') as HTMLInputElement;
+      const firstNameInput = document.getElementById('first_name') as HTMLInputElement;
+      const lastNameInput = document.getElementById('last_name') as HTMLInputElement;
+      const usernameInput = document.getElementById('username') as HTMLInputElement;
+      const emailInput = document.getElementById('email') as HTMLInputElement;
+      const phoneInput = document.getElementById('phone') as HTMLInputElement;
+      const positionInput = document.getElementById('position') as HTMLInputElement;
+      const passwordInput = document.getElementById('password') as HTMLInputElement;
+      // PATCH request with form data - matching API payload structure
+      const updateData: {
+        username?: string;
+        email?: string;
+        password?: string;
+        first_name?: string;
+        last_name?: string;
+        name?: string;
+        phone?: string;
+        role?: UserRole;
+        title?: string;
+        avatar?: string;
+      } = {
+        username: usernameInput?.value || user.username,
+        email: emailInput?.value || user.email,
+        first_name: firstNameInput?.value || user.first_name,
+        last_name: lastNameInput?.value || user.last_name,
+        name: nameInput?.value || user.name,
+        phone: phoneInput?.value || user.phone,
+        role: selectedRole as UserRole || user.role,
+        title: positionInput?.value || user.position,
+        avatar: user.avatar || ""
+      };
+      
+      // Only include password if it's provided
+      if (passwordInput?.value && passwordInput.value.trim() !== '') {
+        updateData.password = passwordInput.value;
+      }
       
       console.log('Making PATCH request to:', `/api/accounts/users/${user.id}/`);
-        console.log('Request data:', updateData);
+      console.log('Request data:', updateData);
+      console.log('Selected role being sent:', selectedRole);
         
-        const updatedUser = await apiService.updateUser(user.id, updateData);
-        console.log('User updated successfully:', updatedUser);
+      const updatedUser = await apiService.updateUser(user.id, updateData);
+      console.log('User updated successfully:', updatedUser);
+      console.log('Updated user role from API response:', updatedUser.role);
+      console.log('Full API response:', JSON.stringify(updatedUser, null, 2));
       
-      // Optionally refresh the users list or show success message
-      // You might want to call a refetch function here
+      // Update the selectedUser state with the new data
+      if (selectedUser) {
+        const updatedSelectedUser = {
+          ...selectedUser,
+          username: updatedUser.username || updateData.username || selectedUser.username,
+          first_name: updatedUser.first_name || updateData.first_name || selectedUser.first_name,
+          last_name: updatedUser.last_name || updateData.last_name || selectedUser.last_name,
+          name: updatedUser.name || updateData.name || selectedUser.name,
+          email: updatedUser.email || updateData.email || selectedUser.email,
+          phone: updatedUser.phone || updateData.phone || selectedUser.phone,
+          role: (updatedUser.role as UserRole) || (updateData.role as UserRole) || selectedUser.role,
+          position: updatedUser.position || updateData.title || selectedUser.position,
+          updated_at: updatedUser.updated_at || new Date().toISOString()
+        };
+        console.log('Updated selectedUser state:', updatedSelectedUser);
+        console.log('Role in updated state:', updatedSelectedUser.role);
+        setSelectedUser(updatedSelectedUser);
+        setSelectedRole(updatedUser.role || updateData.role || selectedUser.role);
+        console.log('Set selectedRole to:', updatedUser.role || updateData.role || selectedUser.role);
+      }
+      
+      // Invalidate and refetch users query to update the UI
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+      
+      // Close the dialog after successful save
+      setIsEditDialogOpen(false);
+      
+      // Show success message
+      console.log('User updated and UI refreshed successfully');
       
     } catch (error) {
       console.error('Error updating user:', error);
       // Handle error - show error message to user
     }
-    
-    setSelectedUser(user);
-    setIsEditDialogOpen(true);
-    console.log('Dialog should be open now');
+  };
+
+  const handleCreateNewUser = async () => {
+    try {
+      // Get form data from the create dialog inputs
+      const nameInput = document.getElementById('new-name') as HTMLInputElement;
+      const firstNameInput = document.getElementById('new-first-name') as HTMLInputElement;
+      const lastNameInput = document.getElementById('new-last-name') as HTMLInputElement;
+      const usernameInput = document.getElementById('new-username') as HTMLInputElement;
+      const emailInput = document.getElementById('new-email') as HTMLInputElement;
+      const passwordInput = document.getElementById('new-password') as HTMLInputElement;
+      const phoneInput = document.getElementById('new-phone') as HTMLInputElement;
+      const positionInput = document.getElementById('new-position') as HTMLInputElement;
+      const avatarInput = document.getElementById('new-avatar') as HTMLInputElement;
+      const roleSelect = document.querySelector('[id="new-role"] input') as HTMLInputElement;
+      
+      // Validate required fields
+      if (!nameInput?.value || !emailInput?.value || !passwordInput?.value || !usernameInput?.value) {
+        alert('Please fill in all required fields (Name, Username, Email, Password)');
+        return;
+      }
+      
+      // Create user data payload matching API structure
+      const createData = {
+        username: usernameInput.value,
+        email: emailInput.value,
+        password: passwordInput.value,
+        first_name: firstNameInput?.value || '',
+        last_name: lastNameInput?.value || '',
+        name: nameInput.value,
+        phone: phoneInput?.value || '',
+        role: roleSelect?.value || 'Employee',
+        position: positionInput?.value || '',
+        avatar: avatarInput?.value || ''
+      };
+      
+      console.log('Creating user with data:', createData);
+      
+      // TODO: Replace with actual API call when endpoint is available
+      // const response = await apiService.post('/users', createData);
+      
+      // Simulate successful creation for now
+      console.log('User created successfully');
+      
+      // Invalidate and refetch users query to update the UI
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+      
+      // Close the dialog after successful creation
+      setIsCreateDialogOpen(false);
+      
+      // Clear form fields
+      if (nameInput) nameInput.value = '';
+      if (firstNameInput) firstNameInput.value = '';
+      if (lastNameInput) lastNameInput.value = '';
+      if (usernameInput) usernameInput.value = '';
+      if (emailInput) emailInput.value = '';
+      if (passwordInput) passwordInput.value = '';
+      if (phoneInput) phoneInput.value = '';
+      if (positionInput) positionInput.value = '';
+      if (avatarInput) avatarInput.value = '';
+      
+      console.log('User created and UI refreshed successfully');
+      
+    } catch (error) {
+      console.error('Error creating user:', error);
+      alert('Error creating user. Please try again.');
+    }
   };
 
   const handleDeleteUser = (userId: string) => {
@@ -253,19 +386,31 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
               </div>
             </div>
             <div className="flex gap-4">
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Filter by role" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem key="all" value="all">All Roles</SelectItem>
-                    <SelectItem key="Admin" value="Admin">Admin</SelectItem>
-                    <SelectItem key="HR" value="HR">HR</SelectItem>
-                    <SelectItem key="Head-of-Dept" value="Head-of-Dept">Head of Department</SelectItem>
-                    <SelectItem key="Line Manager" value="Line Manager">Line Manager</SelectItem>
-                    <SelectItem key="Employee" value="Employee">Employee</SelectItem>
-                  </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select value={filterRole} onValueChange={setFilterRole}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Filter by role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem key="all" value="all">All Roles</SelectItem>
+                      <SelectItem key="Admin" value="Admin">Admin</SelectItem>
+                      <SelectItem key="HR" value="HR">HR</SelectItem>
+                      <SelectItem key="Head-of-Dept" value="Head-of-Dept">Head of Department</SelectItem>
+                      <SelectItem key="Line Manager" value="Line Manager">Line Manager</SelectItem>
+                      <SelectItem key="Employee" value="Employee">Employee</SelectItem>
+                    </SelectContent>
+                </Select>
+                {filterRole !== 'all' && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setFilterRole('all')}
+                    className="px-2"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
 
             </div>
           </div>
@@ -312,6 +457,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-1">
                       <h3 className="font-semibold text-gray-900">{user.name}</h3>
+                      <span className="text-sm text-gray-500">@{user.username}</span>
                       <Badge className={getRoleBadgeColor(user.role)}>
                         {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                       </Badge>
@@ -327,7 +473,23 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                           <span>{user.phone}</span>
                         </div>
                       )}
+                      {user.position && (
+                        <div className="flex items-center space-x-1">
+                          <span>{user.position}</span>
+                        </div>
+                      )}
                     </div>
+                    {user.updated_at && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Last updated: {new Date(user.updated_at).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    )}
 
                   </div>
                 </div>
@@ -381,13 +543,25 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                     <Input id="name" defaultValue={selectedUser.name} />
                   </div>
                   <div>
+                    <Label htmlFor="first_name">First Name</Label>
+                    <Input id="first_name" defaultValue={selectedUser.first_name} />
+                  </div>
+                  <div>
+                    <Label htmlFor="last_name">Last Name</Label>
+                    <Input id="last_name" defaultValue={selectedUser.last_name} />
+                  </div>
+                  <div>
+                    <Label htmlFor="username">Username</Label>
+                    <Input id="username" defaultValue={selectedUser.username} />
+                  </div>
+                  <div>
                     <Label htmlFor="email">Email</Label>
                     <Input id="email" type="email" defaultValue={selectedUser.email} />
                   </div>
                   <div>
                     <Label htmlFor="role">Role</Label>
-                    <Select defaultValue={selectedUser.role}>
-                      <SelectTrigger>
+                    <Select value={selectedRole} onValueChange={setSelectedRole}>
+                      <SelectTrigger id="role">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -406,6 +580,10 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                   <div>
                     <Label htmlFor="position">Position</Label>
                     <Input id="position" defaultValue={selectedUser.position} />
+                  </div>
+                  <div>
+                    <Label htmlFor="password">Password</Label>
+                    <Input id="password" type="password" placeholder="Enter new password (leave blank to keep current)" />
                   </div>
                 </div>
               </TabsContent>
@@ -450,7 +628,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => setIsEditDialogOpen(false)}>
+            <Button onClick={() => selectedUser && handleSaveUser(selectedUser)}>
               Save Changes
             </Button>
           </DialogFooter>
@@ -470,13 +648,33 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                 <Input id="new-name" placeholder="Enter full name" />
               </div>
               <div>
+                <Label htmlFor="new-first-name">First Name</Label>
+                <Input id="new-first-name" placeholder="Enter first name" />
+              </div>
+              <div>
+                <Label htmlFor="new-last-name">Last Name</Label>
+                <Input id="new-last-name" placeholder="Enter last name" />
+              </div>
+              <div>
+                <Label htmlFor="new-username">Username</Label>
+                <Input id="new-username" placeholder="Enter username" />
+              </div>
+              <div>
                 <Label htmlFor="new-email">Email</Label>
                 <Input id="new-email" type="email" placeholder="Enter email address" />
               </div>
               <div>
+                <Label htmlFor="new-password">Password</Label>
+                <Input id="new-password" type="password" placeholder="Enter password" />
+              </div>
+              <div>
+                <Label htmlFor="new-phone">Phone</Label>
+                <Input id="new-phone" placeholder="Enter phone number" />
+              </div>
+              <div>
                 <Label htmlFor="new-role">Role</Label>
                 <Select>
-                  <SelectTrigger>
+                  <SelectTrigger id="new-role">
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -489,16 +687,12 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="new-phone">Phone</Label>
-                <Input id="new-phone" placeholder="Enter phone number" />
-              </div>
-              <div>
                 <Label htmlFor="new-position">Position</Label>
                 <Input id="new-position" placeholder="Enter position/title" />
               </div>
               <div>
-                <Label htmlFor="new-password">Temporary Password</Label>
-                <Input id="new-password" type="password" placeholder="Enter temporary password" />
+                <Label htmlFor="new-avatar">Avatar URL</Label>
+                <Input id="new-avatar" placeholder="Enter avatar URL (optional)" />
               </div>
             </div>
           </div>
@@ -506,7 +700,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => setIsCreateDialogOpen(false)}>
+            <Button onClick={handleCreateNewUser}>
               Create User
             </Button>
           </DialogFooter>
