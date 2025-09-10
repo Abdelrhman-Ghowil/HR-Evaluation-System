@@ -356,6 +356,60 @@ class ApiService {
     }
   }
 
+  async importHierarchy(file: File, dryRun: boolean = false): Promise<{ success: boolean; message: string; data?: any; errors?: any[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint = dryRun ? '/api/org/companies/import-hierarchy/?dry_run=true' : '/api/org/companies/import-hierarchy/';
+
+    try {
+      const response: AxiosResponse<{ success: boolean; message: string; data?: any; errors?: any[] }> = await this.api.post(endpoint, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+  
+  async importPlacements(file: File, dryRun: boolean = false): Promise<{ success: boolean; message: string; data?: any; errors?: any[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint = dryRun ? '/api/org/placements/import-levels/?dry_run=true' : '/api/org/placements/import-levels/';
+
+    try {
+      const response: AxiosResponse<{ success: boolean; message: string; data?: any; errors?: any[] }> = await this.api.post(endpoint, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  async importEmployees(file: File, dryRun: boolean = false): Promise<{ success: boolean; message: string; data?: any; errors?: any[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint = dryRun ? '/api/employees/import/?dry_run=true/' : '/api/employees/import/';
+
+    try {
+      const response: AxiosResponse<{ success: boolean; message: string; data?: any; errors?: any[] }> = await this.api.post(endpoint, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
   // Department methods
   async getDepartments(params?: DepartmentQueryParams): Promise<PaginatedResponse<ApiDepartment>> {
     const response: AxiosResponse<PaginatedResponse<ApiDepartment>> = await this.api.get('/api/org/departments/', {

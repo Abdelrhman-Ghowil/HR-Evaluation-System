@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { Building, Users, Plus, Eye, Edit, Trash2 } from 'lucide-react';
+import { Building, Users, Plus, Eye, Edit, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { ApiDepartment, ApiCompany, CreateDepartmentRequest, UpdateDepartmentRequest, ApiEmployee } from '@/types/api';
 import { useOrganizational } from '@/contexts/OrganizationalContext';
@@ -39,6 +39,14 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [departmentToDelete, setDepartmentToDelete] = useState<ApiDepartment | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Import Excel state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [uploadMessage, setUploadMessage] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch employees for manager dropdown
   const { data: employeesData } = useEmployees();
@@ -301,6 +309,116 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
     }
   };
 
+  // File handling functions for import
+  const validateFile = (file: File): string | null => {
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+      'text/csv', // .csv
+      'application/csv' // .csv alternative
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      return 'Please select a valid Excel (.xlsx, .xls) or CSV (.csv) file.';
+    }
+    
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      return 'File size must be less than 50MB.';
+    }
+    
+    return null;
+  };
+
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const error = validateFile(file);
+      if (error) {
+        setUploadStatus('error');
+        setUploadMessage(error);
+        return;
+      }
+      setSelectedFile(file);
+      setUploadStatus('idle');
+      setUploadMessage('');
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      const error = validateFile(file);
+      if (error) {
+        setUploadStatus('error');
+        setUploadMessage(error);
+        return;
+      }
+      setSelectedFile(file);
+      setUploadStatus('idle');
+      setUploadMessage('');
+    }
+  };
+
+  const handleFileUpload = async (dryRun: boolean = false) => {
+    if (!selectedFile) return;
+
+    setUploadStatus('uploading');
+    setUploadMessage(dryRun ? 'Validating file...' : 'Uploading file...');
+
+    try {
+      const response = await apiService.importHierarchy(selectedFile, dryRun);
+      setUploadStatus('success');
+      
+      if (dryRun) {
+        setUploadMessage('File validation completed successfully! No errors found.');
+      } else {
+        setUploadMessage('Hierarchy imported successfully!');
+        // Refresh the departments list
+        await fetchDepartments();
+        
+        // Close modal after a short delay
+        setTimeout(() => {
+          resetImportModal();
+        }, 2000);
+      }
+    } catch (error: unknown) {
+      console.error('Error uploading file:', error);
+      setUploadStatus('error');
+      const errorMessage = (error as { message?: string }).message || (dryRun ? 'File validation failed. Please check your file format.' : 'Failed to import hierarchy. Please try again.');
+      setUploadMessage(errorMessage);
+    }
+  };
+
+  const resetImportModal = () => {
+    setIsImportModalOpen(false);
+    setSelectedFile(null);
+    setIsDragOver(false);
+    setUploadStatus('idle');
+    setUploadMessage('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -356,89 +474,336 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
           <h2 className="text-2xl font-bold text-gray-900">Departments</h2>
           <p className="text-gray-600">Manage organizational departments</p>
         </div>
-        <Dialog open={isAddModalOpen} onOpenChange={handleModalClose}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Department
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-semibold">Add New Department</DialogTitle>
-              <p className="text-sm text-gray-600">Create a new department for your organization</p>
-            </DialogHeader>
-            <div className="space-y-6 py-4">
-              {validationErrors.general && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                  <p className="text-sm text-red-600">{validationErrors.general}</p>
+        <div className="flex gap-3">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Import Hierarchy
+          </Button>
+          <Dialog open={isAddModalOpen} onOpenChange={handleModalClose}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Department
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-semibold">Add New Department</DialogTitle>
+                <p className="text-sm text-gray-600">Create a new department for your organization</p>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                {validationErrors.general && (
+                  <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                    <p className="text-sm text-red-600">{validationErrors.general}</p>
+                  </div>
+                )}
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="department-name" className="text-sm font-medium">Department Name *</Label>
+                    <Input
+                      id="department-name"
+                      placeholder="e.g., Human Resources, Engineering, Marketing"
+                      value={newDepartment.name}
+                      onChange={(e) => setNewDepartment(prev => ({ ...prev, name: e.target.value }))}
+                      className={validationErrors.name ? 'border-red-500' : ''}
+                    />
+                    {validationErrors.name && (
+                      <p className="text-sm text-red-500">{validationErrors.name}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="company" className="text-sm font-medium">Company *</Label>
+                    <Select
+                      value={newDepartment.company_id}
+                      onValueChange={(value) => setNewDepartment(prev => ({ ...prev, company_id: value }))}
+                    >
+                      <SelectTrigger className={validationErrors.company ? 'border-red-500' : ''}>
+                        <SelectValue placeholder="Select a company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.company_id} value={company.company_id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {validationErrors.company && (
+                      <p className="text-sm text-red-500">{validationErrors.company}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="manager" className="text-sm font-medium">Manager (Optional)</Label>
+                    <Input
+                      id="manager"
+                      placeholder="e.g., John Doe, jane.smith@company.com"
+                      value={newDepartment.manager || ''}
+                      onChange={(e) => setNewDepartment(prev => ({ ...prev, manager: e.target.value }))}
+                      className={validationErrors.manager ? 'border-red-500' : ''}
+                    />
+                    {validationErrors.manager && (
+                      <p className="text-sm text-red-500">{validationErrors.manager}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => handleModalClose(false)} disabled={isCreating}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateDepartment} disabled={isCreating}>
+                  {isCreating ? 'Creating...' : 'Create Department'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Import Excel Modal */}
+      <Dialog open={isImportModalOpen} onOpenChange={(open) => {
+        setIsImportModalOpen(open);
+        if (!open) resetImportModal();
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+              <FileSpreadsheet className="h-6 w-6 text-blue-600" />
+              Import Hierarchy File
+            </DialogTitle>
+            <p className="text-sm text-gray-600 mt-2">
+              Upload an Excel (.xlsx, .xls) or CSV file to import organizational hierarchy. You can validate your file first before importing.
+            </p>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* File Upload Area */}
+            <div
+              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer ${
+                isDragOver
+                  ? 'border-blue-500 bg-blue-50 scale-[1.02] shadow-lg'
+                  : selectedFile
+                  ? 'border-green-500 bg-green-50 shadow-md'
+                  : uploadStatus === 'error'
+                  ? 'border-red-300 bg-red-50'
+                  : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={handleFileSelect}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              
+              {selectedFile ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center">
+                    <div className="bg-green-100 p-4 rounded-full animate-pulse">
+                      <CheckCircle className="h-10 w-10 text-green-600" />
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border border-green-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <FileSpreadsheet className="h-8 w-8 text-green-600" />
+                        <div>
+                          <p className="text-lg font-medium text-gray-900 truncate max-w-xs">
+                            {selectedFile.name}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • {selectedFile.type.includes('sheet') ? 'Excel' : 'CSV'} File
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFile(null);
+                          setUploadStatus('idle');
+                          setUploadMessage('');
+                        }}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleFileSelect();
+                    }}
+                    className="bg-white hover:bg-gray-50 border-dashed"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Choose Different File
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-center">
+                    <div className={`p-4 rounded-full transition-colors ${
+                      isDragOver ? 'bg-blue-100' : 'bg-gray-100'
+                    }`}>
+                      <Upload className={`h-12 w-12 transition-colors ${
+                        isDragOver ? 'text-blue-600' : 'text-gray-400'
+                      }`} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xl font-medium text-gray-900">
+                      {isDragOver ? 'Drop your file here' : 'Drag and drop your file here'}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      or click to browse files from your computer
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-center gap-3">
+                    <Button
+                      onClick={handleFileSelect}
+                      className="bg-blue-600 hover:bg-blue-700 px-6 py-2"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Browse Files
+                    </Button>
+                    <p className="text-xs text-gray-400">
+                      Supported formats: .xlsx, .xls, .csv (Max 50MB)
+                    </p>
+                  </div>
                 </div>
               )}
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="department-name" className="text-sm font-medium">Department Name *</Label>
-                  <Input
-                    id="department-name"
-                    placeholder="e.g., Human Resources, Engineering, Marketing"
-                    value={newDepartment.name}
-                    onChange={(e) => setNewDepartment(prev => ({ ...prev, name: e.target.value }))}
-                    className={validationErrors.name ? 'border-red-500' : ''}
-                  />
-                  {validationErrors.name && (
-                    <p className="text-sm text-red-500">{validationErrors.name}</p>
-                  )}
+            </div>
+
+            {/* File Requirements */}
+            <div className="bg-gray-50 rounded-lg p-4 border">
+              <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-blue-600" />
+                File Requirements
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-gray-600">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  Excel (.xlsx, .xls) or CSV files
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="company" className="text-sm font-medium">Company *</Label>
-                  <Select
-                    value={newDepartment.company_id}
-                    onValueChange={(value) => setNewDepartment(prev => ({ ...prev, company_id: value }))}
-                  >
-                    <SelectTrigger className={validationErrors.company ? 'border-red-500' : ''}>
-                      <SelectValue placeholder="Select a company" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companies.map((company) => (
-                        <SelectItem key={company.company_id} value={company.company_id}>
-                          {company.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {validationErrors.company && (
-                    <p className="text-sm text-red-500">{validationErrors.company}</p>
-                  )}
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  Maximum file size: 50MB
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="manager" className="text-sm font-medium">Manager (Optional)</Label>
-                  <Input
-                    id="manager"
-                    placeholder="e.g., John Doe, jane.smith@company.com"
-                    value={newDepartment.manager || ''}
-                    onChange={(e) => setNewDepartment(prev => ({ ...prev, manager: e.target.value }))}
-                    className={validationErrors.manager ? 'border-red-500' : ''}
-                  />
-                  {validationErrors.manager && (
-                    <p className="text-sm text-red-500">{validationErrors.manager}</p>
-                  )}
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  Required columns: Company, Department, Manager
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  UTF-8 encoding recommended
                 </div>
               </div>
             </div>
-            
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => handleModalClose(false)} disabled={isCreating}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateDepartment} disabled={isCreating}>
-                {isCreating ? 'Creating...' : 'Create Department'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+
+            {/* Upload Status */}
+            {uploadMessage && (
+              <div className={`p-4 rounded-lg border-l-4 ${
+                uploadStatus === 'success' 
+                  ? 'bg-green-50 border-green-400 border border-green-200' 
+                  : uploadStatus === 'error'
+                  ? 'bg-red-50 border-red-400 border border-red-200'
+                  : 'bg-blue-50 border-blue-400 border border-blue-200'
+              }`}>
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    {uploadStatus === 'uploading' && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
+                    {uploadStatus === 'success' && <CheckCircle className="h-5 w-5 text-green-600" />}
+                    {uploadStatus === 'error' && <AlertCircle className="h-5 w-5 text-red-600" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${
+                      uploadStatus === 'success' 
+                        ? 'text-green-800' 
+                        : uploadStatus === 'error'
+                        ? 'text-red-800'
+                        : 'text-blue-800'
+                    }`}>
+                      {uploadStatus === 'uploading' ? 'Processing...' : 
+                       uploadStatus === 'success' ? 'Success!' : 'Error'}
+                    </p>
+                    <p className={`text-sm mt-1 ${
+                      uploadStatus === 'success' 
+                        ? 'text-green-700' 
+                        : uploadStatus === 'error'
+                        ? 'text-red-700'
+                        : 'text-blue-700'
+                    }`}>
+                      {uploadMessage}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+            <Button 
+              variant="outline" 
+              onClick={resetImportModal}
+              disabled={uploadStatus === 'uploading'}
+              className="order-3 sm:order-1"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => handleFileUpload(true)}
+              disabled={!selectedFile || uploadStatus === 'uploading'}
+              className="border-amber-500 text-amber-700 hover:bg-amber-50 hover:border-amber-600 order-2 sm:order-2 transition-all duration-200"
+            >
+              {uploadStatus === 'uploading' ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Validating...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Test Run (Validate Only)
+                </>
+              )}
+            </Button>
+            <Button 
+              onClick={() => handleFileUpload(false)}
+              disabled={!selectedFile || uploadStatus === 'uploading'}
+              className="bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-200 order-1 sm:order-3"
+            >
+              {uploadStatus === 'uploading' ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import Hierarchy
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {departments.length === 0 ? (
         <div className="flex items-center justify-center py-12">

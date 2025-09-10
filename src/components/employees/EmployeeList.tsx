@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, Plus, Edit, Mail, Phone, X, Search, Filter, Trash2 } from 'lucide-react';
+import { Users, Plus, Edit, Mail, Phone, X, Search, Filter, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import EmployeeDetails from './EmployeeDetails';
 import { apiService } from '@/services/api';
 import { ApiEmployee, ApiDepartment, ApiCompany, UpdateEmployeeRequest } from '@/types/api';
@@ -85,8 +85,13 @@ const EmployeeList = () => {
     title: ''
   });
 
-  // Drag and drop state
-
+  // Import functionality state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResults, setImportResults] = useState<{ success: boolean; message: string; data?: any; errors?: any[] } | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Clear auto-filled form data
   const clearAutoFilledData = () => {
@@ -172,6 +177,127 @@ const EmployeeList = () => {
       }
     } catch (error) {
       console.error('Error fetching departments:', error);
+    }
+  };
+
+  // File validation function
+  const validateFile = (file: File): boolean => {
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+      'text/csv', // .csv
+      'application/csv' // .csv (alternative MIME type)
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please select a valid Excel or CSV file (.xlsx, .xls, or .csv)');
+      return false;
+    }
+    
+    // Check file size (50MB limit)
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      alert('File size must be less than 50MB');
+      return false;
+    }
+    
+    return true;
+  };
+
+  // Drag and drop handlers
+  const handleDragOver = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    const file = files[0];
+    
+    if (file && validateFile(file)) {
+      setSelectedFile(file);
+    }
+  }, []);
+
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (validateFile(file)) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Handle dry run validation
+  const handleDryRun = async () => {
+    if (!selectedFile) return;
+
+    setIsImporting(true);
+    try {
+      const result = await apiService.importEmployees(selectedFile, true);
+      setImportResults(result);
+    } catch (error) {
+      console.error('Dry run failed:', error);
+      setImportResults({
+        success: false,
+        message: 'Validation failed. Please try again.',
+        errors: []
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Handle actual import
+  const handleActualImport = async () => {
+    if (!selectedFile) return;
+
+    setIsImporting(true);
+    try {
+      const result = await apiService.importEmployees(selectedFile, false);
+      setImportResults(result);
+      
+      if (result.success) {
+        fetchEmployees(); // Refresh the employees list
+      }
+    } catch (error) {
+      console.error('Import failed:', error);
+      setImportResults({
+        success: false,
+        message: 'Import failed. Please try again.',
+        errors: []
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Handle import modal close
+  const handleImportModalClose = () => {
+    setIsImportModalOpen(false);
+    setImportResults(null);
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -706,13 +832,22 @@ const EmployeeList = () => {
           <h2 className="text-2xl font-bold text-gray-900">Employee Management</h2>
           <p className="text-gray-600">Manage employee profiles and information</p>
         </div>
-        <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Employee
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-3">
+          <Button 
+            variant="outline" 
+            className="border-blue-600 text-blue-600 hover:bg-blue-50"
+            onClick={() => setIsImportModalOpen(true)}
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Import Excel/CSV
+          </Button>
+          <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Employee
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold">Add New Employee</DialogTitle>
@@ -1111,6 +1246,7 @@ const EmployeeList = () => {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Enhanced Filters */}
@@ -1549,6 +1685,164 @@ const EmployeeList = () => {
                 <Button onClick={handleSaveEdit}>Save Changes</Button>
               </div>
             </div>)}
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Modal */}
+      <Dialog open={isImportModalOpen} onOpenChange={handleImportModalClose}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-gray-900">
+              Import Employees from Excel
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* File Upload Area */}
+            <div className="space-y-4">
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  isDragOver
+                    ? 'border-green-400 bg-green-50'
+                    : selectedFile
+                    ? 'border-green-300 bg-green-50'
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                {selectedFile ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center">
+                      <div className="bg-green-100 p-3 rounded-full">
+                        <FileSpreadsheet className="h-8 w-8 text-green-600" />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-lg font-medium text-gray-900">{selectedFile.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRemoveFile}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Remove File
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center">
+                      <div className="bg-gray-100 p-3 rounded-full">
+                        <Upload className="h-8 w-8 text-gray-400" />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-lg font-medium text-gray-900">
+                        Drag and drop your Excel or CSV file here
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        or click to browse files
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={handleFileSelect}
+                      className="bg-white hover:bg-gray-50"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Choose File
+                    </Button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            {selectedFile && (
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleDryRun}
+                  disabled={isImporting}
+                  variant="outline"
+                  className="flex-1 border-blue-200 text-blue-700 hover:bg-blue-50"
+                >
+                  {isImporting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                  )}
+                  {isImporting ? 'Validating...' : 'Test Run (Validate Only)'}
+                </Button>
+                <Button
+                  onClick={handleActualImport}
+                  disabled={isImporting}
+                  className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                >
+                  {isImporting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  {isImporting ? 'Importing...' : 'Import Employees'}
+                </Button>
+              </div>
+            )}
+
+            {/* Results Display */}
+            {importResults && (
+              <div className={`rounded-lg p-4 ${
+                importResults.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <div className={`p-1 rounded-full ${
+                    importResults.success ? 'bg-green-100' : 'bg-red-100'
+                  }`}>
+                    {importResults.success ? (
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5 text-red-600" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className={`font-medium ${
+                      importResults.success ? 'text-green-800' : 'text-red-800'
+                    }`}>
+                      {importResults.message}
+                    </p>
+                    {importResults.errors && importResults.errors.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {importResults.errors.slice(0, 5).map((error, index) => (
+                          <p key={index} className="text-sm text-red-600">
+                            • {error}
+                          </p>
+                        ))}
+                        {importResults.errors.length > 5 && (
+                          <p className="text-sm text-red-600">
+                            ... and {importResults.errors.length - 5} more errors
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

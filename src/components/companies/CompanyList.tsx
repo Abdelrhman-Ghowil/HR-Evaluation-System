@@ -253,7 +253,7 @@ const CompanyList = () => {
     setIsDeleteModalOpen(open);
   };
 
-  // Handle Excel file import
+  // Handle Excel and CSV file import
   const handleImportClick = () => {
     setIsImportModalOpen(true);
     setImportResults(null);
@@ -263,11 +263,13 @@ const CompanyList = () => {
   const validateFile = (file: File): boolean => {
     const allowedTypes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-      'application/vnd.ms-excel' // .xls
+      'application/vnd.ms-excel', // .xls
+      'text/csv', // .csv
+      'application/csv' // .csv (alternative MIME type)
     ];
     
     if (!allowedTypes.includes(file.type)) {
-      alert('Please select a valid Excel file (.xlsx or .xls)');
+      alert('Please select a valid Excel or CSV file (.xlsx, .xls, or .csv)');
       return false;
     }
     
@@ -411,7 +413,7 @@ const CompanyList = () => {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx,.xls"
+            accept=".xlsx,.xls,.csv"
             onChange={handleFileChange}
             className="hidden"
           />
@@ -804,7 +806,7 @@ const CompanyList = () => {
                     </div>
                     <div>
                       <p className="text-lg font-medium text-gray-900">
-                        Drag and drop your Excel file here
+                        Drag and drop your Excel or CSV file here
                       </p>
                       <p className="text-sm text-gray-500 mt-1">
                         or click to browse files
@@ -819,7 +821,7 @@ const CompanyList = () => {
                       Choose File
                     </Button>
                     <p className="text-xs text-gray-400">
-                      Supports .xlsx and .xls files up to 50MB
+                      Supports .xlsx, .xls, and .csv files up to 50MB
                     </p>
                   </div>
                 )}
@@ -828,7 +830,7 @@ const CompanyList = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -946,13 +948,13 @@ const CompanyList = () => {
 
             {/* Help Text */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-blue-800 mb-2">Excel File Requirements:</h4>
+              <h4 className="text-sm font-medium text-blue-800 mb-2">File Requirements:</h4>
               <ul className="text-xs text-blue-700 space-y-1">
                 <li>• Required columns: Company Name, Company Code, Email</li>
                 <li>• Optional columns: Phone, Address, City, Country, Industry, Website, Description</li>
                 <li>• First row should contain column headers</li>
                 <li>• Maximum file size: 50MB</li>
-                <li>• Supported formats: .xlsx, .xls</li>
+                <li>• Supported formats: .xlsx, .xls, .csv</li>
               </ul>
             </div>
           </div>
