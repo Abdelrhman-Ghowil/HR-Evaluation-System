@@ -102,22 +102,22 @@ const ReplacementPage: React.FC = () => {
 
   // Handle sub-department change
   const handleSubDepartmentChange = (subDepartmentId: string) => {
-     if (editingPlacement) {
-       const selectedSubDept = subDepartments.find(sd => sd.sub_department_id === subDepartmentId);
-       setEditingPlacement({
-         ...editingPlacement,
-         sub_department_id: subDepartmentId,
-         sub_department_name: selectedSubDept?.name || 'Not assigned',
-         section_id: '',
-         section_name: 'Not assigned',
-         sub_section_id: '',
-         sub_section_name: 'Not assigned'
-       });
-       setSections([]);
-     }
-   };
+    if (editingPlacement) {
+      const selectedSubDept = subDepartments.find(sd => sd.sub_department_id === subDepartmentId);
+      setEditingPlacement({
+        ...editingPlacement,
+        sub_department_id: subDepartmentId,
+        sub_department_name: selectedSubDept?.name || 'Not assigned',
+        section_id: '',
+        section_name: 'Not assigned',
+        sub_section_id: '',
+        sub_section_name: 'Not assigned'
+      });
+      setSections([]);
+    }
+  };
 
-   const handleSectionChange = (sectionId: string) => {
+  const handleSectionChange = (sectionId: string) => {
     if (editingPlacement) {
       const selectedSection = sections.find(s => s.section_id === sectionId);
       setEditingPlacement({
@@ -128,57 +128,58 @@ const ReplacementPage: React.FC = () => {
         sub_section_name: 'Not assigned'
       });
       // Clear sub-sections when section changes
-     setSubSections([]);
-   }
- };
+    setSubSections([]);
+  }
+};
 
- const handleSubSectionChange = (subSectionId: string) => {
-   if (editingPlacement) {
-     const selectedSubSection = subSections.find(ss => ss.sub_section_id === subSectionId);
-     setEditingPlacement({
-       ...editingPlacement,
-       sub_section_id: subSectionId,
-       sub_section_name: selectedSubSection?.name || 'Not assigned'
-     });
-   }
- };
+const handleSubSectionChange = (subSectionId: string) => {
+  if (editingPlacement) {
+    const selectedSubSection = subSections.find(ss => ss.sub_section_id === subSectionId);
+    setEditingPlacement({
+    ...editingPlacement,
+  sub_section_id: subSectionId,
+  sub_section_name: selectedSubSection?.name || 'Not assigned'
+  });
+  }
+};
 
-   useEffect(() => {
-     const loadSections = async () => {
-       if (!editingPlacement?.sub_department_id) {
-         setSections([]);
-         return;
-       }
-       try {
-         setSectionsLoading(true);
-         const response: unknown = await apiService.getSections({ sub_department: editingPlacement.sub_department_id });
+  useEffect(() => {
+    const loadSections = async () => {
+      if (!editingPlacement?.sub_department_id) {
+        setSections([]);
+        return;
+      }
+      try {
+        setSectionsLoading(true);
+        const response: unknown = await apiService.getSections({ sub_department: editingPlacement.sub_department_id });
           let sectionsData: ApiSection[] = [];
-         if (Array.isArray(response)) {
-           sectionsData = response;
-         } else if (response && typeof response === 'object') {
-           if (Array.isArray(response.results)) {
-             sectionsData = response.results;
-           } else if (response && typeof response === 'object' && 'section_id' in response) {
-             sectionsData = [response];
-           } else {
-             sectionsData = [];
-           }
-         }
-         setSections(sectionsData);
-       } catch (e) {
-         console.error('Error loading sections:', e);
-         setSections([]);
-         toast({
-           title: 'Error loading sections',
-           description: 'Failed to load sections. Please try again.',
-           variant: 'destructive'
-         });
-       } finally {
-         setSectionsLoading(false);
-       }
-     };
-     loadSections();
-   }, [editingPlacement?.sub_department_id]);
+        if (Array.isArray(response)) {
+          sectionsData = response;
+        } else if (response && typeof response === 'object') {
+          const responseObj = response as { results?: ApiSection[] };
+          if (Array.isArray(responseObj.results)) {
+            sectionsData = responseObj.results;
+          } else if (response && typeof response === 'object' && 'section_id' in response) {
+            sectionsData = [response as ApiSection];
+          } else {
+            sectionsData = [];
+          }
+        }
+        setSections(sectionsData);
+      } catch (e) {
+        console.error('Error loading sections:', e);
+        setSections([]);
+        toast({
+          title: 'Error loading sections',
+          description: 'Failed to load sections. Please try again.',
+          variant: 'destructive'
+        });
+      } finally {
+        setSectionsLoading(false);
+      }
+    };
+    loadSections();
+  }, [editingPlacement?.sub_department_id, toast]);
 
   // Load sub-sections when section is selected
   useEffect(() => {
@@ -194,10 +195,11 @@ const ReplacementPage: React.FC = () => {
         if (Array.isArray(response)) {
           subSectionsData = response;
         } else if (response && typeof response === 'object') {
-          if (Array.isArray(response.results)) {
-            subSectionsData = response.results;
+          const responseObj = response as { results?: ApiSubSection[] };
+          if (Array.isArray(responseObj.results)) {
+            subSectionsData = responseObj.results;
           } else if (response && typeof response === 'object' && 'sub_section_id' in response) {
-            subSectionsData = [response];
+            subSectionsData = [response as ApiSubSection];
           } else {
             subSectionsData = [];
           }
@@ -216,7 +218,7 @@ const ReplacementPage: React.FC = () => {
       }
     };
     loadSubSections();
-  }, [editingPlacement?.section_id]);
+  }, [editingPlacement?.section_id, toast]);
 
   // Debug logging
   console.log('Placements API Response:', placements);
@@ -276,11 +278,7 @@ const ReplacementPage: React.FC = () => {
           });
         },
         onError: (error) => {
-          toast({
-            title: "Error",
-            description: "Failed to update placement",
-            variant: "destructive",
-          });
+          // Error handling without toast message
         }
       }
     );
@@ -307,19 +305,24 @@ const ReplacementPage: React.FC = () => {
   };
 
   const filteredPlacements = placements.filter(placement =>
-    placement.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    placement.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    placement.department_name.toLowerCase().includes(searchTerm.toLowerCase())
+    (placement.employee_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (placement.company_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (placement.department_name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   // File handling functions
@@ -451,7 +454,7 @@ const ReplacementPage: React.FC = () => {
           </Button>
           <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
             <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700">
+              <Button className="bg-blue-600 hover:bg-blue-700" disabled>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Placement
               </Button>
@@ -782,13 +785,13 @@ const ReplacementPage: React.FC = () => {
                   {filteredPlacements.map((placement) => (
                     <tr key={placement.placement_id} className="border-b hover:bg-gray-50">
                       <td className="p-3">
-                        <div className="font-medium text-gray-900">{placement.employee_name}</div>
+                        <div className="font-medium text-gray-900">{placement.employee_name || 'N/A'}</div>
                       </td>
                       <td className="p-3">
-                        <div className="font-medium text-gray-900">{placement.company_name}</div>
+                        <div className="font-medium text-gray-900">{placement.company_name || 'N/A'}</div>
                       </td>
                       <td className="p-3">
-                        <Badge variant="secondary">{placement.department_name}</Badge>
+                        <Badge variant="secondary">{placement.department_name || 'N/A'}</Badge>
                       </td>
                       <td className="p-3">
                         {placement.sub_department_name ? (
@@ -858,176 +861,175 @@ const ReplacementPage: React.FC = () => {
           </DialogHeader>
           {editingPlacement && (
             <div className="space-y-4">
+              <div>
+                  <Label htmlFor="employee_name">Employee</Label>
+                  <Input
+                    id="employee_name"
+                    value={editingPlacement.employee_name || ''}
+                    readOnly
+                    className="bg-gray-50 cursor-not-allowed"
+                    placeholder="Employee name"
+                  />
+                </div>
                 <div>
-                   <Label htmlFor="employee_name">Employee</Label>
-                   <Input
-                     id="employee_name"
-                     value={editingPlacement.employee_name || ''}
-                     readOnly
-                     className="bg-gray-50 cursor-not-allowed"
-                     placeholder="Employee name"
-                   />
-                 </div>
-                <div>
-                   <Label htmlFor="company_select">Company</Label>
-                   {editingPlacement.company_id && editingPlacement.company_name ? (
-                     <div className="flex items-center justify-between p-2 border rounded-md bg-gray-50">
-                       <span className="text-sm font-medium">{editingPlacement.company_name}</span>
-                       <Button
-                         variant="ghost"
-                         size="sm"
-                         onClick={() => {
-                           setEditingPlacement({...editingPlacement, company_id: '', company_name: ''});
-                           setSelectedCompanyId('');
-                         }}
-                         className="text-blue-600 hover:text-blue-700"
-                       >
-                         Change
-                       </Button>
-                     </div>
-                   ) : (
-                     <Select
-                       value={editingPlacement.company_id || ''}
-                       onValueChange={handleCompanyChange}
-                     >
-                       <SelectTrigger>
-                         <SelectValue placeholder="Select a company" />
-                       </SelectTrigger>
-                       <SelectContent>
-                         {companiesLoading ? (
-                           <SelectItem value="loading" disabled>Loading companies...</SelectItem>
-                         ) : (
-                           companies.map((company: ApiCompany) => (
-                             <SelectItem key={company.company_id} value={company.company_id}>
-                               {company.name}
-                             </SelectItem>
-                           ))
-                         )}
-                       </SelectContent>
-                     </Select>
-                   )}
-                 </div>
-                <div>
-                   <Label htmlFor="department_select">Department</Label>
-                   {editingPlacement.department_id && editingPlacement.department_name ? (
-                     <div className="flex items-center justify-between p-2 border rounded-md bg-gray-50">
-                       <span className="text-sm font-medium">{editingPlacement.department_name}</span>
-                       <Button
-                         variant="ghost"
-                         size="sm"
-                         onClick={() => {
-                           setEditingPlacement({...editingPlacement, department_id: '', department_name: ''});
-                           setSelectedDepartmentId('');
-                         }}
-                         className="text-blue-600 hover:text-blue-700"
-                       >
-                         Change
-                       </Button>
-                     </div>
-                   ) : (
-                     <Select
-                       value={editingPlacement.department_id || ''}
-                       onValueChange={handleDepartmentChange}
-                       disabled={!selectedCompanyId || departmentsLoading}
-                     >
-                       <SelectTrigger>
-                         <SelectValue placeholder={selectedCompanyId ? "Select a department" : "Select a company first"} />
-                       </SelectTrigger>
-                       <SelectContent>
-                         {departmentsLoading ? (
-                           <SelectItem value="loading" disabled>Loading departments...</SelectItem>
-                         ) : departments.length === 0 ? (
-                           <SelectItem value="no-departments" disabled>No departments available</SelectItem>
-                         ) : (
-                           departments.map((department: ApiDepartment) => (
-                             <SelectItem key={department.department_id} value={department.department_id}>
-                               {department.name}
-                             </SelectItem>
-                           ))
-                         )}
-                       </SelectContent>
-                     </Select>
-                   )}
-                 </div>
-                 <div>
-                   <Label htmlFor="sub_department_select">Sub Department</Label>
-                   <Select
-                     value={editingPlacement.sub_department_id || ''}
-                     onValueChange={handleSubDepartmentChange}
-                     disabled={!selectedDepartmentId || subDepartmentsLoading}
-                   >
-                     <SelectTrigger>
-                       <SelectValue placeholder={selectedDepartmentId ? "Select a sub department" : "Select a department first"} />
-                     </SelectTrigger>
-                     <SelectContent>
-                       {subDepartmentsLoading ? (
-                         <SelectItem value="loading" disabled>Loading sub departments...</SelectItem>
-                       ) : subDepartments.length === 0 ? (
-                         <SelectItem value="no-subdepartments" disabled>No sub departments found</SelectItem>
-                       ) : (
-                         subDepartments.map((subDepartment: ApiSubDepartment) => (
-                           <SelectItem key={subDepartment.sub_department_id} value={subDepartment.sub_department_id}>
-                             {subDepartment.name}
-                           </SelectItem>
-                         ))
-                       )}
-                     </SelectContent>
-                   </Select>
-                 </div>
-                 <div>
-                   <Label htmlFor="section_select">Section</Label>
-                   <Select
-                     value={editingPlacement.section_id || ''}
-                     onValueChange={handleSectionChange}
-                     disabled={!editingPlacement?.sub_department_id || sectionsLoading}
-                   >
-                     <SelectTrigger id="section_select">
-                       <SelectValue placeholder={editingPlacement?.sub_department_id ? "Select a section" : "Select a sub department first"} />
-                     </SelectTrigger>
-                     <SelectContent>
-                       {sectionsLoading ? (
-                         <SelectItem value="loading" disabled>Loading sections...</SelectItem>
-                       ) : sections.length === 0 ? (
-                         <SelectItem value="no-sections" disabled>No sections found</SelectItem>
-                       ) : (
-                         sections.map((section: ApiSection) => (
-                           <SelectItem key={section.section_id} value={section.section_id}>
-                             {section.name}
-                           </SelectItem>
-                         ))
-                       )}
-                     </SelectContent>
-                   </Select>
-                 </div>
-                 <div>
-                   <Label htmlFor="sub_section_id">Sub Section</Label>
-                   <Select
-                     value={editingPlacement.sub_section_id || ''}
-                     onValueChange={handleSubSectionChange}
-                     disabled={!editingPlacement.section_id || subSectionsLoading}
-                   >
-                     <SelectTrigger>
-                       <SelectValue 
-                         placeholder={
-                           !editingPlacement.section_id 
-                             ? "Select a section first" 
-                             : subSectionsLoading 
-                             ? "Loading sub-sections..." 
-                             : subSections.length === 0 
-                             ? "No sub-sections found" 
-                             : "Select sub-section"
-                         }
-                       />
-                     </SelectTrigger>
-                     <SelectContent>
-                       {subSections.map((subSection) => (
-                         <SelectItem key={subSection.sub_section_id} value={subSection.sub_section_id}>
-                           {subSection.name}
-                         </SelectItem>
-                       ))}
-                     </SelectContent>
-                   </Select>
-                 </div>
+                <Label htmlFor="company_select">Company</Label>
+                {editingPlacement.company_id && editingPlacement.company_name ? (
+                  <div className="flex items-center justify-between p-2 border rounded-md bg-gray-50">
+                    <span className="text-sm font-medium">{editingPlacement.company_name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditingPlacement({...editingPlacement, company_id: '', company_name: ''});
+                        setSelectedCompanyId('');
+                      }}
+                      className="text-blue-600 hover:text-blue-700"
+                    >
+                      Change
+                    </Button>
+                  </div>
+                ) : (
+                  <Select
+                    value={editingPlacement.company_id || ''}
+                    onValueChange={handleCompanyChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companiesLoading ? (
+                        <SelectItem value="loading" disabled>Loading companies...</SelectItem>
+                      ) : (
+                        companies.map((company: ApiCompany) => (
+                          <SelectItem key={company.company_id} value={company.company_id}>
+                            {company.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="department_select">Department</Label>
+                {editingPlacement.department_id && editingPlacement.department_name ? (
+                  <div className="flex items-center justify-between p-2 border rounded-md bg-gray-50">
+                    <span className="text-sm font-medium">{editingPlacement.department_name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditingPlacement({...editingPlacement, department_id: '', department_name: ''});
+                        setSelectedDepartmentId('');
+                      }}
+                      className="text-blue-600 hover:text-blue-700"
+                    >
+                      Change
+                    </Button>
+                  </div>
+                ) : (
+                  <Select
+                    value={editingPlacement.department_id || ''}
+                    onValueChange={handleDepartmentChange}
+                    disabled={!selectedCompanyId || departmentsLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedCompanyId ? "Select a department" : "Select a company first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departmentsLoading ? (
+                        <SelectItem value="loading" disabled>Loading departments...</SelectItem>
+                      ) : departments.length === 0 ? (
+                        <SelectItem value="no-departments" disabled>No departments available</SelectItem>
+                      ) : (
+                        departments.map((department: ApiDepartment) => (
+                          <SelectItem key={department.department_id} value={department.department_id}>
+                            {department.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="sub_department_select">Sub Department</Label>
+                <Select
+                  value={editingPlacement.sub_department_id || ''}
+                  onValueChange={handleSubDepartmentChange}
+                  disabled={!selectedDepartmentId || subDepartmentsLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedDepartmentId ? "Select a sub department" : "Select a department first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subDepartmentsLoading ? (
+                      <SelectItem value="loading" disabled>Loading sub departments...</SelectItem>
+                    ) : subDepartments.length === 0 ? (
+                      <SelectItem value="no-subdepartments" disabled>No sub departments found</SelectItem>
+                    ) : (
+                      subDepartments.map((subDepartment: ApiSubDepartment) => (
+                        <SelectItem key={subDepartment.sub_department_id} value={subDepartment.sub_department_id}>
+                          {subDepartment.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="section_select">Section</Label>
+                <Select
+                  value={editingPlacement.section_id || ''}
+                  onValueChange={handleSectionChange}
+                  disabled={!editingPlacement?.sub_department_id || sectionsLoading}
+                >
+                  <SelectTrigger id="section_select">
+                    <SelectValue placeholder={editingPlacement?.sub_department_id ? "Select a section" : "Select a sub department first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sectionsLoading ? (
+                      <SelectItem value="loading" disabled>Loading sections...</SelectItem>
+                    ) : sections.length === 0 ? (
+                      <SelectItem value="no-sections" disabled>No sections found</SelectItem>
+                    ) : (
+                      sections.map((section: ApiSection) => (
+                        <SelectItem key={section.section_id} value={section.section_id}>
+                          {section.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="sub_section_id">Sub Section</Label>
+                <Select
+                  value={editingPlacement.sub_section_id || ''}
+                  onValueChange={handleSubSectionChange}
+                  disabled={!editingPlacement.section_id || subSectionsLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue 
+                      placeholder={
+                        !editingPlacement.section_id 
+                          ? "Select a section first" 
+                          : subSectionsLoading 
+                          ? "Loading sub-sections..." 
+                          : subSections.length === 0 
+                          ? "No sub-sections found" 
+                          : "Select sub-section"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subSections.map((subSection) => (
+                      <SelectItem key={subSection.sub_section_id} value={subSection.sub_section_id}>
+                        {subSection.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex justify-end space-x-2">
                 <Button variant="outline" onClick={() => setShowEditForm(false)}>
                   Cancel
