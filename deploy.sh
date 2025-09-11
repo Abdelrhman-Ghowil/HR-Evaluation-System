@@ -4,7 +4,7 @@
 # This script ensures proper environment variables are set for production build
 
 echo "Setting up production environment variables..."
-export VITE_API_BASE_URL="https://hr-eval-sys.vercel.app"
+export VITE_API_BASE_URL="https://hr-eval-sys-git-feature-schema-v2-bd5633-mohs-projects-85795635.vercel.app/"
 export VITE_APP_ENV="production"
 export VITE_API_TIMEOUT="10000"
 
