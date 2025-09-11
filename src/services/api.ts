@@ -25,7 +25,7 @@ import {
 } from '../types/api';
 
 // Base API configuration
-const BASE_URL = import.meta.env.VITE_API_BASE_URL';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT || '10000', 10);
 
 class ApiService {
