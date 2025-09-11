@@ -19,7 +19,7 @@ This project uses environment-specific configuration files:
    ```json
    {
      "env": {
-       "VITE_API_BASE_URL": "https://hr-eval-sys.vercel.app",
+       "VITE_API_BASE_URL": "https://hr-eval-sys-git-feature-schema-v2-bd5633-mohs-projects-85795635.vercel.app/",
        "VITE_APP_ENV": "production"
      }
    }
@@ -29,7 +29,7 @@ This project uses environment-specific configuration files:
    - Go to your Vercel project dashboard
    - Navigate to Settings → Environment Variables
    - Add the following variables:
-     - `VITE_API_BASE_URL` = `https://hr-eval-sys.vercel.app`
+     - `VITE_API_BASE_URL` = `https://hr-eval-sys-git-feature-schema-v2-bd5633-mohs-projects-85795635.vercel.app/`
      - `VITE_APP_ENV` = `production`
      - `VITE_API_TIMEOUT` = `10000`
 

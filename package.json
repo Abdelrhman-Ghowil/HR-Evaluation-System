@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:prod": "cross-env VITE_API_BASE_URL=https://hr-eval-sys.vercel.app VITE_APP_ENV=production VITE_API_TIMEOUT=10000 vite build",
+    "build:prod": "cross-env VITE_API_BASE_URL=https://hr-eval-sys-git-feature-schema-v2-bd5633-mohs-projects-85795635.vercel.app/ VITE_APP_ENV=production VITE_API_TIMEOUT=10000 vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"
