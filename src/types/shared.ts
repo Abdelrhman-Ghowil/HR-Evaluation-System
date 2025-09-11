@@ -1,35 +1,43 @@
 // Shared type definitions for the HR Evaluation system
 
 export interface Employee {
-  id: number;
+  id: string;
   name: string;
   position: string;
   department: string;
   email: string;
   phone: string;
   hire_date: string;
-  status: 'active' | 'inactive';
+  status: 'Active' | 'Inactive';
 }
 
 export interface EmployeeInput {
   id: string;
+  employeeCode: string;
   name: string;
   email: string;
   phone: string;
-  countryCode?: string;
+  countryCode: string;
+  warnings: string[];
+  warningsCount: number;
   avatar: string;
   department: string;
   position: string;
-  role: 'Admin' | 'HR' | 'HOD' | 'LM' | 'Employee';
-  managerialWeight: 'Supervisory' | 'Middle Management' | 'IC';
-  status: 'active' | 'inactive';
+  role: 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP';
+  managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management';
+  status: 'Active' | 'Inactive';
   companyName: string;
+  orgPath: string;
+  directManager: string;
   joinDate: string;
+  jobType: string;
+  location: string;
+  branch: string;
 }
 
 export interface Evaluation {
-  id: number;
-  employee_id: number;
+  id: string;
+  employee_id: string;
   type: string;
   period: string;
   status: 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed';
@@ -51,8 +59,8 @@ export interface EvaluationInput {
 
 export interface Objective {
   id: number;
-  employee_id: number;
-  evaluation_id: number;
+  employee_id: string;
+  evaluation_id: string;
   title: string;
   description: string;
   target: number;
@@ -63,8 +71,8 @@ export interface Objective {
 
 export interface Competency {
   id: number;
-  employee_id: number;
-  evaluation_id: number;
+  employee_id: string;
+  evaluation_id: string;
   name: string;
   category: 'Core' | 'Leadership' | 'Functional';
   required_level: number;

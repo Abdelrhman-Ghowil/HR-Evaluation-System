@@ -9,13 +9,12 @@ interface User {
   name: string;
   email: string;
   role: 'admin' | 'hr' | 'manager' | 'employee';
-  department: string;
   avatar?: string;
   username?: string;
   first_name?: string;
   last_name?: string;
   phone?: string;
-  title?: string;
+  position?: string;
 }
 
 // Helper function to map API user role to local role
@@ -38,17 +37,16 @@ const mapApiRoleToLocalRole = (apiRole: UserRole): User['role'] => {
 // Helper function to convert API user to local user format
 const convertApiUserToLocalUser = (apiUser: ApiUser): User => {
   return {
-    id: apiUser.id,
+    id: apiUser.user_id,
     name: apiUser.name || `${apiUser.first_name} ${apiUser.last_name}`.trim(),
     email: apiUser.email,
     role: mapApiRoleToLocalRole(apiUser.role),
-    department: apiUser.title || 'Unknown', // Using title as department for now
     avatar: apiUser.avatar,
     username: apiUser.username,
     first_name: apiUser.first_name,
     last_name: apiUser.last_name,
     phone: apiUser.phone,
-    title: apiUser.title,
+    position: apiUser.position,
   };
 };
 

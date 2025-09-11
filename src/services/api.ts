@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import {
   LoginRequest,
@@ -15,13 +16,36 @@ import {
   ApiEvaluation,
   CreateEvaluationRequest,
   UpdateEvaluationRequest,
+  ApiObjective,
+  CreateObjectiveRequest,
+  UpdateObjectiveRequest,
+  ApiCompetency,
+  CreateCompetencyRequest,
+  UpdateCompetencyRequest,
   ApiResponse,
   PaginatedResponse,
   ApiError,
   AuthHeaders,
   EmployeeQueryParams,
   DepartmentQueryParams,
-  EvaluationQueryParams
+  EvaluationQueryParams,
+  WeightsConfiguration,
+  WeightsConfigurationLevel,
+  UpdateWeightsConfigurationRequest,
+  ApiSubDepartment,
+  CreateSubDepartmentRequest,
+  UpdateSubDepartmentRequest,
+  SubDepartmentQueryParams,
+  ApiSection,
+  CreateSectionRequest,
+  UpdateSectionRequest,
+  SectionQueryParams,
+  ApiSubSection,
+  CreateSubSectionRequest,
+  UpdateSubSectionRequest,
+  SubSectionQueryParams,
+  ApiPlacement,
+  CreatePlacementRequest
 } from '../types/api';
 
 // Base API configuration
@@ -113,15 +137,15 @@ class ApiService {
   }
 
   // Error handling
-  private handleError(error: Error | { response?: { data?: { message?: string; error?: string; details?: unknown }; status: number }; request?: unknown; code?: string }): ApiError {
+  private handleError(error: any): ApiError {
     console.error('Full API Error Details:', {
-      message: error.message,
-      code: (error as any).code,
-      response: error.response,
-      request: error.request ? 'Request made but no response' : 'No request made'
+      message: error?.message,
+      code: error?.code,
+      response: error?.response,
+      request: error?.request ? 'Request made but no response' : 'No request made'
     });
 
-    if (error.response) {
+    if (error?.response) {
       // Server responded with error status
       const errorMessage = error.response.data?.message || error.response.data?.error || `Server error (${error.response.status})`;
       return {
@@ -129,9 +153,9 @@ class ApiService {
         status: error.response.status,
         details: error.response.data?.details,
       };
-    } else if (error.request) {
+    } else if (error?.request) {
       // Request was made but no response received
-      const errorCode = (error as any).code;
+      const errorCode = error?.code;
       let networkMessage = 'Network error - please check your connection';
       
       if (errorCode === 'ENOTFOUND') {
@@ -151,7 +175,7 @@ class ApiService {
     } else {
       // Something else happened in setting up the request
       return {
-        message: error.message || 'An unexpected error occurred',
+        message: error?.message || 'An unexpected error occurred',
         status: 0,
       };
     }
@@ -183,7 +207,7 @@ class ApiService {
       const payload = JSON.parse(atob(token.split('.')[1]));
       
       return {
-        id: payload.user_id || payload.id || 'unknown',
+        user_id: payload.user_id || payload.id || 'unknown',
         username: payload.username || payload.name?.split(' ')[0] || 'user',
         email: payload.email || '',
         first_name: payload.first_name || payload.name?.split(' ')[0] || '',
@@ -237,12 +261,28 @@ class ApiService {
   }
 
   async updateUser(userId: string, userData: UpdateUserRequest): Promise<ApiUser> {
-    const response: AxiosResponse<ApiUser> = await this.api.patch(`/api/accounts/users/${userId}/`, userData);
-    return response.data;
+    try {
+      // Try with trailing slash first
+      const response: AxiosResponse<ApiUser> = await this.api.patch(`/api/accounts/users/${userId}/`, userData);
+      return response.data;
+    } catch (error: any) {
+      // If 404, try without trailing slash as fallback
+      if (error?.response?.status === 404) {
+        console.log('Trying alternative endpoint without trailing slash...');
+        const response: AxiosResponse<ApiUser> = await this.api.patch(`/api/accounts/users/${userId}`, userData);
+        return response.data;
+      }
+      throw error;
+    }
   }
 
   async getUser(userId: string): Promise<ApiUser> {
     const response: AxiosResponse<ApiUser> = await this.api.get(`/api/accounts/users/${userId}/`);
+    return response.data;
+  }
+
+  async getUsers(): Promise<ApiUser[]> {
+    const response: AxiosResponse<ApiUser[]> = await this.api.get('/api/accounts/users/');
     return response.data;
   }
 
@@ -295,7 +335,79 @@ class ApiService {
   }
 
   async deleteCompany(companyId: string): Promise<void> {
-    await this.api.delete(`/api/org/companies/${companyId}/`);
+    await this.api.delete(`/companies/${companyId}`);
+  }
+
+  async importCompanies(file: File, dryRun: boolean = false): Promise<{ success: boolean; message: string; data?: any; errors?: any[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint = dryRun ? '/api/org/companies/import/?dry_run=true' : '/api/org/companies/import/';
+
+    try {
+      const response: AxiosResponse<{ success: boolean; message: string; data?: any; errors?: any[] }> = await this.api.post(endpoint, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  async importHierarchy(file: File, dryRun: boolean = false): Promise<{ success: boolean; message: string; data?: any; errors?: any[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint = dryRun ? '/api/org/companies/import-hierarchy/?dry_run=true' : '/api/org/companies/import-hierarchy/';
+
+    try {
+      const response: AxiosResponse<{ success: boolean; message: string; data?: any; errors?: any[] }> = await this.api.post(endpoint, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+  
+  async importPlacements(file: File, dryRun: boolean = false): Promise<{ success: boolean; message: string; data?: any; errors?: any[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint = dryRun ? '/api/org/placements/import-levels/?dry_run=true' : '/api/org/placements/import-levels/';
+
+    try {
+      const response: AxiosResponse<{ success: boolean; message: string; data?: any; errors?: any[] }> = await this.api.post(endpoint, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  async importEmployees(file: File, dryRun: boolean = false): Promise<{ success: boolean; message: string; data?: any; errors?: any[] }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const endpoint = dryRun ? '/api/employees/import/?dry_run=true/' : '/api/employees/import/';
+
+    try {
+      const response: AxiosResponse<{ success: boolean; message: string; data?: any; errors?: any[] }> = await this.api.post(endpoint, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
   }
 
   // Department methods
@@ -325,6 +437,87 @@ class ApiService {
     await this.api.delete(`/api/org/departments/${departmentId}/`);
   }
 
+  // Sub-Department methods
+  async getSubDepartments(params?: SubDepartmentQueryParams): Promise<PaginatedResponse<ApiSubDepartment>> {
+    const response: AxiosResponse<PaginatedResponse<ApiSubDepartment>> = await this.api.get('/api/org/sub-departments/', {
+      params,
+    });
+    return response.data;
+  }
+
+  async getSubDepartment(subDepartmentId: string): Promise<ApiSubDepartment> {
+    const response: AxiosResponse<ApiSubDepartment> = await this.api.get(`/api/org/sub-departments/${subDepartmentId}/`);
+    return response.data;
+  }
+
+  async createSubDepartment(subDepartmentData: CreateSubDepartmentRequest): Promise<ApiSubDepartment> {
+    const response: AxiosResponse<ApiSubDepartment> = await this.api.post('/api/org/sub-departments/', subDepartmentData);
+    return response.data;
+  }
+
+  async updateSubDepartment(subDepartmentId: string, subDepartmentData: UpdateSubDepartmentRequest): Promise<ApiSubDepartment> {
+    const response: AxiosResponse<ApiSubDepartment> = await this.api.patch(`/api/org/sub-departments/${subDepartmentId}/`, subDepartmentData);
+    return response.data;
+  }
+
+  async deleteSubDepartment(subDepartmentId: string): Promise<void> {
+    await this.api.delete(`/api/org/sub-departments/${subDepartmentId}/`);
+  }
+
+  // Section methods
+  async getSections(params?: SectionQueryParams): Promise<PaginatedResponse<ApiSection>> {
+    const response: AxiosResponse<PaginatedResponse<ApiSection>> = await this.api.get('/api/org/sections/', {
+      params,
+    });
+    return response.data;
+  }
+
+  async getSection(sectionId: string): Promise<ApiSection> {
+    const response: AxiosResponse<ApiSection> = await this.api.get(`/api/org/sections/${sectionId}/`);
+    return response.data;
+  }
+
+  async createSection(sectionData: CreateSectionRequest): Promise<ApiSection> {
+    const response: AxiosResponse<ApiSection> = await this.api.post('/api/org/sections/', sectionData);
+    return response.data;
+  }
+
+  async updateSection(sectionId: string, sectionData: UpdateSectionRequest): Promise<ApiSection> {
+    const response: AxiosResponse<ApiSection> = await this.api.patch(`/api/org/sections/${sectionId}/`, sectionData);
+    return response.data;
+  }
+
+  async deleteSection(sectionId: string): Promise<void> {
+    await this.api.delete(`/api/org/sections/${sectionId}/`);
+  }
+
+  // Sub-Section methods
+  async getSubSections(params?: SubSectionQueryParams): Promise<PaginatedResponse<ApiSubSection>> {
+    const response: AxiosResponse<PaginatedResponse<ApiSubSection>> = await this.api.get('/api/org/sub-sections/', {
+      params,
+    });
+    return response.data;
+  }
+
+  async getSubSection(subSectionId: string): Promise<ApiSubSection> {
+    const response: AxiosResponse<ApiSubSection> = await this.api.get(`/api/org/sub-sections/${subSectionId}/`);
+    return response.data;
+  }
+
+  async createSubSection(subSectionData: CreateSubSectionRequest): Promise<ApiSubSection> {
+    const response: AxiosResponse<ApiSubSection> = await this.api.post('/api/org/sub-sections/', subSectionData);
+    return response.data;
+  }
+
+  async updateSubSection(subSectionId: string, subSectionData: UpdateSubSectionRequest): Promise<ApiSubSection> {
+    const response: AxiosResponse<ApiSubSection> = await this.api.patch(`/api/org/sub-sections/${subSectionId}/`, subSectionData);
+    return response.data;
+  }
+
+  async deleteSubSection(subSectionId: string): Promise<void> {
+    await this.api.delete(`/api/org/sub-sections/${subSectionId}/`);
+  }
+
   // Evaluation methods
   async getEvaluations(params?: EvaluationQueryParams): Promise<PaginatedResponse<ApiEvaluation>> {
     const response: AxiosResponse<PaginatedResponse<ApiEvaluation>> = await this.api.get('/api/evaluations/', {
@@ -350,6 +543,61 @@ class ApiService {
 
   async deleteEvaluation(evaluationId: string): Promise<void> {
     await this.api.delete(`/api/evaluations/${evaluationId}/`);
+  }
+
+  // Objective methods
+  async getObjectives(evaluationId: string): Promise<ApiObjective[]> {
+    const response: AxiosResponse<ApiObjective[] | PaginatedResponse<ApiObjective> | ApiResponse<ApiObjective[]>> = await this.api.get(`/api/objectives/?evaluation_id=${evaluationId}`);
+    
+    // Handle different response formats
+    if (Array.isArray(response.data)) {
+      // Direct array response
+      return response.data;
+    } else if (response.data && 'results' in response.data && Array.isArray(response.data.results)) {
+      // Paginated response
+      return response.data.results;
+    } else if (response.data && 'data' in response.data && Array.isArray(response.data.data)) {
+      // Wrapped response
+      return response.data.data;
+    } else {
+      // Unexpected format, return empty array
+      console.warn('Unexpected response format for objectives:', response.data);
+      return [];
+    }
+  }
+
+  async createObjective(objectiveData: CreateObjectiveRequest): Promise<ApiObjective> {
+    const response = await this.api.post('/api/objectives/', objectiveData);
+    return response.data;
+  }
+
+  async updateObjective(objectiveId: string, objectiveData: UpdateObjectiveRequest): Promise<ApiObjective> {
+    const response = await this.api.patch(`/api/objectives/${objectiveId}/`, objectiveData);
+    return response.data;
+  }
+
+  async deleteObjective(objectiveId: string): Promise<void> {
+    await this.api.delete(`/api/objectives/${objectiveId}/`);
+  }
+
+  // Competency methods
+  async getCompetencies(evaluationId: string): Promise<ApiCompetency[]> {
+    const response = await this.api.get(`/api/competencies/?evaluation_id=${evaluationId}`);
+    return response.data;
+  }
+
+  async createCompetency(competencyData: CreateCompetencyRequest): Promise<ApiCompetency> {
+    const response = await this.api.post('/api/competencies/', competencyData);
+    return response.data;
+  }
+
+  async updateCompetency(competencyId: string, competencyData: UpdateCompetencyRequest): Promise<ApiCompetency> {
+    const response = await this.api.patch(`/api/competencies/${competencyId}/`, competencyData);
+    return response.data;
+  }
+
+  async deleteCompetency(competencyId: string): Promise<void> {
+    await this.api.delete(`/api/competencies/${competencyId}/`);
   }
 
   // Utility methods
@@ -420,6 +668,42 @@ class ApiService {
       this.clearToken();
       return false;
     }
+  }
+
+  // Weights Configuration Methods
+  async getWeightsConfiguration(level: WeightsConfigurationLevel): Promise<WeightsConfiguration> {
+    const response: AxiosResponse<WeightsConfiguration> = await this.api.get(`/api/weights-configuration/${level}`);
+    return response.data;
+  }
+
+  async updateWeightsConfiguration(level: WeightsConfigurationLevel, configData: UpdateWeightsConfigurationRequest): Promise<WeightsConfiguration> {
+    const response: AxiosResponse<WeightsConfiguration> = await this.api.put(`/api/weights-configuration/${level}`, configData);
+    return response.data;
+  }
+
+  // Placement methods
+  async getPlacements(): Promise<ApiPlacement[]> {
+    const response: AxiosResponse<ApiPlacement[]> = await this.api.get('/api/org/placements/');
+    return response.data;
+  }
+
+  async getPlacement(placementId: string): Promise<ApiPlacement> {
+    const response: AxiosResponse<ApiPlacement> = await this.api.get(`/api/org/placements/${placementId}`);
+    return response.data;
+  }
+
+  async createPlacement(placementData: CreatePlacementRequest): Promise<ApiPlacement> {
+    const response: AxiosResponse<ApiPlacement> = await this.api.post('/api/org/placements/', placementData);
+    return response.data;
+  }
+
+  async updatePlacement(placementId: string, placementData: Partial<CreatePlacementRequest>): Promise<ApiPlacement> {
+    const response: AxiosResponse<ApiPlacement> = await this.api.put(`/api/org/placements/${placementId}`, placementData);
+    return response.data;
+  }
+
+  async deletePlacement(placementId: string): Promise<void> {
+    await this.api.delete(`/api/org/placements/${placementId}`);
   }
 }
 

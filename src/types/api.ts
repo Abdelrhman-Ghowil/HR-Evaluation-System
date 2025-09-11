@@ -14,16 +14,19 @@ export interface LoginResponse {
 }
 
 export interface ApiUser {
-  id: string;
+  user_id: string;
   username: string;
   email: string;
+  password?: string;
   first_name: string;
   last_name: string;
   name: string;
   phone?: string;
   role: UserRole;
-  title?: string;
+  position?: string;
   avatar?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type UserRole = 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP';
@@ -57,29 +60,95 @@ export interface UpdateUserRequest {
 
 // Employee Types
 export interface ApiEmployee {
-  id: string;
-  user_id: string;
-  company: string;
-  managerial_level: ManagerialLevel;
-  status: EmployeeStatus;
+  employee_id: string;
+  employee_code: string;
+  name: string;
+  email: string;
+  phone: string;
+  country_code: string;
+  warnings: string[];
+  warnings_count: number;
+  avatar: string;
+  role: string;
+  position: string;
+  managerial_level: string;
+  status: string;
+  company_name: string;
+  department: string[];
+  org_path: string;
+  direct_manager: string;
   join_date: string;
-  user: ApiUser;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  company_id: string;
+  job_type: string;
+  location: string;
+  branch: string;
 }
 
-export type ManagerialLevel = 'IC' | 'SUPERVISORY' | 'MIDDLE';
-export type EmployeeStatus = 'ACTIVE' | 'INACTIVE';
+export type ManagerialLevel = 'Individual Contributor' | 'Supervisory' | 'Middle Management';
+export type EmployeeStatus = 'Active' | 'Inactive';
 
 export interface CreateEmployeeRequest {
-  user_id: string;
-  company: string;
-  managerial_level: ManagerialLevel;
-  status: EmployeeStatus;
+  user_data: {
+    username: string;
+    email: string;
+    password: string;
+    role: string;
+    name: string;
+    avatar?: string;
+    first_name: string;
+    last_name: string;
+    title?: string;
+    phone?: string;
+  };
+  employee_code: string;
+  country_code: string;
+  warnings?: string[];
+  company_id: string;
+  departments_ids: string[];
+  managerial_level: string;
+  status: string;
+  org_path?: string;
+  direct_manager?: string;
   join_date: string;
+  job_type: string;
+  location: string;
+  branch: string;
+}
+
+export interface UpdateEmployeeRequest {
+  user_data?: {
+    username?: string;
+    email?: string;
+    password?: string;
+    role?: string;
+    name?: string;
+    avatar?: string;
+    first_name?: string;
+    last_name?: string;
+    title?: string;
+    phone?: string;
+  };
+  employee_code?: string;
+  country_code?: string;
+  warnings?: string[];
+  company_id?: string;
+  departments_ids?: string[];
+  managerial_level?: string;
+  status?: string;
+  org_path?: string;
+  direct_manager?: string;
+  join_date?: string;
+  job_type?: string;
+  location?: string;
+  branch?: string;
 }
 
 // Company Types
 export interface ApiCompany {
-  id: string;
+  company_id: string;
   name: string;
   industry?: string;
   size?: CompanySize;
@@ -96,14 +165,19 @@ export interface CreateCompanyRequest {
   name: string;
   industry?: string;
   size?: CompanySize;
-  description?: string;
-  website?: string;
+  address?: string;
+}
+
+export interface UpdateCompanyRequest {
+  name?: string;
+  industry?: string;
+  size?: CompanySize;
   address?: string;
 }
 
 // Department Types
 export interface ApiDepartment {
-  id: string;
+  department_id: string;
   name: string;
   employee_count?: number;
   company: string;
@@ -114,14 +188,41 @@ export interface ApiDepartment {
 
 export interface CreateDepartmentRequest {
   name: string;
-  employee_count?: number;
-  company: string;
+  company_id: string;
+  manager?: string;
 }
 
 export interface UpdateDepartmentRequest {
   name?: string;
   employee_count?: number;
   manager?: string;
+}
+
+// Placement Types
+export interface ApiPlacement {
+  placement_id: string;
+  employee_id: string;
+  employee_name: string;
+  company_id: string;
+  company_name: string;
+  department_id: string;
+  department_name: string;
+  sub_department_id: string | null;
+  section_id: string | null;
+  sub_section_id: string | null;
+  sub_department_name: string | null;
+  section_name: string | null;
+  sub_section_name: string | null;
+  assigned_at: string;
+}
+
+export interface CreatePlacementRequest {
+  employee_id: string;
+  company_id: string;
+  department_id: string;
+  sub_department_id?: string;
+  section_id?: string;
+  sub_section_id?: string;
 }
 
 // Evaluation Types
@@ -138,15 +239,30 @@ export interface ApiEvaluation {
   updated_at: string;
 }
 
-export type EvaluationType = 'ANNUAL' | 'QUARTERLY' | 'MONTHLY' | 'PROBATION';
+// Extended evaluation interface that matches the actual API response
+export interface ApiEvaluationResponse {
+  evaluation_id: string;
+  employee: string;
+  employee_id: string;
+  type: EvaluationType;
+  status: EvaluationStatus;
+  score: string;
+  reviewer: string;
+  reviewer_id: string;
+  period: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type EvaluationType = 'Annual' | 'Quarterly' | 'Optional';
 export type EvaluationStatus = 
-  | 'DRAFT' 
-  | 'PENDING_HOD' 
-  | 'PENDING_HR' 
-  | 'EMPLOYEE_REVIEW' 
-  | 'APPROVED' 
-  | 'REJECTED' 
-  | 'COMPLETED';
+  | 'Draft' 
+  | 'Pending HoD Approval' 
+  | 'Pending HR Approval' 
+  | 'Employee Review' 
+  | 'Approved' 
+  | 'Rejected' 
+  | 'Completed';
 
 export interface CreateEvaluationRequest {
   employee_id: string;
@@ -165,24 +281,75 @@ export interface UpdateEvaluationRequest {
 
 // Objective Types
 export interface ApiObjective {
-  id: string;
+  objective_id: string;
+  evaluation_id: string;
+  employee_id: string;
+  title: string;
+  description: string;
+  target: number;
+  achieved: number;
+  weight: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ObjectiveStatus = 'Not started' | 'In-progress' | 'Completed';
+
+export interface CreateObjectiveRequest {
   evaluation_id: string;
   title: string;
   description: string;
+  target: number;
+  achieved: number;
   weight: number;
-  target?: number;
-  achieved?: number;
-  status?: ObjectiveStatus;
+  status: string;
 }
 
-export type ObjectiveStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
-
-export interface CreateObjectiveRequest {
-  title: string;
-  description: string;
-  weight: number;
+export interface UpdateObjectiveRequest {
+  title?: string;
+  description?: string;
   target?: number;
   achieved?: number;
+  weight?: number;
+  status?: string;
+}
+
+// Competency Types
+export interface ApiCompetency {
+  competence_id: string;
+  employee_id: string;
+  evaluation_id?: string;
+  name: string;
+  category: string;
+  required_level: number;
+  actual_level: number;
+  weight: number;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CompetencyCategory = 'Core' | 'Leadership' | 'Functional';
+
+export interface CreateCompetencyRequest {
+  employee_id: string;
+  evaluation_id?: string;
+  name: string;
+  category: string;
+  required_level: number;
+  actual_level: number;
+  weight: number;
+  description: string;
+}
+
+export interface UpdateCompetencyRequest {
+  name?: string;
+  category?: string;
+  required_level?: number;
+  actual_level?: number;
+  weight?: number;
+  description?: string;
 }
 
 // API Response Types
@@ -210,7 +377,7 @@ export interface ApiError {
 // Request Configuration
 export interface RequestConfig {
   headers?: Record<string, string>;
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
 }
 
 // Auth Headers
@@ -240,6 +407,122 @@ export interface EvaluationQueryParams {
   type?: EvaluationType;
   status?: EvaluationStatus;
   period?: string;
+  page?: number;
+  page_size?: number;
+}
+
+// Weights Configuration Types
+export type WeightsConfigurationLevel = 'IC' | 'SUPERVISORY' | 'MIDDLE';
+
+export interface WeightsConfiguration {
+  level_name: string;
+  core_weight: number;
+  leadership_weight: number;
+  functional_weight: number;
+  competency_weight: number;
+  objective_weight: number;
+  scoring_rules?: ScoringRule[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ScoringRule {
+  min_score: number;
+  max_score: number;
+  grade: string;
+  description: string;
+}
+
+export interface UpdateWeightsConfigurationRequest {
+  core_weight: number;
+  leadership_weight: number;
+  functional_weight: number;
+  competency_weight: number;
+  objective_weight: number;
+  scoring_rules: ScoringRule[];
+}
+
+// Organizational Structure Types
+export interface ApiSubDepartment {
+  sub_department_id: string;
+  name: string;
+  employee_count: number;
+  manager: string;
+  department: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSubDepartmentRequest {
+  name: string;
+  department_id: string;
+  manager: string;
+}
+
+export interface UpdateSubDepartmentRequest {
+  name?: string;
+  department_id?: string;
+  manager?: string;
+}
+
+export interface ApiSection {
+  section_id: string;
+  name: string;
+  employee_count: number;
+  manager: string;
+  sub_department: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSectionRequest {
+  name: string;
+  sub_department_id: string;
+  manager?: string;
+}
+
+export interface UpdateSectionRequest {
+  name?: string;
+  sub_department_id?: string;
+  manager?: string;
+}
+
+export interface ApiSubSection {
+  sub_section_id: string;
+  name: string;
+  employee_count: number;
+  manager: string;
+  section: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSubSectionRequest {
+  name: string;
+  section_id: string;
+  manager_id?: string;
+}
+
+export interface UpdateSubSectionRequest {
+  name?: string;
+  section_id?: string;
+  manager_id?: string;
+}
+
+export interface SubDepartmentQueryParams {
+  department?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface SectionQueryParams {
+  sub_department?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface SubSectionQueryParams {
+  section?: string;
   page?: number;
   page_size?: number;
 }

@@ -10,7 +10,7 @@ interface DiagnosticResult {
   test: string;
   success: boolean;
   message: string;
-  details?: any;
+  details?: unknown;
   timestamp: string;
 }
 
@@ -18,7 +18,7 @@ export const NetworkDiagnostic: React.FC = () => {
   const [results, setResults] = useState<DiagnosticResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
-  const addResult = (test: string, success: boolean, message: string, details?: any) => {
+  const addResult = (test: string, success: boolean, message: string, details?: unknown) => {
     const result: DiagnosticResult = {
       test,
       success,
@@ -67,14 +67,14 @@ export const NetworkDiagnostic: React.FC = () => {
         'Login Test',
         true,
         'Login successful',
-        { userId: loginResult.user.id, role: loginResult.user.role }
+        { userId: loginResult.user.user_id, role: loginResult.user.role }
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       addResult(
         'Login Test',
         false,
-        error.message || 'Login failed',
-        { error: error.message, status: error.status }
+        (error as { message: string }).message || 'Login failed',
+        { error: (error as { message: string }).message, status: (error as { status: number }).status }
       );
     }
 

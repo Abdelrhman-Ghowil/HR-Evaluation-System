@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,9 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Calendar, User, BarChart3, FileText, Target, Plus, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, User, BarChart3, FileText, Target, Plus, Edit, Trash2, Loader2, Mail, Phone, MapPin, Building2, Users, Briefcase, Hash, Clock } from 'lucide-react';
 import EvaluationDetails from './EvaluationDetails';
 import { EmployeeInput, EvaluationInput } from '../../types/shared';
+import { useEvaluations, useCreateEvaluation, useUpdateEvaluation, useDeleteEvaluation, useUsers } from '../../hooks/useApi';
+import { ApiEvaluation } from '../../types/api';
 import { 
   transformEmployeeForEvaluation, 
   transformEvaluationForDetails, 
@@ -28,8 +30,7 @@ interface NewEvaluation {
   type: 'Quarterly' | 'Annual' | 'Optional';
   year: number;
   quarter?: number;
-  reviewer_id: string;
-  date: string;
+  reviewer_id?: string;
   status: 'Draft';
 }
 
@@ -52,20 +53,113 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const [newEvaluation, setNewEvaluation] = useState<NewEvaluation>({
     type: 'Quarterly',
     year: new Date().getFullYear(),
-    reviewer_id: '',
-    date: new Date().toISOString().split('T')[0],
     status: 'Draft'
   });
-  const [evaluationList, setEvaluationList] = useState<EvaluationInput[]>([]);
 
-  // Mock reviewers data - in real app, this would come from API
-  const reviewers: Reviewer[] = [
-    { id: '1', name: 'Michael Chen', role: 'LM' },
-    { id: '2', name: 'Emily Rodriguez', role: 'HOD' },
-    { id: '3', name: 'Sarah Johnson', role: 'HR' },
-    { id: '4', name: 'David Kim', role: 'LM' },
-    { id: '5', name: 'Lisa Wang', role: 'HOD' }
-  ];
+  // Fetch evaluations from API
+  console.log('Fetching evaluations for employee ID:', employee.id);
+  const { data: evaluationsData, isLoading: evaluationsLoading, error: evaluationsError } = useEvaluations({
+    employee_id: employee.id
+  });
+  
+  // Create evaluation mutation
+  const createEvaluationMutation = useCreateEvaluation();
+  
+  // Delete evaluation mutation
+  const deleteEvaluationMutation = useDeleteEvaluation();
+  
+  // Fetch users for reviewer dropdown
+  const { data: usersData, isLoading: usersLoading, error: usersError } = useUsers();
+  
+  console.log('Evaluations loading:', evaluationsLoading);
+  console.log('Evaluations error:', evaluationsError);
+  console.log('Full evaluationsData object:', JSON.stringify(evaluationsData, null, 2));
+
+  // Transform API data to match the expected format
+  const transformApiEvaluation = (apiEval: any): EvaluationInput => {
+    // Handle both ApiEvaluation (id) and ApiEvaluationResponse (evaluation_id) formats
+    const evaluationId = apiEval.id || apiEval.evaluation_id;
+    
+    // Parse score safely
+    let score: number | undefined;
+    if (apiEval.score !== undefined) {
+      // Handle both number and string scores
+      score = typeof apiEval.score === 'string' ? parseFloat(apiEval.score) : apiEval.score;
+    }
+    
+    // Parse reviewer_id safely
+    let reviewer_id: number | undefined;
+    if (apiEval.reviewer_id) {
+      const parsedReviewerId = parseInt(apiEval.reviewer_id, 10);
+      reviewer_id = isNaN(parsedReviewerId) ? undefined : parsedReviewerId;
+    }
+    
+    return {
+      id: evaluationId,
+      type: apiEval.type,
+      period: apiEval.period,
+      status: apiEval.status,
+      score: score,
+      reviewer: reviewer_id ? 'Unknown' : undefined,
+      reviewer_id: reviewer_id,
+      date: new Date(apiEval.created_at).toISOString().split('T')[0]
+    };
+  };
+
+  // Get evaluation list from API data
+  const evaluationList = useMemo(() => {
+    // Handle different possible response structures
+    let dataToTransform: any[] = [];
+    
+    if (evaluationsData?.results && Array.isArray(evaluationsData.results)) {
+      dataToTransform = evaluationsData.results;
+    } else if (Array.isArray(evaluationsData)) {
+      // Handle case where API returns array directly
+      dataToTransform = evaluationsData;
+    } else if (evaluationsData && typeof evaluationsData === 'object') {
+      // Handle case where API returns object with data property
+      if (evaluationsData.data && Array.isArray(evaluationsData.data)) {
+        dataToTransform = evaluationsData.data;
+      }
+    }
+    
+    if (!dataToTransform || dataToTransform.length === 0) {
+       return [];
+     }
+    
+    try {
+      return dataToTransform.map(transformApiEvaluation);
+    } catch (error) {
+      console.error('Error transforming evaluations:', error);
+      return [];
+    }
+  }, [evaluationsData]);
+
+  // Transform users data to reviewers format
+  const reviewers: Reviewer[] = useMemo(() => {
+    if (!usersData) {
+      return [];
+    }
+    
+    // Handle different response formats
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let usersArray: any[] = [];
+    if (usersData.results && Array.isArray(usersData.results)) {
+      usersArray = usersData.results;
+    } else if (Array.isArray(usersData)) {
+      usersArray = usersData;
+    } else {
+      return [];
+    }
+    
+    return usersArray
+      .filter(user => user && user.user_id) // Filter out invalid users
+      .map(user => ({
+        id: user.user_id.toString(), // Ensure ID is a string
+        name: user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'Unknown User',
+        role: user.role === 'HR' ? 'HR' : user.role === 'HOD' ? 'HOD' : 'LM'
+      }));
+  }, [usersData, usersLoading, usersError]);
 
   // Generate year options (current year ± 3)
   const currentYear = new Date().getFullYear();
@@ -78,69 +172,79 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const generateEvaluationRecords = () => {
     const records: Partial<EvaluationInput>[] = [];
     const baseRecord = {
-      reviewer: reviewers.find(r => r.id === newEvaluation.reviewer_id)?.name || '',
-      date: newEvaluation.date,
+      reviewer: 'To be assigned',
+      date: new Date().toISOString().split('T')[0],
       status: 'Draft' as const,
       type: newEvaluation.type
     };
 
     if (newEvaluation.type === 'Quarterly') {
-      // Generate 4 quarterly records
+      // Generate 4 quarterly records (Q1, Q2, Q3, Q4)
       for (let q = 1; q <= 4; q++) {
         records.push({
           ...baseRecord,
           id: `${Date.now()}-Q${q}`,
           period: `${newEvaluation.year}-Q${q}`,
-          type: 'Quarterly Review'
+          type: 'Quarterly'
         });
       }
     } else if (newEvaluation.type === 'Annual') {
-      // Generate 2 annual records
+      // Generate 2 annual records (Mid-Year, End-Year)
       records.push(
         {
           ...baseRecord,
           id: `${Date.now()}-Mid`,
           period: `${newEvaluation.year}-Mid`,
-          type: 'Mid-Year Review'
+          type: 'Annual'
         },
         {
           ...baseRecord,
           id: `${Date.now()}-End`,
           period: `${newEvaluation.year}-End`,
-          type: 'Annual Review'
+          type: 'Annual'
         }
       );
     } else if (newEvaluation.type === 'Optional' && newEvaluation.quarter) {
-      // Generate 1 optional record
+      // Generate 1 optional record for selected quarter
       records.push({
         ...baseRecord,
         id: `${Date.now()}-Q${newEvaluation.quarter}`,
         period: `${newEvaluation.year}-Q${newEvaluation.quarter}`,
-        type: 'Optional Review'
+        type: 'Optional'
       });
     }
 
     return records;
   };
 
-  const handleCreateEvaluation = () => {
+  const handleCreateEvaluation = async () => {
     const records = generateEvaluationRecords();
     console.log('Creating evaluation records:', records);
-    // In real app, this would make API calls to create the evaluations
     
-    // Add new records to evaluation list
-    const newRecords = records.map(record => ({
-      ...record,
-      id: record.id || `${Date.now()}-${Math.random()}`
-    })) as EvaluationInput[];
-    setEvaluationList(prev => [...prev, ...newRecords]);
+    try {
+      // Create each evaluation record via API
+      for (const record of records) {
+        const evaluationData = {
+          employee_id: employee.id,
+          type: record.type as 'Quarterly' | 'Annual' | 'Optional',
+          status: "Draft" as const,
+          period: record.period,
+          score: null,
+          reviewer_id: null
+        };
+        
+        await createEvaluationMutation.mutateAsync(evaluationData);
+      }
+      
+      console.log('Successfully created all evaluation records');
+    } catch (error) {
+      console.error('Error creating evaluations:', error);
+    }
     
     // Reset form and close modal
     setNewEvaluation({
       type: 'Quarterly',
       year: new Date().getFullYear(),
-      reviewer_id: '',
-      date: new Date().toISOString().split('T')[0],
       status: 'Draft'
     });
     setIsAddEvaluationOpen(false);
@@ -151,24 +255,45 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     setIsEditEvaluationOpen(true);
   };
 
-  const handleUpdateEvaluation = () => {
+  // Update evaluation mutation
+  const updateEvaluationMutation = useUpdateEvaluation();
+
+  const handleUpdateEvaluation = async () => {
     if (!editingEvaluation) return;
 
-    setEvaluationList(prev =>
-      prev.map(evaluation =>
-        evaluation.id === editingEvaluation.id ? editingEvaluation : evaluation
-      )
-    );
+    try {
+      const updateData = {
+        type: editingEvaluation.type,
+        period: editingEvaluation.period,
+        status: editingEvaluation.status, // Send status as-is without transformation
+        reviewer_id: editingEvaluation.reviewer_id?.toString() || null
+        // Note: score field is intentionally excluded to make it non-editable
+      };
+      
+      await updateEvaluationMutation.mutateAsync({
+        evaluationId: editingEvaluation.id,
+        evaluationData: updateData
+      });
+      
+      console.log('Successfully updated evaluation:', editingEvaluation.id);
+    } catch (error) {
+      console.error('Error updating evaluation:', error);
+    }
+    
     setIsEditEvaluationOpen(false);
     setEditingEvaluation(null);
   };
 
-  const handleDeleteEvaluation = (evaluationId: string) => {
-    setEvaluationList(prev => prev.filter(evaluation => evaluation.id !== evaluationId));
+  const handleDeleteEvaluation = async (evaluationId: string) => {
+    try {
+      await deleteEvaluationMutation.mutateAsync(evaluationId);
+      console.log('Successfully deleted evaluation:', evaluationId);
+    } catch (error) {
+      console.error('Error deleting evaluation:', error);
+    }
   };
 
   const isFormValid = () => {
-    if (!newEvaluation.reviewer_id) return false;
     if (newEvaluation.type === 'Optional' && !newEvaluation.quarter) return false;
     return true;
   };
@@ -197,9 +322,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     
     // Basic field validation
     const hasRequiredFields = editingEvaluation.type && 
-                             editingEvaluation.period && 
-                             editingEvaluation.reviewer_id && 
-                             editingEvaluation.date;
+                             editingEvaluation.period;
     
     if (!hasRequiredFields) return false;
     
@@ -212,46 +335,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     return true;
   };
 
-  // Initialize evaluation list with mock data
-  React.useEffect(() => {
-    const initialEvaluations: EvaluationInput[] = [
-      {
-        id: '1',
-        type: 'Annual Review',
-        status: 'Completed',
-        score: 8.5,
-        date: '2024-06-15',
-        reviewer: 'Michael Chen',
-        period: '2024'
-      },
-      {
-        id: '2',
-        type: 'Quarterly Review',
-        status: 'Completed',
-        score: 7.8,
-        date: '2024-03-20',
-        reviewer: 'Emily Rodriguez',
-        period: 'Q1 2024'
-      },
-      {
-        id: '3',
-        type: 'Mid-Year Review',
-        status: 'Employee Review',
-        date: '2024-07-01',
-        reviewer: 'Michael Chen',
-        period: 'Mid 2024'
-      },
-      {
-        id: '4',
-        type: 'Optional Review',
-        status: 'Draft',
-        date: '2024-08-15',
-        reviewer: 'Sarah Johnson',
-        period: '2024-Q3'
-      }
-    ];
-    setEvaluationList(initialEvaluations);
-  }, []);
+
 
   if (selectedEvaluation) {
     // Transform employee data with error handling
@@ -325,62 +409,152 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
       </div>
 
       {/* Employee Info Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-4">
-            <Avatar className="h-16 w-16">
-              <AvatarImage src={employee.avatar} alt={employee.name} />
-              <AvatarFallback className="bg-blue-600 text-white text-xl">
-                {employee.name.split(' ').map(n => n[0]).join('')}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <CardTitle className="text-2xl">{employee.name}</CardTitle>
-              <p className="text-lg text-gray-600">{employee.position}</p>
-              <p className="text-sm text-gray-500 mb-2">{employee.companyName}</p>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <Badge variant={employee.status === 'active' ? 'default' : 'secondary'}>
-                  {employee.status}
-                </Badge>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                  {employee.role}
-                </Badge>
-                <span className="text-sm text-gray-500">{employee.department}</span>
+      <Card className="overflow-hidden border-0 shadow-lg">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 pb-6">
+          <div className="flex items-start space-x-6">
+            <div className="relative">
+              <Avatar className="h-20 w-20 ring-4 ring-white shadow-lg">
+                <AvatarImage src={employee.avatar} alt={employee.name} />
+                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-2xl font-semibold">
+                  {employee.name.split(' ').map(n => n[0]).join('')}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full h-6 w-6 flex items-center justify-center">
+                <div className="bg-white rounded-full h-3 w-3"></div>
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between">
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="text-3xl font-bold text-gray-900 mb-2">{employee.name}</CardTitle>
+                  <p className="text-xl text-gray-700 font-medium mb-1">{employee.position}</p>
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Building2 className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm text-gray-600 font-medium">{employee.companyName}</span>
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center space-x-1">
+                      <Hash className="h-3 w-3 text-gray-500" />
+                      <span className="text-sm text-gray-600 font-mono">{employee.employeeCode}</span>
+                    </div>
+                    <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                      {employee.role}
+                    </Badge>
+                    <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+                      {employee.status}
+                    </Badge>
+                    <span className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded-md">{employee.department}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Email</p>
-              <a 
-                href={`mailto:${employee.email}`}
-                className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-              >
-                {employee.email}
-              </a>
+        <CardContent className="p-6">
+          {/* Contact Information Section */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <User className="h-5 w-5 mr-2 text-blue-500" />
+              Contact Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              <div className="flex items-center space-x-3 p-4 bg-blue-50 rounded-lg">
+                <Mail className="h-5 w-5 text-blue-500" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-700">Email Address</p>
+                  <a 
+                    href={`mailto:${employee.email}`}
+                    className="text-blue-600 hover:text-blue-800 hover:underline transition-colors font-medium truncate block"
+                  >
+                    {employee.email}
+                  </a>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg">
+                <Phone className="h-5 w-5 text-green-500" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-700">Phone Number</p>
+                  <a 
+                    href={generateWhatsAppUrl(employee.phone, employee.countryCode)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-600 hover:text-green-800 hover:underline transition-colors font-medium"
+                  >
+                    {formatPhoneNumber(employee.phone, employee.countryCode)}
+                  </a>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Phone</p>
-              <a 
-                href={generateWhatsAppUrl(employee.phone, employee.countryCode)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-green-600 hover:text-green-800 hover:underline transition-colors"
-              >
-                {formatPhoneNumber(employee.phone, employee.countryCode)}
-              </a>
+          </div>
+
+          {/* Work Information Section */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <Briefcase className="h-5 w-5 mr-2 text-purple-500" />
+              Work Information
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm font-medium text-gray-500 mb-1">Managerial Level</p>
+                <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-200">
+                  {employee.managerialLevel}
+                </Badge>
+              </div>
+              {employee.jobType && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-500 mb-1">Job Type</p>
+                  <div className="flex items-center space-x-2">
+                    <Briefcase className="h-4 w-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-900">{employee.jobType}</span>
+                  </div>
+                </div>
+              )}
+              {employee.location && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-500 mb-1">Location</p>
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="h-4 w-4 text-gray-600" />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">{employee.location}</span>
+                      {employee.branch && (
+                        <p className="text-xs text-gray-600">{employee.branch}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Managerial Weight</p>
-              <Badge variant="outline" className="w-fit">
-                {employee.managerialWeight}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Join Date</p>
-              <p className="text-sm">{formatDate(employee.joinDate)}</p>
+          </div>
+
+          {/* Organization Information Section */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <Building2 className="h-5 w-5 mr-2 text-orange-500" />
+              Organization Details
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="p-4 bg-orange-50 rounded-lg">
+                <p className="text-sm font-medium text-gray-500 mb-1">Join Date</p>
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-4 w-4 text-orange-500" />
+                  <span className="text-sm font-medium text-gray-900">{formatDate(employee.joinDate)}</span>
+                </div>
+              </div>
+              {employee.orgPath && (
+                <div className="p-4 bg-orange-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-500 mb-1">Organization Path</p>
+                  <p className="text-sm text-gray-900 font-mono text-xs">{employee.orgPath}</p>
+                </div>
+              )}
+              {employee.directManager && (
+                <div className="p-4 bg-orange-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-500 mb-1">Direct Manager</p>
+                  <div className="flex items-center space-x-2">
+                    <Users className="h-4 w-4 text-orange-500" />
+                    <span className="text-sm font-medium text-gray-900">{employee.directManager}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
@@ -416,7 +590,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                         setNewEvaluation(prev => ({ ...prev, type: value, quarter: undefined }))
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id="type">
                         <SelectValue placeholder="Select evaluation type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -436,7 +610,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                         setNewEvaluation(prev => ({ ...prev, year: parseInt(value) }))
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id="year">
                         <SelectValue placeholder="Select year" />
                       </SelectTrigger>
                       <SelectContent>
@@ -459,7 +633,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                           setNewEvaluation(prev => ({ ...prev, quarter: parseInt(value) }))
                         }
                       >
-                        <SelectTrigger>
+                        <SelectTrigger id="quarter">
                           <SelectValue placeholder="Select quarter" />
                         </SelectTrigger>
                         <SelectContent>
@@ -473,39 +647,18 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                     </div>
                   )}
 
-                  {/* Reviewer Selection */}
+                  {/* Reviewer Selection - Dummy Input */}
                   <div className="space-y-2">
                     <Label htmlFor="reviewer">Reviewer</Label>
-                    <Select
-                      value={newEvaluation.reviewer_id}
-                      onValueChange={(value) => 
-                        setNewEvaluation(prev => ({ ...prev, reviewer_id: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select reviewer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {reviewers.map(reviewer => (
-                          <SelectItem key={reviewer.id} value={reviewer.id}>
-                            {reviewer.name} ({reviewer.role})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Date */}
-                  <div className="space-y-2">
-                    <Label htmlFor="date">Date</Label>
                     <Input
-                      type="date"
-                      value={newEvaluation.date}
-                      onChange={(e) => 
-                        setNewEvaluation(prev => ({ ...prev, date: e.target.value }))
-                      }
+                      id="reviewer"
+                      value="To be assigned"
+                      disabled
+                      className="bg-gray-50 text-gray-500"
                     />
                   </div>
+
+
 
                   {/* Info about what will be created */}
                   <div className="bg-blue-50 p-3 rounded-lg">
@@ -544,7 +697,24 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {evaluationList.map((evaluation) => (
+            {evaluationsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                <span className="ml-2 text-gray-600">Loading evaluations...</span>
+              </div>
+            ) : evaluationsError ? (
+              <div className="text-center py-8">
+                <p className="text-red-600">Failed to load evaluations</p>
+                <p className="text-sm text-gray-500 mt-1">{evaluationsError.message}</p>
+              </div>
+            ) : evaluationList.length === 0 ? (
+              <div className="text-center py-8">
+                <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No evaluations found</p>
+                <p className="text-sm text-gray-500 mt-1">Add an evaluation to get started</p>
+              </div>
+            ) : (
+              evaluationList.map((evaluation) => (
               <Card 
                 key={evaluation.id} 
                 className="hover:shadow-md transition-all duration-200 border-l-4 border-l-blue-500"
@@ -594,7 +764,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                       <div className="text-right space-y-1">
                         <div className="flex items-center text-sm text-gray-600">
                           <Calendar className="h-4 w-4 mr-1" />
-                          {new Date(evaluation.date).toLocaleDateString()}
+                          {formatDate(evaluation.date)}
                         </div>
                         <div className="flex items-center text-sm text-gray-600">
                           <User className="h-4 w-4 mr-1" />
@@ -630,7 +800,8 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            ))
+            )}
           </div>
         </CardContent>
       </Card>
@@ -696,7 +867,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                          status: value as 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed'
                        })}
                      >
-                       <SelectTrigger>
+                       <SelectTrigger id="edit-status">
                          <SelectValue />
                        </SelectTrigger>
                        <SelectContent>
@@ -743,28 +914,12 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                  <Label htmlFor="edit-reviewer" className="text-right">
                    Reviewer
                  </Label>
-                 <Select
-                   value={editingEvaluation.reviewer_id?.toString() || ''}
-                   onValueChange={(value) => {
-const reviewer = reviewers.find(r => r.id === value);
-                     setEditingEvaluation({
-                       ...editingEvaluation,
-                       reviewer_id: parseInt(value),
-                       reviewer: reviewer?.name || ''
-                     });
-                   }}
-                 >
-                   <SelectTrigger className="col-span-3">
-                     <SelectValue />
-                   </SelectTrigger>
-                   <SelectContent>
-                     {reviewers.map((reviewer) => (
-                       <SelectItem key={reviewer.id} value={reviewer.id.toString()}>
-                         {reviewer.name} ({reviewer.role})
-                       </SelectItem>
-                     ))}
-                   </SelectContent>
-                 </Select>
+                 <Input
+                   id="edit-reviewer"
+                   value="To be assigned"
+                   disabled
+                   className="col-span-3 bg-gray-50 text-gray-500"
+                 />
                </div>
               
               <div className="grid grid-cols-4 items-center gap-4">
@@ -783,26 +938,7 @@ const reviewer = reviewers.find(r => r.id === value);
                 />
               </div>
               
-              {editingEvaluation.score !== undefined && (
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="edit-score" className="text-right">
-                    Score
-                  </Label>
-                  <Input
-                    id="edit-score"
-                    type="number"
-                    min="0"
-                    max="10"
-                    step="0.1"
-                    value={editingEvaluation.score}
-                    onChange={(e) => setEditingEvaluation({
-                      ...editingEvaluation,
-                      score: parseFloat(e.target.value) || 0
-                    })}
-                    className="col-span-3"
-                  />
-                </div>
-              )}
+              {/* Score field removed - made non-editable as requested */}
             </div>
           )}
           
@@ -814,8 +950,7 @@ const reviewer = reviewers.find(r => r.id === value);
                <ul className="text-sm text-yellow-700 mt-1 space-y-1">
                  {!editingEvaluation.type && <li>• Evaluation type is required</li>}
                  {!editingEvaluation.period && <li>• Period is required</li>}
-                 {!editingEvaluation.reviewer_id && <li>• Reviewer selection is required</li>}
-                 {!editingEvaluation.date && <li>• Date is required</li>}
+
                  {(() => {
                    const originalEvaluation = evaluationList.find(e => e.id === editingEvaluation.id);
                    if (originalEvaluation && !isValidStatusTransition(originalEvaluation.status, editingEvaluation.status)) {

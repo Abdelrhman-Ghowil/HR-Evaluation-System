@@ -33,7 +33,7 @@ const LoginPage = () => {
   };
 
   const demoCredentials = [
-    { role: 'Admin', email: 'admin@company.com', icon: Shield },
+    { role: 'ADMIN', email: 'admin@company.com', icon: Shield },
     { role: 'HR Manager', email: 'hr@company.com', icon: Users },
     { role: 'Department Manager', email: 'manager@company.com', icon: BarChart3 }
   ];

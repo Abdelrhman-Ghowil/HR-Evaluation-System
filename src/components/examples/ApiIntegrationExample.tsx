@@ -152,7 +152,7 @@ const ApiIntegrationExample = () => {
                   value={employeeForm.managerial_level}
                   onValueChange={(value: ManagerialLevel) => setEmployeeForm({ ...employeeForm, managerial_level: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="managerial_level">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -168,7 +168,7 @@ const ApiIntegrationExample = () => {
                   value={employeeForm.status}
                   onValueChange={(value: EmployeeStatus) => setEmployeeForm({ ...employeeForm, status: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="status">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -310,7 +310,7 @@ const ApiIntegrationExample = () => {
                 value={evaluationForm.type}
                 onValueChange={(value: EvaluationType) => setEvaluationForm({ ...evaluationForm, type: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger id="type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
