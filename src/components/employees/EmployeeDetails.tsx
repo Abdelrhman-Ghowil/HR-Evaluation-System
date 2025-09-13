@@ -763,10 +763,6 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                       
                       <div className="text-right space-y-1">
                         <div className="flex items-center text-sm text-gray-600">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          {formatDate(evaluation.date)}
-                        </div>
-                        <div className="flex items-center text-sm text-gray-600">
                           <User className="h-4 w-4 mr-1" />
                           {evaluation.reviewer}
                         </div>

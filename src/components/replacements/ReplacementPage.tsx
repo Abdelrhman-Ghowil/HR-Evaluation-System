@@ -266,7 +266,7 @@ const handleSubSectionChange = (subSectionId: string) => {
     };
 
     updatePlacementMutation.mutate(
-      { id: editingPlacement.placement_id, data: payload },
+      { id: editingPlacement.employee_id, data: payload },
       {
         onSuccess: () => {
           setShowEditForm(false);
