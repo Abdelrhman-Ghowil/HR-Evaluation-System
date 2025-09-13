@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Users, Plus, Edit, Mail, Phone, X, Search, Filter, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import EmployeeDetails from './EmployeeDetails';
 import { apiService } from '@/services/api';
-import { ApiEmployee, ApiDepartment, ApiCompany, UpdateEmployeeRequest } from '@/types/api';
+import { ApiEmployee, ApiDepartment, ApiCompany, CreateEmployeeRequest } from '@/types/api';
 import { parsePhoneNumber, formatDate } from '@/utils/dataTransformers';
 import { AnyARecord } from 'dns';
 
@@ -144,7 +144,7 @@ const EmployeeList = () => {
       warnings: apiEmployee.warnings || [],
       warningsCount: apiEmployee.warnings_count || 0,
       avatar: apiEmployee.avatar || '/placeholder.svg',
-      department: apiEmployee.department && apiEmployee.department.length > 0 ? apiEmployee.department[0] : '',
+      department: apiEmployee.department && apiEmployee.department.length > 0 ? (Array.isArray(apiEmployee.department) ? apiEmployee.department.join(', ') : apiEmployee.department) : '',
       position: apiEmployee.position,
       role: apiEmployee.role as 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP',
       managerialLevel: apiEmployee.managerial_level as 'Individual Contributor' | 'Supervisory' | 'Middle Management',
@@ -465,9 +465,9 @@ const EmployeeList = () => {
       const newStatus = employee.status === 'Active' ? 'Inactive' : 'Active';
       
       // Prepare the update payload with only the status change
-      const updateData: UpdateEmployeeRequest = {
-        status: newStatus
-      };
+        const updateData: Partial<CreateEmployeeRequest> = {
+          status: newStatus
+        };
       
       console.log(`Updating employee ${employeeId} status to ${newStatus}`);
       
@@ -536,7 +536,7 @@ const EmployeeList = () => {
     if (editingEmployee && originalEmployee && validateEditForm()) {
       try {
         // Prepare the update payload with only changed fields
-        const updateData: UpdateEmployeeRequest = {};
+        const updateData: Partial<CreateEmployeeRequest> = {};
         
         // Check if user_data fields have changed
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
