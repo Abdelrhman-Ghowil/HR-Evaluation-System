@@ -12,9 +12,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Users, Plus, Edit, Mail, Phone, X, Search, Filter, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import EmployeeDetails from './EmployeeDetails';
 import { apiService } from '@/services/api';
-import { ApiEmployee, ApiDepartment, ApiCompany, CreateEmployeeRequest } from '@/types/api';
+import { ApiEmployee, ApiDepartment, ApiCompany, CreateEmployeeRequest, ImportResponse } from '@/types/api';
 import { parsePhoneNumber, formatDate } from '@/utils/dataTransformers';
-import { AnyARecord } from 'dns';
+
 
 interface Employee {
   id: string;
@@ -72,7 +72,6 @@ const EmployeeList = () => {
     status: 'Active' ,
     companyName: 'Ninja',
     companyId: '',
-    orgPath: '',
     directManager: '',
     joinDate: new Date().toISOString().split('T')[0],
     jobType: 'Full-time',
@@ -81,8 +80,7 @@ const EmployeeList = () => {
     username: '',
     password: 'Password123',
     firstName: '',
-    lastName: '',
-    title: ''
+    lastName: ''
   });
 
   // Import functionality state
@@ -90,7 +88,7 @@ const EmployeeList = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [importResults, setImportResults] = useState<{ success: boolean; message: string; data?: any; errors?: any[] } | null>(null);
+  const [importResults, setImportResults] = useState<ImportResponse | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Clear auto-filled form data
@@ -111,7 +109,6 @@ const EmployeeList = () => {
       status: 'Active',
       companyName: 'Ninja',
       companyId: '',
-      orgPath: '',
       directManager: '',
       joinDate: new Date().toISOString().split('T')[0],
       jobType: 'Full-time',
@@ -120,8 +117,7 @@ const EmployeeList = () => {
       username: '',
       password: 'Password123',
       firstName: '',
-      lastName: '',
-      title: ''
+      lastName: ''
     });
     setValidationErrors({});
   };
@@ -255,12 +251,14 @@ const EmployeeList = () => {
     try {
       const result = await apiService.importEmployees(selectedFile, true);
       setImportResults(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Dry run failed:', error);
       setImportResults({
-        success: false,
-        message: 'Validation failed. Please try again.',
-        errors: []
+        status: 'imported',
+        created: 0,
+        updated: 0,
+        message: error?.message || 'Validation failed. Please try again.',
+        errors: error?.details?.errors || []
       });
     } finally {
       setIsImporting(false);
@@ -276,15 +274,17 @@ const EmployeeList = () => {
       const result = await apiService.importEmployees(selectedFile, false);
       setImportResults(result);
       
-      if (result.success) {
+      if (result.status === 'imported' && (result.created > 0 || result.updated > 0)) {
         fetchEmployees(); // Refresh the employees list
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Import failed:', error);
       setImportResults({
-        success: false,
-        message: 'Import failed. Please try again.',
-        errors: []
+        status: 'imported',
+        created: 0,
+        updated: 0,
+        message: error?.message || 'Import failed. Please try again.',
+        errors: error?.details?.errors || []
       });
     } finally {
       setIsImporting(false);
@@ -338,20 +338,20 @@ const EmployeeList = () => {
         console.log(`Successfully loaded ${transformedEmployees.length} employees from API (direct array)`);
       } else {
         console.warn('Unexpected API response structure:', response);
-        console.log('Falling back to demo data due to unexpected API response structure');
-        setEmployees(initialEmployees);
+        console.error('API returned unexpected structure - no fallback data available');
+        setEmployees([]);
       }
     } catch (error) {
       console.error('Error fetching employees:', error);
       if (error.response?.status === 500) {
-        console.log('API server error (500) - using demo data instead');
+        console.error('API server error (500) - no employees available');
       } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
-        console.log('Network error - API may be unavailable, using demo data instead');
+        console.error('Network error - API may be unavailable, no employees available');
       } else {
-        console.log('API error - using demo data instead');
+        console.error('API error - no employees available');
       }
-      // Fallback to initial employees if API fails
-      setEmployees(initialEmployees);
+      // Set empty array instead of fallback data
+      setEmployees([]);
     }
   };
 
@@ -363,93 +363,7 @@ const EmployeeList = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
-  const initialEmployees: Employee[] = [
-    {
-      id: '1',
-      name: 'Sarah Johnson',
-      email: 'sarah.johnson@company.com',
-      phone: '123-4567',
-      avatar: '/placeholder.svg',
-      department: 'Engineering',
-      position: 'Senior Developer',
-      role: 'EMP',
-      managerialLevel: 'Individual Contributor',
-      status: 'Active',
-      companyName: 'Ninja',
-      joinDate: '2022-01-15',
-      company_id: '',
-      departments_ids: [],
-      user_id: ''
-    },
-    {
-      id: '2',
-      name: 'Michael Chen',
-      email: 'michael.chen@company.com',
-      phone: '234-5678',
-      avatar: '/placeholder.svg',
-      department: 'Human Resources',
-      position: 'HR Manager',
-      role: 'HR',
-      managerialLevel: 'Middle Management',
-      status: 'Active',
-      companyName: 'Ninja',
-      joinDate: '2021-03-10',
-      company_id: '',
-      departments_ids: [],
-      user_id: ''
-    },
-    {
-      id: '3',
-      name: 'Emily Rodriguez',
-      email: 'emily.rodriguez@company.com',
-      phone: '345-6789',
-      avatar: '/placeholder.svg',
-      department: 'Sales',
-      position: 'Sales Manager',
-      role: 'LM',
-      managerialLevel: 'Supervisory',
-      status: 'Active',
-      companyName: 'Ninja',
-      joinDate: '2020-07-22',
-      company_id: '',
-      departments_ids: [],
-      user_id: ''
-    },
-    {
-      id: '4',
-      name: 'David Kim',
-      email: 'david.kim@company.com',
-      phone: '(966) 456-7890',
-      avatar: '/placeholder.svg',
-      department: 'Engineering',
-      position: 'Frontend Developer',
-      role: 'EMP',
-      managerialLevel: 'Individual Contributor',
-      status: 'Active',
-      companyName: 'Ninja',
-      joinDate: '2023-02-01',
-      company_id: '',
-      departments_ids: [],
-      user_id: ''
-    },
-    {
-      id: '5',
-      name: 'Lisa Wang',
-      email: 'lisa.wang@company.com',
-      phone: '(966) 567-8901',
-      avatar: '/placeholder.svg',
-      department: 'Marketing',
-      position: 'Marketing Specialist',
-      role: 'EMP',
-      managerialLevel: 'Individual Contributor',
-      status: 'Inactive',
-      companyName: 'Ninja',
-      joinDate: '2021-11-05',
-      company_id: '',
-      departments_ids: [],
-      user_id: ''
-    }
-  ];
+  // Removed initialEmployees array - using API data exclusively
 
   // Handler functions
   const handleToggleStatus = async (employeeId: string) => {
@@ -621,10 +535,6 @@ const EmployeeList = () => {
           updateData.employee_code = editingEmployee.employeeCode;
         }
         
-        if (editingEmployee.orgPath !== originalEmployee.orgPath) {
-          updateData.org_path = editingEmployee.orgPath;
-        }
-        
         if (editingEmployee.directManager !== originalEmployee.directManager) {
           updateData.direct_manager = editingEmployee.directManager;
         }
@@ -736,7 +646,7 @@ const EmployeeList = () => {
             avatar: newEmployee.avatar || '',
             first_name: firstName,
             last_name: lastName,
-            title: newEmployee.position || newEmployee.title || '',
+            title: newEmployee.position || '',
             phone: fullPhoneNumber
           },
           company_id: newEmployee.companyId,
@@ -747,7 +657,7 @@ const EmployeeList = () => {
           employee_code: newEmployee.employeeCode,
           country_code: newEmployee.countryCode,
           warnings: newEmployee.warnings,
-          org_path: newEmployee.orgPath,
+  
           direct_manager: newEmployee.directManager,
           job_type: newEmployee.jobType,
           location: newEmployee.location,
@@ -776,7 +686,7 @@ const EmployeeList = () => {
           status: 'Active' as const,
           companyName: 'Ninja',
           companyId: '',
-          orgPath: '',
+    
           directManager: '',
           joinDate: new Date().toISOString().split('T')[0],
           jobType: 'Full-time',
@@ -786,7 +696,7 @@ const EmployeeList = () => {
           password: 'Password123',
           firstName: '',
           lastName: '',
-          title: ''
+    
         });
         setValidationErrors({});
         setIsAddModalOpen(false);
@@ -916,16 +826,7 @@ const EmployeeList = () => {
                       className="w-full"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="title" className="text-sm font-medium">Title</Label>
-                    <Input
-                      id="title"
-                      value={newEmployee.title || ''}
-                      onChange={(e) => setNewEmployee(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="Professional title (optional)"
-                      className="w-full"
-                    />
-                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="text-sm font-medium">Phone Number *</Label>
                     <div className="flex gap-2">
@@ -1204,16 +1105,7 @@ const EmployeeList = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="orgPath" className="text-sm font-medium">Organization Path</Label>
-                    <Input
-                      id="orgPath"
-                      value={newEmployee.orgPath || ''}
-                      onChange={(e) => setNewEmployee(prev => ({ ...prev, orgPath: e.target.value }))}
-                      placeholder="Organizational hierarchy path"
-                      className="w-full"
-                    />
-                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="directManager" className="text-sm font-medium">Direct Manager</Label>
                     <Input
@@ -1561,13 +1453,28 @@ const EmployeeList = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-companyName" className="text-sm font-medium">Company Name *</Label>
-                    <Input
-                      id="edit-companyName"
-                      value={editingEmployee.companyName || ''}
-                      onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, companyName: e.target.value } : null)}
-                      placeholder="Company name"
-                      className={`w-full ${editValidationErrors.companyName ? 'border-red-500' : ''}`}
-                    />
+                    <Select 
+                      value={editingEmployee.company_id || ''} 
+                      onValueChange={(value) => {
+                        const selectedCompany = companies.find(company => company.company_id === value);
+                        setEditingEmployee(prev => prev ? { 
+                          ...prev, 
+                          company_id: value,
+                          companyName: selectedCompany?.name || ''
+                        } : null);
+                      }}
+                    >
+                      <SelectTrigger className={`w-full ${editValidationErrors.companyName ? 'border-red-500' : ''}`}>
+                        <SelectValue placeholder="Select company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.company_id} value={company.company_id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     {editValidationErrors.companyName && (
                       <p className="text-sm text-red-500">{editValidationErrors.companyName}</p>
                     )}
@@ -1652,16 +1559,7 @@ const EmployeeList = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-orgPath" className="text-sm font-medium">Organization Path</Label>
-                    <Input
-                      id="edit-orgPath"
-                      value={editingEmployee.orgPath || ''}
-                      onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, orgPath: e.target.value } : null)}
-                      placeholder="Enter organization path"
-                      className="w-full"
-                    />
-                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="edit-directManager" className="text-sm font-medium">Direct Manager</Label>
                     <Input
@@ -1777,16 +1675,12 @@ const EmployeeList = () => {
               <div className="flex gap-3">
                 <Button
                   onClick={handleDryRun}
-                  disabled={isImporting}
+                  disabled={true}
                   variant="outline"
-                  className="flex-1 border-blue-200 text-blue-700 hover:bg-blue-50"
+                  className="flex-1 border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed"
                 >
-                  {isImporting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                  )}
-                  {isImporting ? 'Validating...' : 'Test Run (Validate Only)'}
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Test Run (Validate Only)
                 </Button>
                 <Button
                   onClick={handleActualImport}
@@ -1806,24 +1700,34 @@ const EmployeeList = () => {
             {/* Results Display */}
             {importResults && (
               <div className={`rounded-lg p-4 ${
-                importResults.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                (importResults.created > 0 || importResults.updated > 0) ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
               }`}>
                 <div className="flex items-start gap-3">
                   <div className={`p-1 rounded-full ${
-                    importResults.success ? 'bg-green-100' : 'bg-red-100'
+                    (importResults.created > 0 || importResults.updated > 0) ? 'bg-green-100' : 'bg-red-100'
                   }`}>
-                    {importResults.success ? (
+                    {(importResults.created > 0 || importResults.updated > 0) ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     ) : (
                       <AlertCircle className="h-5 w-5 text-red-600" />
                     )}
                   </div>
                   <div className="flex-1">
-                    <p className={`font-medium ${
-                      importResults.success ? 'text-green-800' : 'text-red-800'
-                    }`}>
-                      {importResults.message}
-                    </p>
+                    {(importResults.created > 0 || importResults.updated > 0) ? (
+                      <div>
+                        <p className="font-medium text-green-800">
+                          Import completed successfully!
+                        </p>
+                        <div className="mt-2 flex gap-4 text-sm text-green-700">
+                          <span>Created: {importResults.created}</span>
+                          <span>Updated: {importResults.updated}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="font-medium text-red-800">
+                        {importResults.message || 'Import failed'}
+                      </p>
+                    )}
                     {importResults.errors && importResults.errors.length > 0 && (
                       <div className="mt-2 space-y-1">
                         {importResults.errors.slice(0, 5).map((error, index) => (

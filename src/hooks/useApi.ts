@@ -34,7 +34,8 @@ import {
   EmployeeQueryParams,
   DepartmentQueryParams,
   EvaluationQueryParams,
-  ApiError
+  ApiError,
+  ImportResponse
 } from '../types/api';
 
 // Query Keys
@@ -273,6 +274,26 @@ export const useDeleteCompany = (options?: UseMutationOptions<void, ApiError, st
     },
     onError: (error: ApiError) => {
       toast.error(error.message || 'Failed to delete company');
+    },
+    ...options,
+  });
+};
+
+export const useImportEmployees = (options?: UseMutationOptions<ImportResponse, ApiError, { file: File; dryRun: boolean }>) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ file, dryRun }) => apiService.importEmployees(file, dryRun),
+    onSuccess: (data, variables) => {
+      if (variables.dryRun) {
+        toast.success('Import validation completed successfully!');
+      } else {
+        toast.success('Employees imported successfully!');
+        queryClient.invalidateQueries({ queryKey: queryKeys.employees });
+      }
+    },
+    onError: (error: ApiError) => {
+      toast.error(error.message || 'Failed to import employees');
     },
     ...options,
   });

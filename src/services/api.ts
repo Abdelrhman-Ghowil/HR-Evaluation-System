@@ -45,7 +45,8 @@ import {
   UpdateSubSectionRequest,
   SubSectionQueryParams,
   ApiPlacement,
-  CreatePlacementRequest
+  CreatePlacementRequest,
+  ImportResponse
 } from '../types/api';
 
 // Base API configuration
@@ -335,7 +336,7 @@ class ApiService {
   }
 
   async deleteCompany(companyId: string): Promise<void> {
-    await this.api.delete(`/companies/${companyId}`);
+    await this.api.delete(`/api/org/companies/${companyId}/`);
   }
 
   async importCompanies(file: File, dryRun: boolean = false): Promise<{ success: boolean; message: string; data?: any; errors?: any[] }> {
@@ -392,19 +393,28 @@ class ApiService {
     }
   }
 
-  async importEmployees(file: File, dryRun: boolean = false): Promise<{ success: boolean; message: string; data?: any; errors?: any[] }> {
+  async importEmployees(file: File, dryRun: boolean = false): Promise<ImportResponse> {
     const formData = new FormData();
     formData.append('file', file);
 
     const endpoint = dryRun ? '/api/employees/import/?dry_run=true/' : '/api/employees/import/';
 
     try {
-      const response: AxiosResponse<{ success: boolean; message: string; data?: any; errors?: any[] }> = await this.api.post(endpoint, formData, {
+      const response: AxiosResponse<ImportResponse> = await this.api.post(endpoint, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      return response.data;
+      
+      // Ensure we return the expected format even if backend returns different structure
+      const data = response.data;
+      return {
+        status: 'imported',
+        created: data.created || 0,
+        updated: data.updated || 0,
+        message: data.message,
+        errors: data.errors
+      };
     } catch (error: any) {
       throw this.handleError(error);
     }

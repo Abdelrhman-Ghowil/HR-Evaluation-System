@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Settings, Database, Shield, Download } from 'lucide-react';
+import { Settings, Shield } from 'lucide-react';
 
 interface AdminToolsProps {
   onNavigateToWeights?: () => void;
@@ -24,20 +24,6 @@ const AdminTools: React.FC<AdminToolsProps> = ({ onNavigateToWeights, onNavigate
       icon: Shield,
       action: 'Manage Users',
       onClick: onNavigateToUserManagement
-    },
-    {
-      title: 'Data Management',
-      description: 'Import/export data and manage backups',
-      icon: Database,
-      action: 'Manage Data',
-      onClick: () => console.log('Data Management clicked')
-    },
-    {
-      title: 'Reports & Analytics',
-      description: 'Generate comprehensive system reports',
-      icon: Download,
-      action: 'Generate Reports',
-      onClick: () => console.log('Reports & Analytics clicked')
     }
   ];
 

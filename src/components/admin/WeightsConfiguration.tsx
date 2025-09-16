@@ -358,73 +358,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
         </CardContent>
       </Card>
 
-      {/* Scoring Rules */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Scoring Rules</CardTitle>
-              <CardDescription>Define grade boundaries and descriptions</CardDescription>
-            </div>
-            <Button onClick={addScoringRule} size="sm" disabled={loading}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Rule
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {scoringRules?.map((rule, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border rounded-lg">
-                <div className="space-y-2">
-                  <Label>Min Score</Label>
-                  <Input
-                    type="number"
-                    value={rule.min_score}
-                    onChange={(e) => handleScoringRuleChange(index, 'min_score', parseInt(e.target.value) || 0)}
-                    disabled={loading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Max Score</Label>
-                  <Input
-                    type="number"
-                    value={rule.max_score}
-                    onChange={(e) => handleScoringRuleChange(index, 'max_score', parseInt(e.target.value) || 0)}
-                    disabled={loading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Grade</Label>
-                  <Input
-                    value={rule.grade}
-                    onChange={(e) => handleScoringRuleChange(index, 'grade', e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Input
-                    value={rule.description}
-                    onChange={(e) => handleScoringRuleChange(index, 'description', e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeScoringRule(index)}
-                    disabled={loading || scoringRules.length <= 1}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+
 
       {/* Actions */}
       <div className="flex justify-end space-x-4">
