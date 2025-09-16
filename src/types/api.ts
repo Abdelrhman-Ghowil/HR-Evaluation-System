@@ -526,3 +526,12 @@ export interface SubSectionQueryParams {
   page?: number;
   page_size?: number;
 }
+
+// Import Response Types
+export interface ImportResponse {
+  status: 'imported';
+  created: number;
+  updated: number;
+  message?: string;
+  errors?: any[];
+}

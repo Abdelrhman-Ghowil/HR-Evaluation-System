@@ -354,15 +354,7 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
             <div className="text-2xl font-bold">{averageSize}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Status</CardTitle>
-            <Badge variant="outline">Active</Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">Operational</div>
-          </CardContent>
-        </Card>
+
       </div>
 
       {/* Search */}
