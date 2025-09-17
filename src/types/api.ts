@@ -532,6 +532,9 @@ export interface ImportResponse {
   status: 'imported';
   created: number;
   updated: number;
+  validated_count?: number;
+  to_create?: number;
+  to_update?: number;
   message?: string;
   errors?: any[];
 }

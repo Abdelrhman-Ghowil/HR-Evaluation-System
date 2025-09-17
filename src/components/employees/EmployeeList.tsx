@@ -253,7 +253,7 @@ const EmployeeList = () => {
       setImportResults(result);
     } catch (error: any) {
       console.error('Dry run failed:', error);
-      setImportResults({
+      setImportResults({  
         status: 'imported',
         created: 0,
         updated: 0,
@@ -1675,9 +1675,9 @@ const EmployeeList = () => {
               <div className="flex gap-3">
                 <Button
                   onClick={handleDryRun}
-                  disabled={true}
+                  disabled={isImporting}
                   variant="outline"
-                  className="flex-1 border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed"
+                  className="flex-1 border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100 hover:border-blue-300"
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Test Run (Validate Only)
@@ -1700,20 +1700,36 @@ const EmployeeList = () => {
             {/* Results Display */}
             {importResults && (
               <div className={`rounded-lg p-4 ${
-                (importResults.created > 0 || importResults.updated > 0) ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                (importResults.created > 0 || importResults.updated > 0 || importResults.validated_count) ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
               }`}>
                 <div className="flex items-start gap-3">
                   <div className={`p-1 rounded-full ${
-                    (importResults.created > 0 || importResults.updated > 0) ? 'bg-green-100' : 'bg-red-100'
+                    (importResults.created > 0 || importResults.updated > 0 || importResults.validated_count) ? 'bg-green-100' : 'bg-red-100'
                   }`}>
-                    {(importResults.created > 0 || importResults.updated > 0) ? (
+                    {(importResults.created > 0 || importResults.updated > 0 || importResults.validated_count) ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     ) : (
                       <AlertCircle className="h-5 w-5 text-red-600" />
                     )}
                   </div>
                   <div className="flex-1">
-                    {(importResults.created > 0 || importResults.updated > 0) ? (
+                    {importResults.validated_count !== undefined ? (
+                      <div>
+                        <p className="font-medium text-green-800">
+                          Validation completed successfully!
+                        </p>
+                        <div className="mt-2 bg-gray-50 p-3 rounded border">
+                          <pre className="text-sm text-gray-700 font-mono">
+{JSON.stringify({
+  status: importResults.status,
+  validated_count: importResults.validated_count,
+  to_create: importResults.to_create || 0,
+  to_update: importResults.to_update || 0
+}, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    ) : (importResults.created > 0 || importResults.updated > 0) ? (
                       <div>
                         <p className="font-medium text-green-800">
                           Import completed successfully!
