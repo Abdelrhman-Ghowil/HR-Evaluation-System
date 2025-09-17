@@ -397,7 +397,7 @@ class ApiService {
     const formData = new FormData();
     formData.append('file', file);
 
-    const endpoint = dryRun ? '/api/employees/import/?dry_run=true/' : '/api/employees/import/';
+    const endpoint = dryRun ? '/api/employees/import/?dry_run=true' : '/api/employees/import/';
 
     try {
       const response: AxiosResponse<ImportResponse> = await this.api.post(endpoint, formData, {
@@ -412,6 +412,9 @@ class ApiService {
         status: 'imported',
         created: data.created || 0,
         updated: data.updated || 0,
+        validated_count: data.validated_count,
+        to_create: data.to_create,
+        to_update: data.to_update,
         message: data.message,
         errors: data.errors
       };
