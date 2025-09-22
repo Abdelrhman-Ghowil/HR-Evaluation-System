@@ -487,6 +487,25 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
             </div>
           </div>
 
+          {/* Personal Information Section */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <User className="h-5 w-5 mr-2 text-indigo-500" />
+              Personal Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {employee.gender && (
+                <div className="p-4 bg-indigo-50 rounded-lg">
+                  <p className="text-sm font-medium text-gray-500 mb-1">Gender</p>
+                  <div className="flex items-center space-x-2">
+                    <User className="h-4 w-4 text-indigo-500" />
+                    <span className="text-sm font-medium text-gray-900">{employee.gender}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Work Information Section */}
           <div className="mb-8">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -557,6 +576,134 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
               )}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Warnings Section - Compact Creative Design */}
+      <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50">
+        {/* Compact animated background elements */}
+        <div className="absolute inset-0 bg-gradient-to-r from-amber-100/20 via-transparent to-orange-100/20"></div>
+        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-200/30 to-yellow-300/20 rounded-full -translate-y-10 translate-x-10 blur-xl animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-orange-200/20 to-amber-300/30 rounded-full translate-y-8 -translate-x-8 blur-lg animate-pulse" style={{ animationDelay: '1s' }}></div>
+        
+        <CardHeader className="relative pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              {/* Compact icon with layered effects */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-400/40 to-orange-500/40 rounded-xl blur-md animate-pulse"></div>
+                <div className="relative p-2 bg-gradient-to-br from-amber-400 via-yellow-500 to-orange-500 rounded-xl shadow-lg border border-amber-300/50">
+                  <FileText className="h-4 w-4 text-white drop-shadow-lg" />
+                </div>
+              </div>
+              
+              <div className="flex flex-col">
+                <CardTitle className="text-lg font-bold text-amber-900 tracking-wide">
+                  Employee Warnings
+                </CardTitle>
+                <p className="text-xs text-amber-700/80 font-medium mt-0.5">
+                  Active disciplinary records
+                </p>
+              </div>
+            </div>
+            
+            {/* Compact count badge */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-500/40 to-orange-500/40 rounded-full blur-md animate-pulse"></div>
+              <Badge className="relative bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500 text-white text-sm font-bold px-3 py-1.5 rounded-full shadow-lg border-2 border-amber-300/50 hover:scale-110 transition-transform duration-300">
+                {employee.warnings_count || employee.warnings?.length || 0}
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        
+        <CardContent className="relative space-y-3">
+          {employee.warnings && employee.warnings.length > 0 ? (
+            <>
+              {/* Compact warnings list */}
+              <div className="space-y-2">
+                {employee.warnings.map((warning, index) => (
+                  <div 
+                    key={index} 
+                    className="relative group p-3 bg-white/70 backdrop-blur-sm border border-amber-200/60 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.01]"
+                  >
+                    {/* Compact decorative line */}
+                    <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-amber-400 to-orange-500 rounded-r-full"></div>
+                    
+                    <div className="ml-3 flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-1.5 mb-1.5">
+                          <div className="w-1.5 h-1.5 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full animate-pulse"></div>
+                          <span className="text-xs font-semibold text-amber-900">
+                            Warning #{index + 1}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-700 leading-relaxed">{warning}</p>
+                      </div>
+                      
+                      {/* Compact severity indicator */}
+                      <div className="ml-3 flex flex-col items-center space-y-0.5">
+                        <div className="w-2 h-2 bg-gradient-to-br from-red-400 to-orange-500 rounded-full shadow-sm"></div>
+                        <span className="text-[10px] text-amber-600 font-medium">High</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Compact summary footer */}
+              <div className="mt-4 p-3 bg-white/50 backdrop-blur-sm border border-amber-200/40 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-gradient-to-br from-amber-400/20 to-orange-400/20 rounded-lg">
+                      <FileText className="h-3 w-3 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-amber-900">
+                        Total Active Warnings
+                      </p>
+                      <p className="text-[10px] text-amber-700/80">
+                        Requires attention
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="text-right">
+                    <div className="text-xl font-bold text-amber-900">
+                      {employee.warnings_count || employee.warnings.length}
+                    </div>
+                    <div className="text-[10px] text-amber-600 font-medium">
+                      Record{(employee.warnings_count || employee.warnings.length) !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Compact no warnings state */
+            <div className="text-center py-6">
+              <div className="relative inline-block mb-3">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-400/30 to-emerald-500/30 rounded-full blur-lg animate-pulse"></div>
+                <div className="relative p-3 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full shadow-lg">
+                  <FileText className="h-6 w-6 text-white drop-shadow-lg" />
+                </div>
+              </div>
+              
+              <h3 className="text-base font-bold text-green-800 mb-1.5">
+                Clean Record
+              </h3>
+              <p className="text-sm text-green-700/80 font-medium mb-3">
+                No active warnings or disciplinary actions
+              </p>
+              
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-gradient-to-r from-green-100 to-emerald-100 border border-green-200/60 rounded-full">
+                <div className="w-1.5 h-1.5 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-semibold text-green-800">
+                  Excellent Standing
+                </span>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

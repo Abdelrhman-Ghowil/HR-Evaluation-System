@@ -41,6 +41,7 @@ interface Employee {
   jobType: string;
   location: string;
   branch: string;
+  gender?: string;
 }
 
 const EmployeeList = () => {
@@ -63,6 +64,7 @@ const EmployeeList = () => {
     countryCode: '+966',
     employeeCode: '',
     warnings: [] as string[],
+    warnings_count: 0,
     avatar: '',
     department: '',
     departmentId: '',
@@ -77,6 +79,7 @@ const EmployeeList = () => {
     jobType: 'Full-time',
     location: '',
     branch: 'Office',
+    gender: '',
     username: '',
     password: 'Password123',
     firstName: '',
@@ -100,6 +103,7 @@ const EmployeeList = () => {
       countryCode: '+966',
       employeeCode: '',
       warnings: [] as string[],
+      warnings_count: 0,
       avatar: '',
       department: '',
       departmentId: '',
@@ -500,6 +504,11 @@ const EmployeeList = () => {
           userDataChanges.phone = newFullPhone;
         }
         
+        // Check if gender has changed
+        if (editingEmployee.gender !== originalEmployee.gender) {
+          userDataChanges.gender = editingEmployee.gender || '';
+        }
+        
         // Only add user_data if there are changes
         if (Object.keys(userDataChanges).length > 0) {
           updateData.user_data = userDataChanges;
@@ -549,6 +558,15 @@ const EmployeeList = () => {
         
         if (editingEmployee.branch !== originalEmployee.branch) {
           updateData.branch = editingEmployee.branch;
+        }
+        
+        // Check warnings fields
+        if (JSON.stringify(editingEmployee.warnings || []) !== JSON.stringify(originalEmployee.warnings || [])) {
+          updateData.warnings = editingEmployee.warnings || [];
+        }
+        
+        if ((editingEmployee.warnings_count || 0) !== (originalEmployee.warnings_count || 0)) {
+          updateData.warnings_count = editingEmployee.warnings_count || editingEmployee.warnings?.length || 0;
         }
         
         // Only make API call if there are changes
@@ -647,7 +665,8 @@ const EmployeeList = () => {
             first_name: firstName,
             last_name: lastName,
             title: newEmployee.position || '',
-            phone: fullPhoneNumber
+            phone: fullPhoneNumber,
+            gender: newEmployee.gender || ''
           },
           company_id: newEmployee.companyId,
           departments_ids: newEmployee.departmentId ? [newEmployee.departmentId] : [],
@@ -657,6 +676,7 @@ const EmployeeList = () => {
           employee_code: newEmployee.employeeCode,
           country_code: newEmployee.countryCode,
           warnings: newEmployee.warnings,
+          warnings_count: newEmployee.warnings_count,
   
           direct_manager: newEmployee.directManager,
           job_type: newEmployee.jobType,
@@ -696,6 +716,7 @@ const EmployeeList = () => {
           password: 'Password123',
           firstName: '',
           lastName: '',
+          gender: '',
     
         });
         setValidationErrors({});
@@ -825,6 +846,21 @@ const EmployeeList = () => {
                       placeholder="Auto-extracted from full name if empty"
                       className="w-full"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gender" className="text-sm font-medium">Gender</Label>
+                    <Select 
+                      value={newEmployee.gender || ''} 
+                      onValueChange={(value) => setNewEmployee(prev => ({ ...prev, gender: value }))}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -1129,6 +1165,82 @@ const EmployeeList = () => {
                       <p className="text-sm text-red-500">{validationErrors.joinDate}</p>
                     )}
                   </div>
+
+                  {/* Warnings Section */}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label className="text-sm font-medium">Warnings</Label>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Add a warning..."
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              const value = e.currentTarget.value.trim();
+                              if (value) {
+                                setNewEmployee(prev => ({
+                                  ...prev,
+                                  warnings: [...prev.warnings, value],
+                                  warnings_count: prev.warnings.length + 1
+                                }));
+                                e.currentTarget.value = '';
+                              }
+                            }
+                          }}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            const input = e.currentTarget.parentElement?.querySelector('input');
+                            const value = input?.value.trim();
+                            if (value) {
+                              setNewEmployee(prev => ({
+                                ...prev,
+                                warnings: [...prev.warnings, value],
+                                warnings_count: prev.warnings.length + 1
+                              }));
+                              if (input) input.value = '';
+                            }
+                          }}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                      
+                      {/* Display warnings */}
+                      {newEmployee.warnings.length > 0 && (
+                        <div className="space-y-1">
+                          <div className="text-sm text-gray-600">
+                            Warnings ({newEmployee.warnings_count}):
+                          </div>
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                            {newEmployee.warnings.map((warning, index) => (
+                              <div key={index} className="flex items-center justify-between bg-yellow-50 border border-yellow-200 rounded px-3 py-2">
+                                <span className="text-sm text-yellow-800">{warning}</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setNewEmployee(prev => ({
+                                      ...prev,
+                                      warnings: prev.warnings.filter((_, i) => i !== index),
+                                      warnings_count: prev.warnings.length - 1
+                                    }));
+                                  }}
+                                  className="h-6 w-6 p-0 text-yellow-600 hover:text-yellow-800"
+                                >
+                                  ×
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             
@@ -1222,6 +1334,23 @@ const EmployeeList = () => {
                     <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700">
                       {employee.managerialLevel}
                     </Badge>
+                    {employee.warningsCount > 0 && (
+                        <div className="relative group">
+                          {/* Compact glow effect */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-amber-400/20 to-orange-400/20 rounded-full blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                          
+                          {/* Compact modern badge */}
+                          <Badge 
+                            variant="outline" 
+                            className="relative bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-300/60 text-[10px] font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 px-1.5 py-0.5"
+                          >
+                            <div className="flex items-center space-x-1">
+                              <div className="w-1 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full animate-pulse"></div>
+                              <span>{employee.warningsCount}</span>
+                            </div>
+                          </Badge>
+                        </div>
+                      )}
                   </div>
                   <span className="text-sm text-gray-500 flex-shrink-0 truncate max-w-[100px]">{employee.department}</span>
                 </div>
@@ -1372,6 +1501,21 @@ const EmployeeList = () => {
                         <p className="text-xs text-gray-500 mt-1">Upload an image file (JPG, PNG, GIF)</p>
                       </div>
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-gender" className="text-sm font-medium">Gender</Label>
+                    <Select 
+                      value={editingEmployee.gender || ''} 
+                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, gender: value } : null)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -1570,6 +1714,82 @@ const EmployeeList = () => {
                       className="w-full"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Warnings Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Warnings</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Add a warning..."
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          const value = e.currentTarget.value.trim();
+                          if (value) {
+                            setEditingEmployee(prev => prev ? {
+                              ...prev,
+                              warnings: [...(prev.warnings || []), value],
+                              warnings_count: (prev.warnings || []).length + 1
+                            } : null);
+                            e.currentTarget.value = '';
+                          }
+                        }
+                      }}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        const input = e.currentTarget.parentElement?.querySelector('input');
+                        const value = input?.value.trim();
+                        if (value) {
+                          setEditingEmployee(prev => prev ? {
+                            ...prev,
+                            warnings: [...(prev.warnings || []), value],
+                            warnings_count: (prev.warnings || []).length + 1
+                          } : null);
+                          if (input) input.value = '';
+                        }
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  
+                  {/* Display warnings */}
+                  {editingEmployee.warnings && editingEmployee.warnings.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="text-sm text-gray-600">
+                        Warnings ({editingEmployee.warnings_count || editingEmployee.warnings.length}):
+                      </div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {editingEmployee.warnings.map((warning, index) => (
+                          <div key={index} className="flex items-center justify-between bg-yellow-50 border border-yellow-200 rounded px-3 py-2">
+                            <span className="text-sm text-yellow-800">{warning}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingEmployee(prev => prev ? {
+                                  ...prev,
+                                  warnings: prev.warnings?.filter((_, i) => i !== index) || [],
+                                  warnings_count: (prev.warnings?.length || 1) - 1
+                                } : null);
+                              }}
+                              className="h-6 w-6 p-0 text-yellow-600 hover:text-yellow-800"
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               

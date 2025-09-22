@@ -148,6 +148,64 @@ const EmployeeCard = ({ employee, onViewProfile }: EmployeeCardProps) => {
           )}
         </div>
 
+        {/* Warnings Section - Compact Modern Design */}
+        {employee.warningsCount > 0 && (
+          <div className="relative overflow-hidden p-2.5 bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 border border-amber-200/60 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 group">
+            {/* Animated background pattern */}
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-100/20 to-yellow-100/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            
+            {/* Compact decorative elements */}
+            <div className="absolute top-0 right-0 w-12 h-12 bg-gradient-to-br from-amber-200/30 to-yellow-200/30 rounded-full -translate-y-6 translate-x-6 blur-lg"></div>
+            <div className="absolute bottom-0 left-0 w-10 h-10 bg-gradient-to-tr from-orange-200/20 to-amber-200/20 rounded-full translate-y-5 -translate-x-5 blur-md"></div>
+            
+            <div className="relative flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                {/* Compact icon with pulse animation */}
+                <div className="relative">
+                  <div className="absolute inset-0 bg-amber-400/30 rounded-full animate-pulse"></div>
+                  <div className="relative p-1.5 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full shadow-md">
+                    <AlertTriangle className="h-3 w-3 text-white drop-shadow-sm" />
+                  </div>
+                </div>
+                
+                <div className="flex flex-col">
+                  <span className="text-xs font-semibold text-amber-900 tracking-wide">
+                    Warning{employee.warningsCount !== 1 ? 's' : ''}
+                  </span>
+                  <span className="text-[10px] text-amber-700/80 font-medium">
+                    Attention needed
+                  </span>
+                </div>
+              </div>
+              
+              {/* Compact badge with glow effect */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-amber-400/40 rounded-full blur-sm animate-pulse"></div>
+                <div className="relative px-2 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full shadow-md border border-amber-300/50">
+                  {employee.warningsCount}
+                </div>
+              </div>
+            </div>
+            
+            {/* Compact progress indicator */}
+            <div className="mt-2 flex items-center space-x-0.5">
+              {Array.from({ length: Math.min(employee.warningsCount, 4) }).map((_, i) => (
+                <div 
+                  key={i} 
+                  className="h-1 w-4 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-sm"
+                  style={{ 
+                    animationDelay: `${i * 0.1}s`,
+                    animation: 'pulse 2s infinite'
+                  }}
+                ></div>
+              ))}
+              {employee.warningsCount > 4 && (
+                <span className="text-[10px] text-amber-600 font-medium ml-1">+{employee.warningsCount - 4}</span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Work Details */}
          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
            {employee.location && (

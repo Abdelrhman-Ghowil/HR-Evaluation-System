@@ -102,10 +102,12 @@ export interface CreateEmployeeRequest {
     last_name: string;
     title?: string;
     phone?: string;
+    gender?: string;
   };
   employee_code: string;
   country_code: string;
   warnings?: string[];
+  warnings_count?: number;
   company_id: string;
   departments_ids: string[];
   managerial_level: string;
@@ -130,10 +132,12 @@ export interface UpdateEmployeeRequest {
     last_name?: string;
     title?: string;
     phone?: string;
+    gender?: string;
   };
   employee_code?: string;
   country_code?: string;
   warnings?: string[];
+  warnings_count?: number;
   company_id?: string;
   departments_ids?: string[];
   managerial_level?: string;
@@ -536,5 +540,5 @@ export interface ImportResponse {
   to_create?: number;
   to_update?: number;
   message?: string;
-  errors?: any[];
+  errors?: ApiError[];
 }
