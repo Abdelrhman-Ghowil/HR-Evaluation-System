@@ -9,6 +9,8 @@ export interface Employee {
   phone: string;
   hire_date: string;
   status: 'Active' | 'Inactive';
+  warnings: string[];
+  warnings_count: number;
 }
 
 export interface EmployeeInput {
