@@ -431,6 +431,13 @@ class ApiService {
     return response.data;
   }
 
+  async getDepartmentsByCompany(companyId: string): Promise<PaginatedResponse<ApiDepartment>> {
+    const response: AxiosResponse<PaginatedResponse<ApiDepartment>> = await this.api.get('/api/org/departments/', {
+      params: { company_id: companyId },
+    });
+    return response.data;
+  }
+
   async getDepartment(departmentId: string): Promise<ApiDepartment> {
     const response: AxiosResponse<ApiDepartment> = await this.api.get(`/api/org/departments/${departmentId}/`);
     return response.data;

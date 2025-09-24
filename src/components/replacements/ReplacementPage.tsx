@@ -823,7 +823,8 @@ const handleSubSectionChange = (subSectionId: string) => {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              const companyName = companies.find(c => c.company_id === placement.company_id)?.name || '';
+                              // Use existing company_name from placement data, or look it up in companies array as fallback
+                              const companyName = placement.company_name || companies.find(c => c.company_id === placement.company_id)?.name || '';
                               setEditingPlacement({
                                 ...placement,
                                 company_name: companyName
@@ -873,41 +874,9 @@ const handleSubSectionChange = (subSectionId: string) => {
                 </div>
                 <div>
                 <Label htmlFor="company_select">Company</Label>
-                {editingPlacement.company_id && editingPlacement.company_name ? (
-                  <div className="flex items-center justify-between p-2 border rounded-md bg-gray-50">
-                    <span className="text-sm font-medium">{editingPlacement.company_name}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setEditingPlacement({...editingPlacement, company_id: '', company_name: ''});
-                        setSelectedCompanyId('');
-                      }}
-                      className="text-blue-600 hover:text-blue-700"
-                    >
-                      Change
-                    </Button>
-                  </div>
-                ) : (
-                  <Select
-                    value={editingPlacement.company_id || ''}
-                    onValueChange={handleCompanyChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a company" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companiesLoading ? (
-                        <SelectItem value="loading" disabled>Loading companies...</SelectItem>
-                      ) : (
-                        companies.map((company: ApiCompany) => (
-                          <SelectItem key={company.company_id} value={company.company_id}>
-                            {company.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                )}
+                <div className="p-2 border rounded-md bg-gray-50">
+                  <span className="text-sm font-medium">{editingPlacement.company_name || 'No company assigned'}</span>
+                </div>
               </div>
               <div>
                 <Label htmlFor="department_select">Department</Label>
@@ -930,14 +899,16 @@ const handleSubSectionChange = (subSectionId: string) => {
                   <Select
                     value={editingPlacement.department_id || ''}
                     onValueChange={handleDepartmentChange}
-                    disabled={!selectedCompanyId || departmentsLoading}
+                    disabled={!editingPlacement.company_id || departmentsLoading}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={selectedCompanyId ? "Select a department" : "Select a company first"} />
+                      <SelectValue placeholder={editingPlacement.company_id ? "Select a department" : "Select a company first"} />
                     </SelectTrigger>
                     <SelectContent>
                       {departmentsLoading ? (
                         <SelectItem value="loading" disabled>Loading departments...</SelectItem>
+                      ) : !editingPlacement.company_id ? (
+                        <SelectItem value="no-company" disabled>Select a company first</SelectItem>
                       ) : departments.length === 0 ? (
                         <SelectItem value="no-departments" disabled>No departments available</SelectItem>
                       ) : (
