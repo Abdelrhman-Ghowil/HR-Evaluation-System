@@ -2,6 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Filter } from 'lucide-react';
 
 interface EmployeeFiltersProps {
@@ -10,6 +11,9 @@ interface EmployeeFiltersProps {
   selectedDepartment: string;
   setSelectedDepartment: (department: string) => void;
   departments: string[];
+  selectedCompany: string;
+  setSelectedCompany: (company: string) => void;
+  companies: { company_id: string; name: string; }[];
 }
 
 const EmployeeFilters = ({
@@ -17,7 +21,10 @@ const EmployeeFilters = ({
   setSearchTerm,
   selectedDepartment,
   setSelectedDepartment,
-  departments
+  departments,
+  selectedCompany,
+  setSelectedCompany,
+  companies
 }: EmployeeFiltersProps) => {
   return (
     <div className="flex flex-col sm:flex-row gap-4">
@@ -42,6 +49,19 @@ const EmployeeFilters = ({
             </option>
           ))}
         </select>
+        <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select company..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Companies</SelectItem>
+            {companies.map((company) => (
+              <SelectItem key={company.company_id} value={company.name}>
+                {company.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button variant="outline">
           <Filter className="h-4 w-4 mr-2" />
           Filter

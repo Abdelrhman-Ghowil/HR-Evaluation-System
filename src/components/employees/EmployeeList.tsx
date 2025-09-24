@@ -47,10 +47,12 @@ interface Employee {
 const EmployeeList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [selectedCompany, setSelectedCompany] = useState('all');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<ApiDepartment[]>([]);
   const [companies, setCompanies] = useState<ApiCompany[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -163,20 +165,35 @@ const EmployeeList = () => {
   };
 
   // Fetch departments from API
-  const fetchDepartments = async () => {
+  const fetchDepartments = async (companyId?: string) => {
     try {
-      console.log('Fetching departments from API...');
-      const response = await apiService.getDepartments();
+      console.log('Fetching departments from API...', companyId ? `for company: ${companyId}` : 'all departments');
+      
+      let response;
+      if (companyId && companyId !== 'all') {
+        // Fetch departments for specific company
+        response = await apiService.getDepartmentsByCompany(companyId);
+      } else {
+        // Fetch all departments
+        response = await apiService.getDepartments();
+      }
+      
       console.log('Departments API Response:', response);
       
-      if (response && Array.isArray(response)) {
+      // Handle both paginated response and direct array response
+      if (response && Array.isArray(response.results)) {
+        setDepartments(response.results);
+        console.log(`Successfully loaded ${response.results.length} departments from API`);
+      } else if (response && Array.isArray(response)) {
         setDepartments(response);
         console.log(`Successfully loaded ${response.length} departments from API`);
       } else {
         console.warn('Unexpected departments API response structure:', response);
+        setDepartments([]);
       }
     } catch (error) {
       console.error('Error fetching departments:', error);
+      setDepartments([]);
     }
   };
 
@@ -326,6 +343,7 @@ const EmployeeList = () => {
   // Fetch employees from API
   const fetchEmployees = async () => {
     try {
+      setLoading(true);
       console.log('Fetching employees from API...');
       const response = await apiService.getEmployees();
       console.log('API Response:', response); // Debug log
@@ -356,6 +374,8 @@ const EmployeeList = () => {
       }
       // Set empty array instead of fallback data
       setEmployees([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -366,6 +386,32 @@ const EmployeeList = () => {
     fetchCompanies();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
+
+  // Fetch departments when selected company changes
+  useEffect(() => {
+    if (selectedCompany) {
+      const selectedCompanyData = companies.find(company => company.name === selectedCompany);
+      const companyId = selectedCompanyData?.company_id;
+      fetchDepartments(companyId);
+      
+      // Reset department filter when company changes
+      setSelectedDepartment('all');
+    }
+  }, [selectedCompany, companies]);
+
+  // Fetch departments for create form when company is selected
+  useEffect(() => {
+    if (newEmployee.companyId) {
+      fetchDepartments(newEmployee.companyId);
+    }
+  }, [newEmployee.companyId]);
+
+  // Fetch departments for edit form when company is selected
+  useEffect(() => {
+    if (editingEmployee?.company_id) {
+      fetchDepartments(editingEmployee.company_id);
+    }
+  }, [editingEmployee?.company_id]);
 
   // Removed initialEmployees array - using API data exclusively
 
@@ -734,6 +780,7 @@ const EmployeeList = () => {
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedDepartment('all');
+    setSelectedCompany('all');
   };
 
 
@@ -743,7 +790,8 @@ const EmployeeList = () => {
                         employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         employee.department.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDepartment = selectedDepartment === 'all' || employee.department === selectedDepartment;
-    return matchesSearch && matchesDepartment;
+    const matchesCompany = selectedCompany === 'all' || employee.companyName === selectedCompany;
+    return matchesSearch && matchesDepartment && matchesCompany;
   });
 
   if (selectedEmployee) {
@@ -752,6 +800,15 @@ const EmployeeList = () => {
         employee={{...selectedEmployee, status: selectedEmployee.status === 'Active' ? 'Active' : 'Inactive'}}
         onBack={() => setSelectedEmployee(null)} 
       />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <span className="ml-2 text-gray-600">Loading employees...</span>
+      </div>
     );
   }
 
@@ -1053,7 +1110,10 @@ const EmployeeList = () => {
                         setNewEmployee(prev => ({ 
                           ...prev, 
                           companyId: value,
-                          companyName: selectedCompany?.name || ''
+                          companyName: selectedCompany?.name || '',
+                          // Reset department when company changes
+                          departmentId: '',
+                          department: ''
                         }));
                       }}
                     >
@@ -1274,6 +1334,19 @@ const EmployeeList = () => {
               {departments.map((dept) => (
                 <SelectItem key={dept.department_id} value={dept.name}>
                   {dept.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Companies</SelectItem>
+              {companies.map((company) => (
+                <SelectItem key={company.company_id} value={company.name}>
+                  {company.name}
                 </SelectItem>
               ))}
             </SelectContent>
