@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { Building, Users, Plus, Eye, Edit, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Building, Users, Plus, Eye, Edit, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle, ArrowLeft, Home } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { ApiDepartment, ApiCompany, CreateDepartmentRequest, UpdateDepartmentRequest, ApiEmployee } from '@/types/api';
 import { useOrganizational } from '@/contexts/OrganizationalContext';
@@ -21,8 +22,13 @@ interface DepartmentListProps {
 const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
   const { setDepartment } = useOrganizational();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const companyIdFromUrl = searchParams.get('company_id');
+  
   const [departments, setDepartments] = useState<ApiDepartment[]>([]);
   const [companies, setCompanies] = useState<ApiCompany[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<ApiCompany | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -58,7 +64,17 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       setLoading(true);
       setError(null);
       console.log('Fetching departments from API...');
-      const response = await apiService.getDepartments();
+      
+      let response;
+      if (companyIdFromUrl) {
+        // Fetch departments for specific company
+        console.log(`Fetching departments for company ID: ${companyIdFromUrl}`);
+        response = await apiService.getDepartmentsByCompany(companyIdFromUrl);
+      } else {
+        // Fetch all departments
+        response = await apiService.getDepartments();
+      }
+      
       console.log('Departments API Response:', response);
       
       // Handle both paginated response and direct array response
@@ -99,7 +115,15 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
   useEffect(() => {
     fetchDepartments();
     fetchCompanies();
-  }, []);
+  }, [companyIdFromUrl]);
+
+  // Set selected company when companies are loaded and companyIdFromUrl is present
+  useEffect(() => {
+    if (companyIdFromUrl && companies.length > 0) {
+      const company = companies.find(c => c.id === companyIdFromUrl);
+      setSelectedCompany(company || null);
+    }
+  }, [companyIdFromUrl, companies]);
 
   // Validation function
   const validateDepartmentForm = () => {
@@ -424,8 +448,12 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Departments</h2>
-            <p className="text-gray-600">Manage organizational departments</p>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {selectedCompany ? `${selectedCompany.name} - Departments` : 'Departments'}
+            </h2>
+            <p className="text-gray-600">
+              {selectedCompany ? `Manage departments for ${selectedCompany.name}` : 'Manage organizational departments'}
+            </p>
           </div>
           <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
             <Plus className="h-4 w-4 mr-2" />
@@ -447,8 +475,12 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Departments</h2>
-            <p className="text-gray-600">Manage organizational departments</p>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {selectedCompany ? `${selectedCompany.name} - Departments` : 'Departments'}
+            </h2>
+            <p className="text-gray-600">
+              {selectedCompany ? `Manage departments for ${selectedCompany.name}` : 'Manage organizational departments'}
+            </p>
           </div>
           <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
             <Plus className="h-4 w-4 mr-2" />
@@ -469,10 +501,44 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb Navigation */}
+      <nav className="flex items-center space-x-2 text-sm" aria-label="Breadcrumb">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate('/companies')}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 p-2"
+        >
+          <Home className="h-4 w-4" />
+          Companies
+        </Button>
+        <span className="text-gray-400">/</span>
+        <span className="text-gray-900 font-medium">
+          {selectedCompany ? `${selectedCompany.name} - Departments` : 'Departments'}
+        </span>
+      </nav>
+
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Departments</h2>
-          <p className="text-gray-600">Manage organizational departments</p>
+          <div className="flex items-center gap-3 mb-2">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {selectedCompany ? `${selectedCompany.name} - Departments` : 'Departments'}
+            </h2>
+            {selectedCompany && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/companies')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Return to Companies
+              </Button>
+            )}
+          </div>
+          <p className="text-gray-600">
+            {selectedCompany ? `Manage departments for ${selectedCompany.name}` : 'Manage organizational departments'}
+          </p>
         </div>
         <div className="flex gap-3">
           <Button 

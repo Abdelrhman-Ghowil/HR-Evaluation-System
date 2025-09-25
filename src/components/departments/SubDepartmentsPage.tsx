@@ -51,7 +51,7 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
       </div>
     );
   }
-  const { selectedDepartment, setSubDepartment } = useOrganizational();
+  const { selectedDepartment, setDepartment, setSubDepartment } = useOrganizational();
   const { toast } = useToast();
   
   // Fetch departments for dropdown
@@ -289,8 +289,9 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
     setSubDepartmentToDelete(null);
   };
 
-  // Handle view sections
+  // Handle view sections - navigate to sections for the selected sub-department
   const handleViewSections = (subDepartment: ApiSubDepartment) => {
+    // Set the sub-department in context to filter sections
     setSubDepartment(subDepartment);
     if (onViewChange) {
       onViewChange('sections');
@@ -376,9 +377,21 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
             <li>
               <div className="flex items-center">
                 <span className="mx-2 text-gray-400">/</span>
-                <span className="text-sm font-medium text-gray-500">
-                  {selectedDepartment ? selectedDepartment.name : 'All Departments'}
-                </span>
+                {selectedDepartment ? (
+                  <button
+                    onClick={() => {
+                      setDepartment(null);
+                      onViewChange?.('departments');
+                    }}
+                    className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    {selectedDepartment.name}
+                  </button>
+                ) : (
+                  <span className="text-sm font-medium text-gray-500">
+                    All Departments
+                  </span>
+                )}
               </div>
             </li>
             <li>
