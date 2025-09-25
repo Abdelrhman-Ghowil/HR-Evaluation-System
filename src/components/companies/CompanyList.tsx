@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, Users, MapPin, Plus, Loader2, Edit, Trash2, Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Search, Filter } from 'lucide-react';
+import { Building2, Users, MapPin, Plus, Loader2, Edit, Trash2, Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Search, Filter, Eye, Building } from 'lucide-react';
 import { apiService } from '@/services/api';
-import { ApiCompany, CreateCompanyRequest, UpdateCompanyRequest } from '@/types/api';
+import { ApiCompany, CreateCompanyRequest, UpdateCompanyRequest, ApiDepartment } from '@/types/api';
 import { useUpdateCompany, useDeleteCompany, useImportCompanies } from '@/hooks/useApi';
 
 const CompanyList = () => {
+  const navigate = useNavigate();
   const [companies, setCompanies] = useState<ApiCompany[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +40,13 @@ const CompanyList = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // View Departments modal state
+  const [isViewDepartmentsModalOpen, setIsViewDepartmentsModalOpen] = useState(false);
+  const [selectedCompanyForDepartments, setSelectedCompanyForDepartments] = useState<ApiCompany | null>(null);
+  const [departments, setDepartments] = useState<ApiDepartment[]>([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
+  const [departmentsError, setDepartmentsError] = useState<string | null>(null);
 
   // Filter state variables
   const [searchTerm, setSearchTerm] = useState('');
@@ -108,6 +117,12 @@ const CompanyList = () => {
   useEffect(() => {
     fetchCompanies();
   }, []);
+
+  // Handle view departments navigation
+  const handleViewDepartments = (company: ApiCompany) => {
+    // Navigate to departments page with company_id as query parameter
+    navigate(`/departments?company_id=${company.company_id}`);
+  };
 
   // Validation function
   const validateForm = (): boolean => {
@@ -713,10 +728,19 @@ const CompanyList = () => {
                   </div>
                 )}
                 
-                <div className="pt-2 border-t border-gray-100">
+                <div className="pt-2 border-t border-gray-100 space-y-2">
                   <p className="text-xs text-gray-500">
                     Created: {new Date(company.created_at).toLocaleDateString()}
                   </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewDepartments(company)}
+                    className="w-full h-8 text-xs"
+                  >
+                    <Eye className="h-3 w-3 mr-1" />
+                    View Departments
+                  </Button>
                 </div>
               </CardContent>
             </Card>
