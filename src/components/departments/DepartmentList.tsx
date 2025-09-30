@@ -13,7 +13,7 @@ import { apiService } from '@/services/api';
 import { ApiDepartment, ApiCompany, CreateDepartmentRequest, UpdateDepartmentRequest, ApiEmployee } from '@/types/api';
 import { useOrganizational } from '@/contexts/OrganizationalContext';
 import { useEmployees } from '@/hooks/useApi';
-import { useManagers } from '@/hooks/useManagers';
+import { useManagers } from '@/hooks/usemanagers';
 import { useToast } from '@/hooks/use-toast';
 
 interface DepartmentListProps {
