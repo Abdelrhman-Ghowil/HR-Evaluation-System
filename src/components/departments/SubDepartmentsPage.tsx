@@ -457,7 +457,7 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
                         </SelectItem>
                       ))}
                       {departments.length === 0 && !departmentsLoading && (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="no-department" disabled>
                           No departments available
                         </SelectItem>
                       )}
@@ -682,7 +682,7 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
                     </SelectItem>
                   ))}
                   {departments.length === 0 && !departmentsLoading && (
-                    <SelectItem value="" disabled>
+                    <SelectItem value="no-department" disabled>
                       No departments available
                     </SelectItem>
                   )}

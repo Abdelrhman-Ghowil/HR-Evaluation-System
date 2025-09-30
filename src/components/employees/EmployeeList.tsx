@@ -1029,11 +1029,17 @@ const EmployeeList = () => {
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept.department_id} value={dept.department_id}>
-                            {dept.name}
+                        {departments.length > 0 ? (
+                          departments.map((dept) => (
+                            <SelectItem key={dept.department_id} value={dept.department_id}>
+                              {dept.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-department" disabled>
+                            No departments for selected company 
                           </SelectItem>
-                        ))}
+                        )}
                       </SelectContent>
                     </Select>
                     {validationErrors.department && (
@@ -1202,7 +1208,7 @@ const EmployeeList = () => {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
+                  {/* <div className="space-y-2">
                     <Label htmlFor="directManager" className="text-sm font-medium">Direct Manager</Label>
                     <Input
                       id="directManager"
@@ -1211,7 +1217,7 @@ const EmployeeList = () => {
                       placeholder="Manager's name"
                       className="w-full"
                     />
-                  </div>
+                  </div> */}
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="joinDate" className="text-sm font-medium">Join Date *</Label>
                     <Input
@@ -1606,11 +1612,17 @@ const EmployeeList = () => {
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept.department_id} value={dept.name}>
-                            {dept.name}
+                        {departments.length > 0 ? (
+                          departments.map((dept) => (
+                            <SelectItem key={dept.department_id} value={dept.name}>
+                              {dept.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-department" disabled>
+                            No departments in selected company
                           </SelectItem>
-                        ))}
+                        )}
                       </SelectContent>
                     </Select>
                     {editValidationErrors.department && (
@@ -1777,7 +1789,7 @@ const EmployeeList = () => {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
+                  {/* <div className="space-y-2">
                     <Label htmlFor="edit-directManager" className="text-sm font-medium">Direct Manager</Label>
                     <Input
                       id="edit-directManager"
@@ -1786,7 +1798,7 @@ const EmployeeList = () => {
                       placeholder="Enter direct manager"
                       className="w-full"
                     />
-                  </div>
+                  </div> */}
                 </div>
               </div>
 

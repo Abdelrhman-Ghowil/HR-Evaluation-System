@@ -13,6 +13,7 @@ import { apiService } from '@/services/api';
 import { ApiDepartment, ApiCompany, CreateDepartmentRequest, UpdateDepartmentRequest, ApiEmployee } from '@/types/api';
 import { useOrganizational } from '@/contexts/OrganizationalContext';
 import { useEmployees } from '@/hooks/useApi';
+import { useManagers } from '@/hooks/usemanagers';
 import { useToast } from '@/hooks/use-toast';
 
 interface DepartmentListProps {
@@ -54,9 +55,24 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
   const [uploadMessage, setUploadMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch employees for manager dropdown
-  const { data: employeesData } = useEmployees();
-  const employees = employeesData?.results || [];
+  // Fetch employees for manager dropdown - replaced with useManagers hook
+  // const { data: employeesData } = useEmployees();
+  // const employees = employeesData?.results || [];
+
+  // Get company_id from the selected company in the edit form
+  const selectedCompanyId = editingDepartment?.company_id || 
+    (editingDepartment?.company ? 
+      companies.find(c => c.name === editingDepartment.company)?.company_id : 
+      undefined);
+
+  // Get company_id from the selected company in the add form
+  const newDepartmentCompanyId = newDepartment.company_id;
+
+  // Fetch managers (employees with roles LM, HOD, HR) for the selected company
+  const { data: managers = [], isLoading: managersLoading } = useManagers(selectedCompanyId);
+  
+  // Fetch managers for the add department form
+  const { data: newDepartmentManagers = [], isLoading: newDepartmentManagersLoading } = useManagers(newDepartmentCompanyId);
 
   // Fetch departments from API
   const fetchDepartments = async () => {
@@ -120,7 +136,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
   // Set selected company when companies are loaded and companyIdFromUrl is present
   useEffect(() => {
     if (companyIdFromUrl && companies.length > 0) {
-      const company = companies.find(c => c.id === companyIdFromUrl);
+      const company = companies.find(c => c.company_id === companyIdFromUrl);
       setSelectedCompany(company || null);
     }
   }, [companyIdFromUrl, companies]);
@@ -156,9 +172,10 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
         company_id: newDepartment.company_id
       };
       
-      // Only include manager if it's not empty
+      // Only include manager_id if it's not empty
+      // Send the employee_id as the manager_id value
       if (newDepartment.manager && newDepartment.manager.trim()) {
-        departmentData.manager = newDepartment.manager.trim();
+        departmentData.manager_id = newDepartment.manager.trim(); // This should be the employee_id from the dropdown
       }
       
       console.log('Creating department with data:', departmentData);
@@ -228,9 +245,10 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
         name: editingDepartment.name
       };
       
-      // Only include manager field if it's not 'no-manager'
+      // Only include manager_id field if it's not 'no-manager'
+      // Send the employee_id as the manager_id value
       if (editingDepartment.manager && editingDepartment.manager !== 'no-manager') {
-        updateData.manager = editingDepartment.manager;
+        updateData.manager_id = editingDepartment.manager; // This should be the employee_id from the dropdown
       }
 
       const updatedDepartment = await apiService.updateDepartment(editingDepartment.department_id, updateData);
@@ -607,13 +625,31 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="manager" className="text-sm font-medium">Manager (Optional)</Label>
-                    <Input
-                      id="manager"
-                      placeholder="e.g., John Doe, jane.smith@company.com"
-                      value={newDepartment.manager || ''}
-                      onChange={(e) => setNewDepartment(prev => ({ ...prev, manager: e.target.value }))}
-                      className={validationErrors.manager ? 'border-red-500' : ''}
-                    />
+                    <Select
+                      value={newDepartment.manager || 'no-manager'}
+                      onValueChange={(value) => setNewDepartment(prev => ({ 
+                        ...prev, 
+                        manager: value === 'no-manager' ? '' : value 
+                      }))}
+                    >
+                      <SelectTrigger className={validationErrors.manager ? 'border-red-500' : ''}>
+                        <SelectValue placeholder="Select a manager (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {newDepartmentManagersLoading ? (
+                          <SelectItem value="loading" disabled>Loading managers...</SelectItem>
+                        ) : (
+                          <>
+                            <SelectItem value="no-manager">No Manager</SelectItem>
+                            {Array.isArray(newDepartmentManagers) && newDepartmentManagers.map((manager) => (
+                            <SelectItem key={manager.employee_id} value={manager.user_id}>
+                              {manager.name} ({manager.role})
+                            </SelectItem>
+                            ))}
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
                     {validationErrors.manager && (
                       <p className="text-sm text-red-500">{validationErrors.manager}</p>
                     )}
@@ -1016,21 +1052,30 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
               </Label>
               <div className="col-span-3">
                 <Select
-                  value={editingDepartment?.manager || ''}
+                  value={editingDepartment?.manager || 'no-manager'}
                   onValueChange={(value) => setEditingDepartment(prev => 
-                    prev ? { ...prev, manager: value } : null
+                    prev ? { 
+                      ...prev, 
+                      manager: value === 'no-manager' ? '' : value 
+                    } : null
                   )}
                 >
                   <SelectTrigger className={validationErrors.manager ? 'border-red-500' : ''}>
                     <SelectValue placeholder="Select a manager (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="no-manager">No Manager</SelectItem>
-                    {employees.map((employee) => (
-                      <SelectItem key={employee.employee_id} value={employee.name}>
-                        {employee.name}
-                      </SelectItem>
-                    ))}
+                    {managersLoading ? (
+                      <SelectItem value="loading" disabled>Loading managers...</SelectItem>
+                    ) : (
+                      <>
+                        <SelectItem value="no-manager">No Manager</SelectItem>
+                        {Array.isArray(managers) && managers.map((manager) => (
+                          <SelectItem key={manager.employee_id} value={manager.user_id}>
+                            {manager.name} ({manager.role})
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
                 {validationErrors.manager && (
