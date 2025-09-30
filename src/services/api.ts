@@ -717,8 +717,8 @@ class ApiService {
     return response.data;
   }
 
-  async updatePlacement(placementId: string, placementData: Partial<CreatePlacementRequest>): Promise<ApiPlacement> {
-    const response: AxiosResponse<ApiPlacement> = await this.api.put(`/api/org/placements/${placementId}`, placementData);
+  async updatePlacement(employeeId: string, placementData: Partial<CreatePlacementRequest>): Promise<ApiPlacement> {
+    const response: AxiosResponse<ApiPlacement> = await this.api.put(`/api/org/placements/${employeeId}/`, placementData);
     return response.data;
   }
 

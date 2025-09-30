@@ -185,6 +185,7 @@ export interface ApiDepartment {
   name: string;
   employee_count?: number;
   company: string;
+  company_id?: string; // Add company_id field that might be in API response
   manager?: string;
   created_at: string;
   updated_at: string;
@@ -193,13 +194,13 @@ export interface ApiDepartment {
 export interface CreateDepartmentRequest {
   name: string;
   company_id: string;
-  manager?: string;
+  manager_id?: string;
 }
 
 export interface UpdateDepartmentRequest {
   name?: string;
   employee_count?: number;
-  manager?: string;
+  manager_id?: string;
 }
 
 // Placement Types
@@ -392,18 +393,17 @@ export interface AuthHeaders {
 
 // Query Parameters
 export interface EmployeeQueryParams {
-  company?: string;
+  company_id?: string;
   department?: string;
   status?: EmployeeStatus;
-  role?: UserRole;
+  role?: UserRole | string; // Allow string for multiple roles like "LM,HOD,HR"
   page?: number;
   page_size?: number;
 }
 
 export interface DepartmentQueryParams {
-  company?: string;
-  page?: number;
-  page_size?: number;
+  company_id?: string;
+
 }
 
 export interface EvaluationQueryParams {
@@ -411,8 +411,6 @@ export interface EvaluationQueryParams {
   type?: EvaluationType;
   status?: EvaluationStatus;
   period?: string;
-  page?: number;
-  page_size?: number;
 }
 
 // Weights Configuration Types
