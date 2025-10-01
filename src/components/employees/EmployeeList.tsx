@@ -53,6 +53,9 @@ const EmployeeList = () => {
   const [departments, setDepartments] = useState<ApiDepartment[]>([]);
   const [companies, setCompanies] = useState<ApiCompany[]>([]);
   const [loading, setLoading] = useState(true);
+  const [autoRefreshing, setAutoRefreshing] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [lastError, setLastError] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -71,9 +74,9 @@ const EmployeeList = () => {
     department: '',
     departmentId: '',
     position: '',
-    role: 'EMP' ,
+    role: 'EMP' as 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP',
     managerialLevel: 'Individual Contributor',
-    status: 'Active' ,
+    status: 'Active' as 'Active' | 'Inactive',
     companyName: 'Ninja',
     companyId: '',
     directManager: '',
@@ -120,6 +123,7 @@ const EmployeeList = () => {
       jobType: 'Full-time',
       location: '',
       branch: 'Office',
+      gender: '',
       username: '',
       password: 'Password123',
       firstName: '',
@@ -272,14 +276,16 @@ const EmployeeList = () => {
     try {
       const result = await apiService.importEmployees(selectedFile, true);
       setImportResults(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Dry run failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Validation failed. Please try again.';
+      const errorDetails = (error as any)?.details?.errors || [];
       setImportResults({  
         status: 'imported',
         created: 0,
         updated: 0,
-        message: error?.message || 'Validation failed. Please try again.',
-        errors: error?.details?.errors || []
+        message: errorMessage,
+        errors: errorDetails
       });
     } finally {
       setIsImporting(false);
@@ -298,14 +304,16 @@ const EmployeeList = () => {
       if (result.status === 'imported' && (result.created > 0 || result.updated > 0)) {
         fetchEmployees(); // Refresh the employees list
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Import failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Import failed. Please try again.';
+      const errorDetails = (error as any)?.details?.errors || [];
       setImportResults({
         status: 'imported',
         created: 0,
         updated: 0,
-        message: error?.message || 'Import failed. Please try again.',
-        errors: error?.details?.errors || []
+        message: errorMessage,
+        errors: errorDetails
       });
     } finally {
       setIsImporting(false);
@@ -340,50 +348,170 @@ const EmployeeList = () => {
     }
   };
 
-  // Fetch employees from API
-  const fetchEmployees = async () => {
+  // Fetch employees from API with enhanced retry logic and error handling
+  const fetchEmployees = async (retryAttempt = 0, isAutoRefresh = false) => {
+    const maxRetries = 3;
+    const baseDelay = 1000;
+    const retryDelay = baseDelay * Math.pow(2, retryAttempt); // Exponential backoff: 1s, 2s, 4s
+    const startTime = Date.now();
+    
+    // Update retry count for user feedback
+    setRetryCount(retryAttempt);
+    
     try {
-      setLoading(true);
-      console.log('Fetching employees from API...');
+      if (isAutoRefresh) {
+        setAutoRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      
+      // Clear previous error on new attempt
+      if (retryAttempt === 0) {
+        setLastError(null);
+      }
+      
+      // Enhanced logging for troubleshooting
+      console.log(`[Employee Fetch] Starting attempt ${retryAttempt + 1}/${maxRetries + 1}${isAutoRefresh ? ' [Auto-refresh]' : ''}`);
+      console.log(`[Employee Fetch] Request timestamp: ${new Date().toISOString()}`);
+      
       const response = await apiService.getEmployees();
-      console.log('API Response:', response); // Debug log
+      const responseTime = Date.now() - startTime;
+      
+      console.log(`[Employee Fetch] Response received in ${responseTime}ms`);
+      console.log(`[Employee Fetch] Response type: ${typeof response}, isArray: ${Array.isArray(response)}`);
       
       // Check if response has the expected structure
       if (response && response.results && Array.isArray(response.results)) {
         const transformedEmployees = response.results.map(transformApiEmployee);
         setEmployees(transformedEmployees);
-        console.log(`Successfully loaded ${transformedEmployees.length} employees from API`);
+        console.log(`[Employee Fetch] ✅ Successfully loaded ${transformedEmployees.length} employees from paginated API response`);
+        console.log(`[Employee Fetch] Total response time: ${responseTime}ms`);
+        
+        // Clear error state on success
+        setLastError(null);
+        setRetryCount(0);
       } else if (response && Array.isArray(response)) {
         // Handle case where API returns array directly instead of paginated response
         const transformedEmployees = response.map(transformApiEmployee);
         setEmployees(transformedEmployees);
-        console.log(`Successfully loaded ${transformedEmployees.length} employees from API (direct array)`);
+        console.log(`[Employee Fetch] ✅ Successfully loaded ${transformedEmployees.length} employees from direct array response`);
+        console.log(`[Employee Fetch] Total response time: ${responseTime}ms`);
+        
+        // Clear error state on success
+        setLastError(null);
+        setRetryCount(0);
       } else {
-        console.warn('Unexpected API response structure:', response);
-        console.error('API returned unexpected structure - no fallback data available');
+        console.warn(`[Employee Fetch] ⚠️ Unexpected API response structure:`, response);
+        console.error(`[Employee Fetch] ❌ API returned unexpected structure - no fallback data available`);
         setEmployees([]);
+        setLastError('Unexpected response format from server');
       }
     } catch (error) {
-      console.error('Error fetching employees:', error);
-      if (error.response?.status === 500) {
-        console.error('API server error (500) - no employees available');
+      const responseTime = Date.now() - startTime;
+      
+      // Enhanced error logging for troubleshooting
+      console.error(`[Employee Fetch] ❌ Error on attempt ${retryAttempt + 1}/${maxRetries + 1} (${responseTime}ms):`);
+      console.error(`[Employee Fetch] Error type: ${error.constructor.name}`);
+      console.error(`[Employee Fetch] Error message: ${error.message}`);
+      console.error(`[Employee Fetch] Error code: ${error.code || 'N/A'}`);
+      console.error(`[Employee Fetch] HTTP status: ${error.response?.status || 'N/A'}`);
+      console.error(`[Employee Fetch] HTTP status text: ${error.response?.statusText || 'N/A'}`);
+      console.error(`[Employee Fetch] Full error object:`, error);
+      
+      // Determine if error is retryable
+      const isRetryableError = (
+        // Server errors (5xx)
+        (error.response?.status >= 500 && error.response?.status < 600) ||
+        // Network errors
+        error.code === 'NETWORK_ERROR' ||
+        error.message?.includes('Network Error') ||
+        error.message?.includes('timeout') ||
+        error.message?.includes('ECONNREFUSED') ||
+        error.message?.includes('ENOTFOUND') ||
+        // Request timeout
+        error.code === 'ECONNABORTED' ||
+        // DNS resolution errors
+        error.code === 'EAI_AGAIN'
+      );
+      
+      console.log(`[Employee Fetch] Error is retryable: ${isRetryableError}`);
+      console.log(`[Employee Fetch] Retry count: ${retryAttempt}/${maxRetries}`);
+      
+      // Set user-friendly error message
+      let userErrorMessage = 'Failed to load employee data';
+      if (error.response?.status >= 500 && error.response?.status < 600) {
+        userErrorMessage = `Server error (${error.response.status}) - Please try again later`;
+      } else if (error.response?.status === 404) {
+        userErrorMessage = 'Employee data not found - Please check your permissions';
+      } else if (error.response?.status === 401) {
+        userErrorMessage = 'Authentication required - Please log in again';
+      } else if (error.response?.status === 403) {
+        userErrorMessage = 'Access denied - Insufficient permissions';
       } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
-        console.error('Network error - API may be unavailable, no employees available');
-      } else {
-        console.error('API error - no employees available');
+        userErrorMessage = 'Network connection failed - Check your internet connection';
+      } else if (error.message?.includes('timeout')) {
+        userErrorMessage = 'Request timed out - Server is taking too long to respond';
       }
-      // Set empty array instead of fallback data
+      
+      setLastError(userErrorMessage);
+      
+      // Enhanced retry logic
+      if (retryAttempt < maxRetries && isRetryableError) {
+        console.log(`[Employee Fetch] 🔄 Scheduling retry ${retryAttempt + 2}/${maxRetries + 1} in ${retryDelay}ms...`);
+        console.log(`[Employee Fetch] Next retry at: ${new Date(Date.now() + retryDelay).toISOString()}`);
+        
+        setTimeout(() => {
+          console.log(`[Employee Fetch] 🔄 Executing retry ${retryAttempt + 2}/${maxRetries + 1}`);
+          fetchEmployees(retryAttempt + 1, isAutoRefresh);
+        }, retryDelay);
+        return;
+      }
+      
+      // Final error handling after all retries exhausted
+      console.error(`[Employee Fetch] 💥 All retry attempts exhausted or non-retryable error`);
+      
+      if (error.response?.status >= 500 && error.response?.status < 600) {
+        console.error(`[Employee Fetch] 🔥 Server error (${error.response.status}) - API server is experiencing issues`);
+      } else if (error.response?.status === 404) {
+        console.error(`[Employee Fetch] 🔍 Not found (404) - Employee endpoint may not exist`);
+      } else if (error.response?.status === 401) {
+        console.error(`[Employee Fetch] 🔐 Unauthorized (401) - Authentication required`);
+      } else if (error.response?.status === 403) {
+        console.error(`[Employee Fetch] 🚫 Forbidden (403) - Insufficient permissions`);
+      } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
+        console.error(`[Employee Fetch] 🌐 Network error - API may be unavailable or connectivity issues`);
+      } else if (error.message?.includes('timeout')) {
+        console.error(`[Employee Fetch] ⏱️ Request timeout - API response took too long`);
+      } else {
+        console.error(`[Employee Fetch] ❓ Unknown error - Check network connectivity and API status`);
+      }
+      
+      // Set empty array as fallback
       setEmployees([]);
     } finally {
-      setLoading(false);
+      const totalTime = Date.now() - startTime;
+      console.log(`[Employee Fetch] 🏁 Request completed in ${totalTime}ms`);
+      
+      if (isAutoRefresh) {
+        setAutoRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
-  // Initialize data
+  // Initialize data - only run once on mount
   useEffect(() => {
-    fetchEmployees();
-    fetchDepartments();
-    fetchCompanies();
+    const initializeData = async () => {
+      // Fetch all data in parallel for better performance
+      await Promise.allSettled([
+        fetchEmployees(),
+        fetchDepartments(),
+        fetchCompanies()
+      ]);
+    };
+    
+    initializeData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
@@ -412,6 +540,29 @@ const EmployeeList = () => {
       fetchDepartments(editingEmployee.company_id);
     }
   }, [editingEmployee?.company_id]);
+
+  // Auto-refresh mechanism when no employees are found
+  useEffect(() => {
+    let refreshInterval: NodeJS.Timeout;
+    
+    // Only start auto-refresh if not loading and no employees found
+    if (!loading && !autoRefreshing && employees.length === 0) {
+      console.log('No employees found, starting auto-refresh mechanism...');
+      
+      // Start auto-refresh every 10 seconds
+      refreshInterval = setInterval(() => {
+        console.log('Auto-refreshing employee data...');
+        fetchEmployees(0, true);
+      }, 10000);
+    }
+    
+    // Cleanup interval on unmount or when employees are found
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, [loading, autoRefreshing, employees.length]);
 
   // Removed initialEmployees array - using API data exclusively
 
@@ -611,8 +762,8 @@ const EmployeeList = () => {
           updateData.warnings = editingEmployee.warnings || [];
         }
         
-        if ((editingEmployee.warnings_count || 0) !== (originalEmployee.warnings_count || 0)) {
-          updateData.warnings_count = editingEmployee.warnings_count || editingEmployee.warnings?.length || 0;
+        if ((editingEmployee.warningsCount || 0) !== (originalEmployee.warningsCount || 0)) {
+          updateData.warnings_count = editingEmployee.warningsCount || editingEmployee.warnings?.length || 0;
         }
         
         // Only make API call if there are changes
@@ -743,6 +894,7 @@ const EmployeeList = () => {
           countryCode: '+966',
           employeeCode: '',
           warnings: [] as string[],
+          warnings_count: 0,
           avatar: '',
           department: '',
           departmentId: '',
@@ -752,7 +904,6 @@ const EmployeeList = () => {
           status: 'Active' as const,
           companyName: 'Ninja',
           companyId: '',
-    
           directManager: '',
           joinDate: new Date().toISOString().split('T')[0],
           jobType: 'Full-time',
@@ -763,7 +914,6 @@ const EmployeeList = () => {
           firstName: '',
           lastName: '',
           gender: '',
-    
         });
         setValidationErrors({});
         setIsAddModalOpen(false);
@@ -1849,7 +1999,7 @@ const EmployeeList = () => {
                   {editingEmployee.warnings && editingEmployee.warnings.length > 0 && (
                     <div className="space-y-1">
                       <div className="text-sm text-gray-600">
-                        Warnings ({editingEmployee.warnings_count || editingEmployee.warnings.length}):
+                        Warnings ({editingEmployee.warningsCount || editingEmployee.warnings.length}):
                       </div>
                       <div className="space-y-1 max-h-32 overflow-y-auto">
                         {editingEmployee.warnings.map((warning, index) => (
@@ -2076,7 +2226,50 @@ const EmployeeList = () => {
           <CardContent className="py-12 text-center">
             <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No employees found</h3>
-            <p className="text-gray-600">Try adjusting your search criteria or add a new employee.</p>
+            <p className="text-gray-600 mb-4">Try adjusting your search criteria or add a new employee.</p>
+            
+            {/* Error message display */}
+            {lastError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center justify-center gap-2 text-red-700">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm font-medium">{lastError}</span>
+                </div>
+                {retryCount > 0 && (
+                  <div className="mt-2 text-xs text-red-600">
+                    Retry attempt {retryCount}/3 failed
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Auto-refresh indicator */}
+            {autoRefreshing && (
+              <div className="flex items-center justify-center gap-2 text-blue-600">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">
+                  {retryCount > 0 
+                    ? `Retrying... (attempt ${retryCount + 1}/4)` 
+                    : 'Checking for new employee data...'
+                  }
+                </span>
+              </div>
+            )}
+            
+            {/* Auto-refresh status when not actively refreshing */}
+            {!autoRefreshing && employees.length === 0 && !loading && (
+              <div className="text-sm text-gray-500 mt-2">
+                <div className="flex items-center justify-center gap-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span>Auto-refresh active - checking every 10 seconds</span>
+                </div>
+                {lastError && (
+                  <div className="mt-2 text-xs text-gray-400">
+                    Will retry automatically on next refresh
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

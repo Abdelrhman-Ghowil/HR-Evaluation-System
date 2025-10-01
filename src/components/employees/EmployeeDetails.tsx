@@ -12,6 +12,7 @@ import { ArrowLeft, Calendar, User, BarChart3, FileText, Target, Plus, Edit, Tra
 import EvaluationDetails from './EvaluationDetails';
 import { EmployeeInput, EvaluationInput } from '../../types/shared';
 import { useEvaluations, useCreateEvaluation, useUpdateEvaluation, useDeleteEvaluation, useUsers } from '../../hooks/useApi';
+import { useManagers } from '../../hooks/usemanagers';
 import { ApiEvaluation } from '../../types/api';
 import { 
   transformEmployeeForEvaluation, 
@@ -71,9 +72,17 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   // Fetch users for reviewer dropdown
   const { data: usersData, isLoading: usersLoading, error: usersError } = useUsers();
   
+  // Get company ID from employee for manager filtering
+  const employeeCompanyId = employee.company_id || employee.company;
+  
+  // Fetch managers (employees with roles LM, HOD, HR) for the employee's company
+  const { data: managers = [], isLoading: managersLoading, error: managersError } = useManagers(employeeCompanyId);
+  
   console.log('Evaluations loading:', evaluationsLoading);
   console.log('Evaluations error:', evaluationsError);
   console.log('Full evaluationsData object:', JSON.stringify(evaluationsData, null, 2));
+  console.log('Employee company ID:', employeeCompanyId);
+  console.log('Managers data:', managers);
 
   // Transform API data to match the expected format
   const transformApiEvaluation = (apiEval: any): EvaluationInput => {
@@ -172,7 +181,9 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const generateEvaluationRecords = () => {
     const records: Partial<EvaluationInput>[] = [];
     const baseRecord = {
-      reviewer: 'To be assigned',
+      reviewer: newEvaluation.reviewer_id ? 
+        managers.find(m => m.id === newEvaluation.reviewer_id)?.name || 'To be assigned' : 
+        'To be assigned',
       date: new Date().toISOString().split('T')[0],
       status: 'Draft' as const,
       type: newEvaluation.type
@@ -794,15 +805,42 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                     </div>
                   )}
 
-                  {/* Reviewer Selection - Dummy Input */}
+                  {/* Reviewer Selection */}
                   <div className="space-y-2">
                     <Label htmlFor="reviewer">Reviewer</Label>
-                    <Input
-                      id="reviewer"
-                      value="To be assigned"
-                      disabled
-                      className="bg-gray-50 text-gray-500"
-                    />
+                    <Select
+                      value={newEvaluation.reviewer_id || ''}
+                      onValueChange={(value) => setNewEvaluation({
+                        ...newEvaluation,
+                        reviewer_id: value
+                      })}
+                      disabled={managersLoading || managers.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={
+                          managersLoading ? "Loading managers..." :
+                          managers.length === 0 ? "No managers available" :
+                          "Select a reviewer"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {managersError ? (
+                          <SelectItem value="" disabled>
+                            Error loading managers
+                          </SelectItem>
+                        ) : managers.length === 0 ? (
+                          <SelectItem value="" disabled>
+                            No managers found for this company
+                          </SelectItem>
+                        ) : (
+                          managers.map((manager) => (
+                            <SelectItem key={manager.id} value={manager.id}>
+                              {manager.name} ({manager.role})
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
 
 
@@ -962,23 +1000,23 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
           {editingEvaluation && (
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                 <Label htmlFor="edit-type" className="text-right">
-                   Type
-                 </Label>
-                 <Select
-                   value={editingEvaluation.type}
-                   onValueChange={(value) => setEditingEvaluation({
-                     ...editingEvaluation,
-                     type: value as 'Quarterly' | 'Annual' | 'Optional'
-                   })}
-                 >
-                   <SelectTrigger className="col-span-3">
-                     <SelectValue />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="Quarterly">Quarterly</SelectItem>
-                     <SelectItem value="Annual">Annual</SelectItem>
-                     <SelectItem value="Optional">Optional</SelectItem>
+                <Label htmlFor="edit-type" className="text-right">
+                  Type
+                </Label>
+                <Select
+                  value={editingEvaluation.type}
+                  onValueChange={(value) => setEditingEvaluation({
+                    ...editingEvaluation,
+                    type: value as 'Quarterly' | 'Annual' | 'Optional'
+                  })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                   <SelectItem value="Quarterly">Quarterly</SelectItem>
+                    <SelectItem value="Annual">Annual</SelectItem>
+                   <SelectItem value="Optional">Optional</SelectItem>
                    </SelectContent>
                  </Select>
                </div>
@@ -1057,12 +1095,39 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                  <Label htmlFor="edit-reviewer" className="text-right">
                    Reviewer
                  </Label>
-                 <Input
-                   id="edit-reviewer"
-                   value="To be assigned"
-                   disabled
-                   className="col-span-3 bg-gray-50 text-gray-500"
-                 />
+                 <Select
+                   value={editingEvaluation.reviewer_id || ''}
+                   onValueChange={(value) => setEditingEvaluation({
+                     ...editingEvaluation,
+                     reviewer_id: value
+                   })}
+                   disabled={managersLoading || managers.length === 0}
+                 >
+                   <SelectTrigger className="col-span-3">
+                     <SelectValue placeholder={
+                       managersLoading ? "Loading managers..." :
+                       managers.length === 0 ? "No managers available" :
+                       "Select a reviewer"
+                     } />
+                   </SelectTrigger>
+                   <SelectContent>
+                     {managersError ? (
+                       <SelectItem value="" disabled>
+                         Error loading managers
+                       </SelectItem>
+                     ) : managers.length === 0 ? (
+                       <SelectItem value="" disabled>
+                         No managers found for this company
+                       </SelectItem>
+                     ) : (
+                       managers.map((manager) => (
+                         <SelectItem key={manager.user_id} value={manager.user_id}>
+                           {manager.name} ({manager.role})
+                         </SelectItem>
+                       ))
+                     )}
+                   </SelectContent>
+                 </Select>
                </div>
               
               <div className="grid grid-cols-4 items-center gap-4">
