@@ -4,6 +4,7 @@ import { apiService } from '../../services/api';
 import { ApiSubDepartment, CreateSubDepartmentRequest, UpdateSubDepartmentRequest, SubDepartmentQueryParams } from '../../types/api';
 import { useToast } from '../../hooks/use-toast';
 import { useDepartments } from '../../hooks/useApi';
+import { useManagers } from '../../hooks/usemanagers';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -57,6 +58,13 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
   // Fetch departments for dropdown
   const { data: departmentsData, isLoading: departmentsLoading, error: departmentsError } = useDepartments();
   
+  // State for selected company ID and department ID for manager filtering
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  
+  // Fetch managers for the selected company and/or department
+  const { data: managers = [], isLoading: managersLoading, error: managersError } = useManagers(selectedCompanyId, selectedDepartmentId);
+  
   const [subDepartments, setSubDepartments] = useState<ApiSubDepartment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -92,7 +100,27 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
     console.log('Departments data:', departmentsData);
     console.log('Extracted departments:', departments);
     console.log('Departments loading:', departmentsLoading);
-  }, [departmentsData, departments, departmentsLoading]);
+    console.log('Managers data:', managers);
+    console.log('Managers loading:', managersLoading);
+  }, [departmentsData, departments, departmentsLoading, managers, managersLoading]);
+
+  // Update selectedCompanyId and selectedDepartmentId when formData.department changes
+  React.useEffect(() => {
+    if (formData.department) {
+      const selectedDept = departments.find(dept => dept.department_id === formData.department);
+      if (selectedDept) {
+        if (selectedDept.company_id !== selectedCompanyId) {
+          setSelectedCompanyId(selectedDept.company_id);
+        }
+        if (formData.department !== selectedDepartmentId) {
+          setSelectedDepartmentId(formData.department);
+        }
+      }
+    } else {
+      // Clear department ID when no department is selected
+      setSelectedDepartmentId('');
+    }
+  }, [formData.department, departments, selectedCompanyId, selectedDepartmentId]);
 
   // Load sub-departments
   const loadSubDepartments = async () => {
@@ -327,14 +355,21 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
   };
 
   // Error handling UI
-  if (departmentsError) {
+  if (departmentsError || managersError) {
     return (
       <div className={`space-y-6 ${className || ''}`}>
         <Card>
           <CardContent className="p-6">
             <div className="text-center">
-              <h2 className="text-lg font-semibold text-red-600 mb-2">Error Loading Departments</h2>
-              <p className="text-gray-600 mb-4">Failed to load departments data. Please try refreshing the page.</p>
+              <h2 className="text-lg font-semibold text-red-600 mb-2">
+                Error Loading {departmentsError ? 'Departments' : 'Managers'}
+              </h2>
+              <p className="text-gray-600 mb-4">
+                {departmentsError 
+                  ? 'Failed to load departments data. Please try refreshing the page.'
+                  : 'Failed to load managers data. Manager selection may be limited.'
+                }
+              </p>
               <Button onClick={() => window.location.reload()} variant="outline">
                 Refresh Page
               </Button>
@@ -470,14 +505,26 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
                   <Select 
                     value={formData.manager}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, manager: value }))}
+                    disabled={!formData.department || managersLoading}
                   >
                     <SelectTrigger id="manager">
                       <SelectValue placeholder="Select manager" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No Manager</SelectItem>
-                      <SelectItem value="emp1">John Doe</SelectItem>
-                      <SelectItem value="emp2">Jane Smith</SelectItem>
+                      {managersLoading ? (
+                        <SelectItem value="loading" disabled>Loading managers...</SelectItem>
+                      ) : managersError ? (
+                        <SelectItem value="error" disabled>Error loading managers</SelectItem>
+                      ) : managers.length === 0 ? (
+                        <SelectItem value="no-managers" disabled>No managers available</SelectItem>
+                      ) : (
+                        managers.map((manager) => (
+                          <SelectItem key={manager.employee_id} value={manager.user_id}>
+                            {manager.name} - ({manager.role})
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -695,14 +742,26 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
               <Select 
                 value={formData.manager}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, manager: value }))}
+                disabled={!formData.department || managersLoading}
               >
                 <SelectTrigger id="edit-manager">
                   <SelectValue placeholder="Select manager" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No Manager</SelectItem>
-                  <SelectItem value="emp1">John Doe</SelectItem>
-                  <SelectItem value="emp2">Jane Smith</SelectItem>
+                  {managersLoading ? (
+                    <SelectItem value="loading" disabled>Loading managers...</SelectItem>
+                  ) : managersError ? (
+                    <SelectItem value="error" disabled>Error loading managers</SelectItem>
+                  ) : managers.length === 0 ? (
+                    <SelectItem value="no-managers" disabled>No managers available</SelectItem>
+                  ) : (
+                    managers.map((manager) => (
+                      <SelectItem key={manager.employee_id} value={manager.employee_id}>
+                        {manager.name} - ({manager.role})
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

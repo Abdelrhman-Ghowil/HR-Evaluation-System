@@ -11,24 +11,27 @@ export interface Manager {
 }
 
 /**
- * Custom hook to fetch managers (employees with roles LM, HOD, HR) for a specific company
+ * Custom hook to fetch managers (employees with roles LM, HOD, HR) for a specific company and/or department
  * @param companyId - The company ID to filter managers by
+ * @param departmentId - The department ID to filter managers by
  * @param options - Additional query options
  * @returns Query result with managers data
  */
 export const useManagers = (
   companyId?: string,
+  departmentId?: string,
   options?: UseQueryOptions<Manager[], Error>
 ) => {
   // Use the existing useEmployees hook with role filtering
   // Pass multiple roles as comma-separated string to the API
   const employeesQuery = useEmployees(
-    companyId ? { 
-      company_id: companyId,
-      role: "LM,HOD" // Filter by multiple roles at API level
+    (companyId || departmentId) ? { 
+      ...(companyId && { company_id: companyId }),
+      ...(departmentId && { department_id: departmentId }),
+      role: "LM,HOD,HR" // Filter by multiple roles at API level including HR
     } : undefined,
     {
-      enabled: !!companyId, // Only fetch when companyId is provided
+      enabled: !!(companyId || departmentId), // Only fetch when companyId or departmentId is provided
       select: (data: PaginatedResponse<ApiEmployee> | ApiEmployee[]) => {
         // Handle both paginated response and direct array response
         let employees: ApiEmployee[] = [];
