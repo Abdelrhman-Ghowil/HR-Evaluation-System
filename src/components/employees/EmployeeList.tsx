@@ -62,6 +62,7 @@ const EmployeeList = () => {
   const [originalEmployee, setOriginalEmployee] = useState<Employee | null>(null);
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [editValidationErrors, setEditValidationErrors] = useState<{[key: string]: string}>({});
+  const [statusUpdatingEmployees, setStatusUpdatingEmployees] = useState<Set<string>>(new Set());
   const [newEmployee, setNewEmployee] = useState({
     name: '',
     email: '',
@@ -576,6 +577,9 @@ const EmployeeList = () => {
         return;
       }
       
+      // Add employee to loading state
+      setStatusUpdatingEmployees(prev => new Set(prev).add(employeeId));
+      
       // Toggle the status
       const newStatus = employee.status === 'Active' ? 'Inactive' : 'Active';
       
@@ -601,6 +605,13 @@ const EmployeeList = () => {
     } catch (error) {
       console.error('Error updating employee status:', error);
        // You can add error handling here, such as showing a toast notification
+    } finally {
+      // Remove employee from loading state
+      setStatusUpdatingEmployees(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employeeId);
+        return newSet;
+      });
     }
   };
 
@@ -1533,10 +1544,16 @@ const EmployeeList = () => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2 flex-shrink-0">
-                  <Switch
-                    checked={employee.status === 'Active'}
-                    onCheckedChange={() => handleToggleStatus(employee.id)}
-                  />
+                  {statusUpdatingEmployees.has(employee.id) ? (
+                    <div className="flex items-center justify-center w-11 h-6">
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    </div>
+                  ) : (
+                    <Switch
+                      checked={employee.status === 'Active'}
+                      onCheckedChange={() => handleToggleStatus(employee.id)}
+                    />
+                  )}
                   <Button
                     variant="outline"
                     size="sm"

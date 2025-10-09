@@ -1,5 +1,5 @@
 import { useEmployees } from './useApi';
-import { ApiEmployee, PaginatedResponse } from '@/types/api';
+import { ApiEmployee } from '@/types/api';
 import { UseQueryOptions } from '@tanstack/react-query';
 
 export interface Manager {
@@ -32,7 +32,7 @@ export const useManagers = (
     } : undefined,
     {
       enabled: !!(companyId || departmentId), // Only fetch when companyId or departmentId is provided
-      select: (data: PaginatedResponse<ApiEmployee> | ApiEmployee[]) => {
+      select: (data: ApiEmployee[]) => {
         // Handle both paginated response and direct array response
         let employees: ApiEmployee[] = [];
         

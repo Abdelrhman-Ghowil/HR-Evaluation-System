@@ -187,6 +187,7 @@ export interface ApiDepartment {
   company: string;
   company_id?: string; // Add company_id field that might be in API response
   manager?: string;
+  manager_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -449,7 +450,8 @@ export interface ApiSubDepartment {
   sub_department_id: string;
   name: string;
   employee_count: number;
-  manager: string;
+  manager?: string;
+  manager_id?: string;
   department: string;
   created_at: string;
   updated_at: string;
@@ -464,14 +466,16 @@ export interface CreateSubDepartmentRequest {
 export interface UpdateSubDepartmentRequest {
   name?: string;
   department_id?: string;
-  manager?: string;
+  manager_id?: string;
 }
 
 export interface ApiSection {
   section_id: string;
+  department_id: string;
   name: string;
   employee_count: number;
-  manager: string;
+  manager?: string;
+  manager_id?: string;
   sub_department: string;
   created_at: string;
   updated_at: string;
@@ -480,20 +484,22 @@ export interface ApiSection {
 export interface CreateSectionRequest {
   name: string;
   sub_department_id: string;
-  manager?: string;
+  manager_id?: string;
 }
 
 export interface UpdateSectionRequest {
   name?: string;
   sub_department_id?: string;
-  manager?: string;
+  manager_id?: string;
 }
 
 export interface ApiSubSection {
   sub_section_id: string;
+  department_id: string;
   name: string;
   employee_count: number;
-  manager: string;
+  manager?: string;
+  manager_id?: string;
   section: string;
   created_at: string;
   updated_at: string;

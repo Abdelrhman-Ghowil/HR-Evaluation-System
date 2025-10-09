@@ -8,15 +8,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useToast } from '../../hooks/use-toast';
-import { usePlacements, useCreatePlacement, useUpdatePlacement, useDeletePlacement, useCompanies, useDepartments, useSubDepartments } from '../../hooks/useApi';
+import { usePlacements, useCreatePlacement, useUpdatePlacement, useDeletePlacement, useCompanies, useDepartments, useSubDepartments, queryKeys } from '../../hooks/useApi';
 import { ApiPlacement, CreatePlacementRequest, ApiCompany, ApiDepartment, ApiSubDepartment, ApiSection, ApiSubSection } from '../../types/api';
 import HierarchicalDropdown from './HierarchicalDropdown';
 import { apiService } from '../../services/api';
+import { useQueryClient } from '@tanstack/react-query';
 
 
 
 const ReplacementPage: React.FC = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -63,7 +65,15 @@ const ReplacementPage: React.FC = () => {
     }
   }, [subDepartmentsError, toast]);
   const createPlacementMutation = useCreatePlacement();
-  const updatePlacementMutation = useUpdatePlacement();
+  const updatePlacementMutation = useUpdatePlacement({
+    onSuccess: () => {
+      // Override default behavior to prevent automatic query invalidation
+      // Manual cache updates are handled in handleEditPlacement
+    },
+    onError: () => {
+      // Override default error handling to prevent duplicate toast messages
+    }
+  });
   const deletePlacementMutation = useDeletePlacement();
 
   // Extract data arrays from API responses
@@ -268,7 +278,21 @@ const handleSubSectionChange = (subSectionId: string) => {
     updatePlacementMutation.mutate(
       { id: editingPlacement.employee_id, data: payload },
       {
-        onSuccess: () => {
+        onSuccess: (updatedPlacement) => {
+          // Manually update the cache to preserve position
+          queryClient.setQueryData(queryKeys.placements, (oldData: ApiPlacement[] | undefined) => {
+            if (!oldData) return oldData;
+            
+            return oldData.map(placement => 
+              placement.employee_id === editingPlacement.employee_id 
+                ? { ...placement, ...updatedPlacement }
+                : placement
+            );
+          });
+
+          // Update the individual placement cache
+          queryClient.setQueryData(queryKeys.placement(editingPlacement.employee_id), updatedPlacement);
+
           setShowEditForm(false);
           setEditingPlacement(null);
           setSelectedCompanyId('');

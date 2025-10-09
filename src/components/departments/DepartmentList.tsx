@@ -38,7 +38,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
   const [newDepartment, setNewDepartment] = useState<CreateDepartmentRequest>({
     name: '',
     company_id: '',
-    manager: ''
+    manager_id: ''
   });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<ApiDepartment | null>(null);
@@ -174,8 +174,12 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       
       // Only include manager_id if it's not empty
       // Send the employee_id as the manager_id value
-      if (newDepartment.manager && newDepartment.manager.trim()) {
-        departmentData.manager_id = newDepartment.manager.trim(); // This should be the employee_id from the dropdown
+      if (newDepartment.manager_id && newDepartment.manager_id.trim()) {
+        // Find the selected manager to get their employee_id
+        const selectedManager = newDepartmentManagers.find(m => m.user_id === newDepartment.manager_id);
+        if (selectedManager) {
+          departmentData.manager_id = selectedManager.employee_id;
+        }
       }
       
       console.log('Creating department with data:', departmentData);
@@ -185,7 +189,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       setDepartments(prev => [...prev, createdDepartment]);
       
       // Reset form and close modal
-      setNewDepartment({ name: '', company_id: '', manager: '' });
+      setNewDepartment({ name: '', company_id: '', manager_id: '' });
       setValidationErrors({});
       setIsAddModalOpen(false);
       
@@ -217,7 +221,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
   const handleModalClose = (open: boolean) => {
     setIsAddModalOpen(open);
     if (!open) {
-      setNewDepartment({ name: '', company_id: '', manager: '' });
+      setNewDepartment({ name: '', company_id: '', manager_id: '' });
       setValidationErrors({});
     }
   };
@@ -626,10 +630,10 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
                   <div className="space-y-2">
                     <Label htmlFor="manager" className="text-sm font-medium">Manager (Optional)</Label>
                     <Select
-                      value={newDepartment.manager || 'no-manager'}
+                      value={newDepartment.manager_id || 'no-manager'}
                       onValueChange={(value) => setNewDepartment(prev => ({ 
                         ...prev, 
-                        manager: value === 'no-manager' ? '' : value 
+                        manager_id: value === 'no-manager' ? '' : value 
                       }))}
                     >
                       <SelectTrigger className={validationErrors.manager ? 'border-red-500' : ''}>
@@ -1056,7 +1060,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
                   onValueChange={(value) => setEditingDepartment(prev => 
                     prev ? { 
                       ...prev, 
-                      manager: value === 'no-manager' ? '' : value 
+                      manager: value === 'no-manager' ? '' : value
                     } : null
                   )}
                 >

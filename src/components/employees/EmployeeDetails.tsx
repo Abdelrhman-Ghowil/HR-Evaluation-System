@@ -56,6 +56,8 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     year: new Date().getFullYear(),
     status: 'Draft'
   });
+  const [isCreatingEvaluation, setIsCreatingEvaluation] = useState(false);
+  const [isUpdatingEvaluation, setIsUpdatingEvaluation] = useState(false);
 
   // Fetch evaluations from API
   console.log('Fetching evaluations for employee ID:', employee.id);
@@ -232,6 +234,8 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     const records = generateEvaluationRecords();
     console.log('Creating evaluation records:', records);
     
+    setIsCreatingEvaluation(true);
+    
     try {
       // Create each evaluation record via API
       for (const record of records) {
@@ -250,6 +254,8 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
       console.log('Successfully created all evaluation records');
     } catch (error) {
       console.error('Error creating evaluations:', error);
+    } finally {
+      setIsCreatingEvaluation(false);
     }
     
     // Reset form and close modal
@@ -272,6 +278,8 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const handleUpdateEvaluation = async () => {
     if (!editingEvaluation) return;
 
+    setIsUpdatingEvaluation(true);
+
     try {
       const updateData = {
         type: editingEvaluation.type,
@@ -289,6 +297,8 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
       console.log('Successfully updated evaluation:', editingEvaluation.id);
     } catch (error) {
       console.error('Error updating evaluation:', error);
+    } finally {
+      setIsUpdatingEvaluation(false);
     }
     
     setIsEditEvaluationOpen(false);
@@ -825,16 +835,16 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                       </SelectTrigger>
                       <SelectContent>
                         {managersError ? (
-                          <SelectItem value="" disabled>
+                          <SelectItem value="error" disabled>
                             Error loading managers
                           </SelectItem>
                         ) : managers.length === 0 ? (
-                          <SelectItem value="" disabled>
+                          <SelectItem value="no-managers" disabled>
                             No managers found for this company
                           </SelectItem>
                         ) : (
                           managers.map((manager) => (
-                            <SelectItem key={manager.id} value={manager.id}>
+                            <SelectItem key={manager.employee_id} value={manager.user_id}>
                               {manager.name} ({manager.role})
                             </SelectItem>
                           ))
@@ -868,10 +878,17 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                   </Button>
                   <Button 
                     onClick={handleCreateEvaluation}
-                    disabled={!isFormValid()}
+                    disabled={!isFormValid() || isCreatingEvaluation}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    Create Evaluation{newEvaluation.type === 'Quarterly' ? 's' : newEvaluation.type === 'Annual' ? 's' : ''}
+                    {isCreatingEvaluation ? (
+                      <div className="flex items-center space-x-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Creating...</span>
+                      </div>
+                    ) : (
+                      `Create Evaluation${newEvaluation.type === 'Quarterly' ? 's' : newEvaluation.type === 'Annual' ? 's' : ''}`
+                    )}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -1112,11 +1129,11 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                    </SelectTrigger>
                    <SelectContent>
                      {managersError ? (
-                       <SelectItem value="" disabled>
+                       <SelectItem value="error" disabled>
                          Error loading managers
                        </SelectItem>
                      ) : managers.length === 0 ? (
-                       <SelectItem value="" disabled>
+                       <SelectItem value="no-managers" disabled>
                          No managers found for this company
                        </SelectItem>
                      ) : (
@@ -1179,10 +1196,17 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
              </Button>
              <Button 
                 onClick={handleUpdateEvaluation}
-                disabled={!isEditFormValid()}
-                className={!isEditFormValid() ? 'opacity-50 cursor-not-allowed' : ''}
+                disabled={!isEditFormValid() || isUpdatingEvaluation}
+                className={!isEditFormValid() || isUpdatingEvaluation ? 'opacity-50 cursor-not-allowed' : ''}
               >
-                Update Evaluation
+                {isUpdatingEvaluation ? (
+                  <div className="flex items-center space-x-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Updating...</span>
+                  </div>
+                ) : (
+                  'Update Evaluation'
+                )}
               </Button>
            </DialogFooter>
         </DialogContent>

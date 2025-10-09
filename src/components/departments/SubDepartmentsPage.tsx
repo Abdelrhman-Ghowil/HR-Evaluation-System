@@ -216,10 +216,13 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
     }
 
     try {
+      // Find the selected manager to get the user_id
+      const selectedManager = managers.find(m => m.employee_id === formData.manager);
+      
       const updateData: UpdateSubDepartmentRequest = {
         name: formData.name.trim(),
         department_id: formData.department || editingSubDepartment.department,
-        manager: formData.manager || editingSubDepartment.manager
+        manager_id: selectedManager ? selectedManager.user_id : (formData.manager || editingSubDepartment.manager)
       };
 
       const updatedSubDepartment = await apiService.updateSubDepartment(editingSubDepartment.sub_department_id, updateData);
@@ -757,7 +760,7 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
                     <SelectItem value="no-managers" disabled>No managers available</SelectItem>
                   ) : (
                     managers.map((manager) => (
-                      <SelectItem key={manager.employee_id} value={manager.employee_id}>
+                      <SelectItem key={manager.employee_id} value={manager.user_id}>
                         {manager.name} - ({manager.role})
                       </SelectItem>
                     ))
