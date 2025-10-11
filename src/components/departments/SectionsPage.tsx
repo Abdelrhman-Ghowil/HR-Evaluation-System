@@ -7,9 +7,12 @@ import { Badge } from '../ui/badge';
 import { ConfirmationDialog } from '../ui/confirmation-dialog';
 import { useOrganizational } from '../../contexts/OrganizationalContext';
 import { apiService } from '../../services/api';
-import { ApiSection, CreateSectionRequest } from '../../types/api';
+import { ApiSection, CreateSectionRequest, UpdateSectionRequest } from '../../types/api';
 import { useToast } from '../../hooks/use-toast';
-import { useSubDepartments } from '../../hooks/useApi';
+import { useSubDepartments, useDepartments } from '../../hooks/useApi';
+import { useManagers } from '../../hooks/usemanagers';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Label } from '../ui/label';
 
 interface SectionsPageProps {
   onViewChange: (view: string) => void;
@@ -19,23 +22,77 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
   const { selectedDepartment, selectedSubDepartment, setSection } = useOrganizational();
   const { toast } = useToast();
   const { data: subDepartmentsData, isLoading: subDepartmentsLoading } = useSubDepartments();
+  const { data: departmentsData, isLoading: departmentsLoading } = useDepartments();
+  
+  // State for selected company ID and department ID for manager filtering
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  
+  // Fetch managers for the selected company and/or department
+  const { data: managersData = [], isLoading: managersLoading, error: managersError } = useManagers(selectedCompanyId, selectedDepartmentId);
+  
+  // Ensure managers is always an array
+  const managers = React.useMemo(() => {
+    return Array.isArray(managersData) ? managersData : [];
+  }, [managersData]);
+  
   const [sections, setSections] = useState<ApiSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
-  const [editingSection, setEditingSection] = useState<ApiSection | null>(null);
+  const [editingSection, setEditingSection] = useState<(ApiSection & { sub_department_id?: string }) | null>(null);
   const [newSection, setNewSection] = useState<CreateSectionRequest>({
     name: '',
-    sub_department: '',
-    manager: ''
+    sub_department_id: '',
+    manager_id: ''
   });
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [sectionToDelete, setSectionToDelete] = useState<ApiSection | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Get sub-departments list from API response
-  const subDepartments = subDepartmentsData?.results || subDepartmentsData || [];
+  // Get sub-departments list from API response with proper array handling
+  const subDepartments = React.useMemo(() => {
+    if (!subDepartmentsData) return [];
+    // Handle both paginated response and direct array response
+    if (Array.isArray(subDepartmentsData)) {
+      return subDepartmentsData;
+    }
+    return subDepartmentsData.results || [];
+  }, [subDepartmentsData]);
+
+  // Get departments list from API response with proper array handling
+  const departments = React.useMemo(() => {
+    if (!departmentsData) return [];
+    // Handle both paginated response and direct array response
+    if (Array.isArray(departmentsData)) {
+      return departmentsData;
+    }
+    return departmentsData.results || [];
+  }, [departmentsData]);
+
+  // Update selectedCompanyId and selectedDepartmentId when newSection.sub_department_id changes
+  React.useEffect(() => {
+    if (newSection.sub_department_id) {
+      const selectedSubDept = subDepartments.find(subDept => subDept.sub_department_id === newSection.sub_department_id);
+      if (selectedSubDept) {
+        // Find the department that contains this sub-department
+        // selectedSubDept.department contains the department name, we need to find the department ID
+        const department = departments.find(dept => dept.name === selectedSubDept.department);
+        const departmentId = department?.department_id || '';
+        if (departmentId !== selectedDepartmentId) {
+          setSelectedDepartmentId(departmentId);
+        }
+        // Set company ID if available
+        if (selectedSubDept.company_id && selectedSubDept.company_id !== selectedCompanyId) {
+          setSelectedCompanyId(selectedSubDept.company_id);
+        }
+      }
+    } else {
+      // Clear department ID when no sub-department is selected
+      setSelectedDepartmentId('');
+    }
+  }, [newSection.sub_department_id, subDepartments, departments, selectedCompanyId, selectedDepartmentId]);
 
   // Load sections when component mounts - autonomous operation
   useEffect(() => {
@@ -61,7 +118,7 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
         if (response.results && Array.isArray(response.results)) {
           // response with results array
           sectionsData = response.results;
-        } else if (response.section_id) {
+        } else if (response.section_id || response.id) {
           // Single section object
           sectionsData = [response];
         } else {
@@ -93,7 +150,7 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
 
   const handleCreateSection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSection.sub_department) {
+    if (!newSection.sub_department_id) {
       toast({
         title: 'Error',
         description: 'Please select a sub-department',
@@ -103,16 +160,19 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
     }
 
     try {
+      // Find the selected manager to get the user_id
+      const selectedManager = managers.find(m => m.employee_id === newSection.manager_id);
+      
       const sectionData: CreateSectionRequest = {
         name: newSection.name,
-        sub_department_id: newSection.sub_department, // This is the sub_department_id
-        ...(newSection.manager && { manager: newSection.manager })
+        sub_department_id: newSection.sub_department_id,
+        manager_id: selectedManager ? selectedManager.user_id : (newSection.manager_id === "no-manager" ? '' : newSection.manager_id || '')
       };
 
       await apiService.createSection(sectionData);
       
       setShowCreateForm(false);
-      setNewSection({ name: '', sub_department: '', manager: '' });
+      setNewSection({ name: '', sub_department_id: '', manager_id: '' });
       loadSections();
       
       toast({
@@ -134,15 +194,29 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
     const subDepartment = subDepartments.find(sd => sd.name === section.sub_department);
     const sectionWithId = {
       ...section,
-      sub_department: subDepartment?.sub_department_id || section.sub_department
+      sub_department_id: subDepartment?.sub_department_id || section.sub_department
     };
+    
+    // Update selectedCompanyId and selectedDepartmentId for manager filtering
+    if (subDepartment) {
+      // subDepartment.department contains the department name, we need to find the department ID
+      const department = departments.find(dept => dept.name === subDepartment.department);
+      const departmentId = department?.department_id || '';
+      if (departmentId !== selectedDepartmentId) {
+        setSelectedDepartmentId(departmentId);
+      }
+      if (subDepartment.company_id && subDepartment.company_id !== selectedCompanyId) {
+        setSelectedCompanyId(subDepartment.company_id);
+      }
+    }
+    
     setEditingSection(sectionWithId);
     setShowEditForm(true);
   };
 
   const handleUpdateSection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingSection || !editingSection.sub_department) {
+    if (!editingSection || !editingSection.sub_department_id) {
       toast({
         title: 'Error',
         description: 'Please select a sub-department',
@@ -152,11 +226,16 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
     }
 
     try {
-      await apiService.updateSection(editingSection.section_id, {
+      // Find the selected manager to get the user_id
+      const selectedManager = managers.find(m => m.employee_id === editingSection.manager);
+      
+      const updateData: UpdateSectionRequest = {
         name: editingSection.name,
-        sub_department_id: editingSection.sub_department, // This is the sub_department_id
-        ...(editingSection.manager && { manager: editingSection.manager })
-      });
+        sub_department_id: editingSection.sub_department_id,
+        manager_id: selectedManager ? selectedManager.user_id : (editingSection.manager === "no-manager" ? undefined : editingSection.manager || '')
+      };
+
+      await apiService.updateSection(editingSection.section_id, updateData);
       
       setShowEditForm(false);
       setEditingSection(null);
@@ -240,6 +319,11 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
     onViewChange('sub-sections');
   };
 
+  // Get manager name
+  const getManagerName = (managerId: string) => {
+    return managerId || 'Unassigned';
+  };
+
   // Filter sections based on search term
   const filteredSections = sections.filter(section =>
     section.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -253,6 +337,29 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
   const contextMessage = selectedSubDepartment 
     ? `Sections in ${selectedSubDepartment.name}`
     : 'All Sections - Independent View';
+
+  // Error handling UI
+  if (managersError) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <h2 className="text-lg font-semibold text-red-600 mb-2">
+                Error Loading Managers
+              </h2>
+              <p className="text-gray-600 mb-4">
+                Failed to load managers data. Manager selection may be limited.
+              </p>
+              <Button onClick={() => window.location.reload()} variant="outline">
+                Refresh Page
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -375,10 +482,9 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
             <h2 className="text-lg font-semibold mb-4">Create New Section</h2>
             <form onSubmit={handleCreateSection} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Section Name
-                </label>
+                <Label htmlFor="name">Section Name *</Label>
                 <Input
+                  id="name"
                   type="text"
                   value={newSection.name}
                   onChange={(e) => setNewSection({ ...newSection, name: e.target.value })}
@@ -386,49 +492,71 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
                   required
                 />
               </div>
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sub-Department *
-                </label>
-                <div className="relative">
-                  <select
-                    value={newSection.sub_department}
-                    onChange={(e) => setNewSection({ ...newSection, sub_department: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
-                    required
-                    disabled={subDepartmentsLoading}
-                  >
-                    <option value="">Select a sub-department</option>
+                <Label htmlFor="sub_department">Sub-Department *</Label>
+                <Select 
+                  value={newSection.sub_department_id}
+                  onValueChange={(value) => setNewSection({ ...newSection, sub_department_id: value })}
+                  disabled={subDepartmentsLoading}
+                >
+                  <SelectTrigger id="sub_department">
+                    <SelectValue placeholder={subDepartmentsLoading ? "Loading sub-departments..." : "Select sub-department"} />
+                  </SelectTrigger>
+                  <SelectContent>
                     {subDepartments.map((subDept) => (
-                      <option key={subDept.sub_department_id} value={subDept.sub_department_id}>
+                      <SelectItem key={subDept.sub_department_id} value={subDept.sub_department_id}>
                         {subDept.name}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
-                </div>
+                    {subDepartments.length === 0 && !subDepartmentsLoading && (
+                      <SelectItem value="no-sub-department" disabled>
+                        No sub-departments available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
                 {subDepartmentsLoading && (
                   <p className="text-sm text-gray-500 mt-1">Loading sub-departments...</p>
                 )}
               </div>
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Manager ID
-                </label>
-                <Input
-                  type="text"
-                  value={newSection.manager}
-                  onChange={(e) => setNewSection({ ...newSection, manager: e.target.value })}
-                  placeholder="Enter manager ID (optional)"
-                />
+                <Label htmlFor="manager">Manager</Label>
+                <Select 
+                  value={newSection.manager_id}
+                  onValueChange={(value) => setNewSection({ ...newSection, manager_id: value })}
+                  disabled={!newSection.sub_department_id || managersLoading}
+                >
+                  <SelectTrigger id="manager">
+                    <SelectValue placeholder="Select manager" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no-manager">No Manager</SelectItem>
+                    {managersLoading ? (
+                      <SelectItem value="loading" disabled>Loading managers...</SelectItem>
+                    ) : managersError ? (
+                      <SelectItem value="error" disabled>Error loading managers</SelectItem>
+                    ) : managers.length === 0 ? (
+                      <SelectItem value="no-managers" disabled>No managers available</SelectItem>
+                    ) : (
+                      managers.map((manager) => (
+                        <SelectItem key={manager.employee_id} value={manager.user_id}>
+                          {manager.name} - ({manager.role})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
+              
               <div className="flex justify-end space-x-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => {
                     setShowCreateForm(false);
-                    setNewSection({ name: '', sub_department: '', manager: '' });
+                    setNewSection({ name: '', sub_department_id: '', manager_id: '' });
                   }}
                 >
                   Cancel
@@ -447,10 +575,9 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
             <h2 className="text-lg font-semibold mb-4">Edit Section</h2>
             <form onSubmit={handleUpdateSection} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Section Name
-                </label>
+                <Label htmlFor="edit_name">Section Name *</Label>
                 <Input
+                  id="edit_name"
                   type="text"
                   value={editingSection.name}
                   onChange={(e) => setEditingSection({ ...editingSection, name: e.target.value })}
@@ -458,42 +585,64 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
                   required
                 />
               </div>
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Sub-Department *
-                </label>
-                <div className="relative">
-                  <select
-                    value={editingSection.sub_department}
-                    onChange={(e) => setEditingSection({ ...editingSection, sub_department: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
-                    required
-                    disabled={subDepartmentsLoading}
-                  >
-                    <option value="">Select a sub-department</option>
+                <Label htmlFor="edit_sub_department">Sub-Department *</Label>
+                <Select 
+                  value={editingSection.sub_department_id}
+                  onValueChange={(value) => setEditingSection({ ...editingSection, sub_department_id: value })}
+                  disabled={subDepartmentsLoading}
+                >
+                  <SelectTrigger id="edit_sub_department">
+                    <SelectValue placeholder={subDepartmentsLoading ? "Loading sub-departments..." : "Select sub-department"} />
+                  </SelectTrigger>
+                  <SelectContent>
                     {subDepartments.map((subDept) => (
-                      <option key={subDept.sub_department_id} value={subDept.sub_department_id}>
+                      <SelectItem key={subDept.sub_department_id} value={subDept.sub_department_id}>
                         {subDept.name}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
-                </div>
+                    {subDepartments.length === 0 && !subDepartmentsLoading && (
+                      <SelectItem value="no-sub-department" disabled>
+                        No sub-departments available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
                 {subDepartmentsLoading && (
                   <p className="text-sm text-gray-500 mt-1">Loading sub-departments...</p>
                 )}
               </div>
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Manager ID
-                </label>
-                <Input
-                  type="text"
-                  value={editingSection.manager}
-                  onChange={(e) => setEditingSection({ ...editingSection, manager: e.target.value })}
-                  placeholder="Enter manager ID (optional)"
-                />
+                <Label htmlFor="edit_manager">Manager</Label>
+                <Select 
+                  value={editingSection.manager_id}
+                  onValueChange={(value) => setEditingSection({ ...editingSection, manager_id: value })}
+                  disabled={!editingSection.sub_department_id || managersLoading}
+                >
+                  <SelectTrigger id="edit_manager">
+                    <SelectValue placeholder="Select manager" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no-manager">No Manager</SelectItem>
+                    {managersLoading ? (
+                      <SelectItem value="loading" disabled>Loading managers...</SelectItem>
+                    ) : managersError ? (
+                      <SelectItem value="error" disabled>Error loading managers</SelectItem>
+                    ) : managers.length === 0 ? (
+                      <SelectItem value="no-managers" disabled>No managers available</SelectItem>
+                    ) : (
+                      managers.map((manager) => (
+                        <SelectItem key={manager.employee_id} value={manager.user_id}>
+                          {manager.name} - ({manager.role})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
+              
               <div className="flex justify-end space-x-2">
                 <Button
                   type="button"
@@ -537,7 +686,7 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
                       Sub-Department: {section.sub_department}
                     </p>
                     <p className="text-sm text-gray-600">
-                      Manager: {section.manager}
+                      Manager: {getManagerName(section.manager)}
                     </p>
                   </div>
                   <div className="flex space-x-1">
