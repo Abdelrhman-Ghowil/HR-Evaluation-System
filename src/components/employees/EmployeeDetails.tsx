@@ -1102,11 +1102,11 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                              Invalid status transition from {originalEvaluation.status} to {editingEvaluation.status}
                            </p>
                          );
-                       }
-                       return null;
-                     })()}
-                   </div>
-                 </div>
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </div>
               
               <div className="grid grid-cols-4 items-center gap-4">
                  <Label htmlFor="edit-reviewer" className="text-right">

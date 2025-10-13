@@ -56,7 +56,7 @@ export interface EvaluationInput {
   date: string;
   reviewer: string;
   period: string;
-  reviewer_id?: number;
+  reviewer_id?: string;
 }
 
 export interface Objective {

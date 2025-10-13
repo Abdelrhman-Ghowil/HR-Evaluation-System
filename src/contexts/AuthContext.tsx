@@ -120,7 +120,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Check for existing session on mount
   useEffect(() => {
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       const savedUser = localStorage.getItem('user');
       const isApiAuthenticated = apiService.isAuthenticated();
       
@@ -132,6 +132,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (error) {
           console.error('Error parsing saved user:', error);
           logout();
+        }
+      } else if (savedUser && !isApiAuthenticated) {
+        // Try to refresh the token if we have a user but no valid token
+        try {
+          const refreshToken = localStorage.getItem('refresh_token');
+          if (refreshToken) {
+            console.log('Attempting to refresh expired token on app initialization...');
+            await apiService.refreshToken();
+            const parsedUser = JSON.parse(savedUser);
+            setUser(parsedUser);
+            setIsAuthenticated(true);
+            console.log('Token refreshed successfully on app initialization');
+          } else {
+            // No refresh token available, clear stale data
+            setUser(null);
+            setIsAuthenticated(false);
+            localStorage.removeItem('user');
+          }
+        } catch (error) {
+          console.error('Failed to refresh token on initialization:', error);
+          // Clear any stale user data if token refresh fails
+          setUser(null);
+          setIsAuthenticated(false);
+          localStorage.removeItem('user');
         }
       } else if (!isApiAuthenticated) {
         // Clear any stale user data if API token is invalid

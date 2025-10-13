@@ -96,17 +96,30 @@ class ApiService {
           try {
             const refreshToken = localStorage.getItem('refresh_token');
             if (refreshToken) {
+              console.log('Token expired, attempting refresh...');
               const response = await axios.post(`${BASE_URL}/api/auth/refresh/`, {
                 refresh: refreshToken
               });
               const { access } = response.data;
               this.saveToken(access);
               originalRequest.headers.Authorization = `Bearer ${access}`;
+              console.log('Token refreshed successfully, retrying original request');
               return this.api(originalRequest);
+            } else {
+              console.log('No refresh token available, redirecting to login');
+              this.clearToken();
+              // Use a more graceful redirect that works with React Router
+              if (typeof window !== 'undefined') {
+                window.location.href = '/';
+              }
             }
           } catch (refreshError) {
+            console.error('Token refresh failed:', refreshError);
             this.clearToken();
-            window.location.href = '/';
+            // Use a more graceful redirect that works with React Router
+            if (typeof window !== 'undefined') {
+              window.location.href = '/';
+            }
           }
         }
 
@@ -120,7 +133,8 @@ class ApiService {
 
   // Token management
   private loadToken(): void {
-    const token = localStorage.getItem('auth_token');
+    // Check both possible token keys for backward compatibility
+    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     if (token) {
       this.token = token;
     }
@@ -129,11 +143,14 @@ class ApiService {
   private saveToken(token: string): void {
     this.token = token;
     localStorage.setItem('auth_token', token);
+    // Also save to 'token' key for backward compatibility
+    localStorage.setItem('token', token);
   }
 
   private clearToken(): void {
     this.token = null;
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('token');
     localStorage.removeItem('refresh_token');
   }
 
