@@ -542,6 +542,36 @@ const EmployeeList = () => {
     }
   }, [editingEmployee?.company_id]);
 
+  // Auto-populate Username, First Name, and Last Name based on Full Name
+  useEffect(() => {
+    if (newEmployee.name.trim()) {
+      const nameParts = newEmployee.name.trim().split(' ').filter(part => part.length > 0);
+      
+      // Generate username (lowercase, no spaces)
+      const generatedUsername = newEmployee.name.toLowerCase().replace(/\s+/g, '');
+      
+      // Split name into first and last name
+      const generatedFirstName = nameParts[0] || '';
+      const generatedLastName = nameParts.slice(1).join(' ') || '';
+      
+      // Only update if the fields are empty (don't overwrite user input)
+      setNewEmployee(prev => ({
+        ...prev,
+        username: prev.username === '' ? generatedUsername : prev.username,
+        firstName: prev.firstName === '' ? generatedFirstName : prev.firstName,
+        lastName: prev.lastName === '' ? generatedLastName : prev.lastName
+      }));
+    } else {
+      // Clear auto-populated fields when name is empty
+      setNewEmployee(prev => ({
+        ...prev,
+        username: '',
+        firstName: '',
+        lastName: ''
+      }));
+    }
+  }, [newEmployee.name]);
+
   // Auto-refresh mechanism when no employees are found
   useEffect(() => {
     let refreshInterval: NodeJS.Timeout;
@@ -1036,33 +1066,54 @@ const EmployeeList = () => {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="username" className="text-sm font-medium">Username</Label>
+                    <Label htmlFor="username" className="text-sm font-medium">
+                      Username
+                      {newEmployee.name && !newEmployee.username && (
+                        <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                          Auto-generated
+                        </span>
+                      )}
+                    </Label>
                     <Input
                       id="username"
                       value={newEmployee.username || ''}
                       onChange={(e) => setNewEmployee(prev => ({ ...prev, username: e.target.value }))}
                       placeholder="Auto-generated from name if empty"
-                      className="w-full"
+                      className={`w-full ${newEmployee.name && !newEmployee.username ? 'bg-blue-50 border-blue-200' : ''}`}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="firstName" className="text-sm font-medium">First Name</Label>
+                    <Label htmlFor="firstName" className="text-sm font-medium">
+                      First Name
+                      {newEmployee.name && !newEmployee.firstName && (
+                        <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                          Auto-extracted
+                        </span>
+                      )}
+                    </Label>
                     <Input
                       id="firstName"
                       value={newEmployee.firstName || ''}
                       onChange={(e) => setNewEmployee(prev => ({ ...prev, firstName: e.target.value }))}
                       placeholder="Auto-extracted from full name if empty"
-                      className="w-full"
+                      className={`w-full ${newEmployee.name && !newEmployee.firstName ? 'bg-green-50 border-green-200' : ''}`}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName" className="text-sm font-medium">Last Name</Label>
+                    <Label htmlFor="lastName" className="text-sm font-medium">
+                      Last Name
+                      {newEmployee.name && !newEmployee.lastName && (
+                        <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                          Auto-extracted
+                        </span>
+                      )}
+                    </Label>
                     <Input
                       id="lastName"
                       value={newEmployee.lastName || ''}
                       onChange={(e) => setNewEmployee(prev => ({ ...prev, lastName: e.target.value }))}
                       placeholder="Auto-extracted from full name if empty"
-                      className="w-full"
+                      className={`w-full ${newEmployee.name && !newEmployee.lastName ? 'bg-green-50 border-green-200' : ''}`}
                     />
                   </div>
                   <div className="space-y-2">
@@ -1174,6 +1225,37 @@ const EmployeeList = () => {
                 <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Work Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label htmlFor="companyName" className="text-sm font-medium">Company Name *</Label>
+                    <Select 
+                      value={newEmployee.companyId} 
+                      onValueChange={(value) => {
+                        const selectedCompany = companies.find(company => company.company_id === value);
+                        setNewEmployee(prev => ({ 
+                          ...prev, 
+                          companyId: value,
+                          companyName: selectedCompany?.name || '',
+                          // Reset department when company changes
+                          departmentId: '',
+                          department: ''
+                        }));
+                      }}
+                    >
+                      <SelectTrigger className={`w-full ${validationErrors.companyName ? 'border-red-500' : ''}`}>
+                        <SelectValue placeholder="Select company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.company_id} value={company.company_id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {validationErrors.companyName && (
+                      <p className="text-sm text-red-500">{validationErrors.companyName}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="department" className="text-sm font-medium">Department *</Label>
                     <Select 
                       value={newEmployee.departmentId} 
@@ -1268,37 +1350,6 @@ const EmployeeList = () => {
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Company Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName" className="text-sm font-medium">Company Name *</Label>
-                    <Select 
-                      value={newEmployee.companyId} 
-                      onValueChange={(value) => {
-                        const selectedCompany = companies.find(company => company.company_id === value);
-                        setNewEmployee(prev => ({ 
-                          ...prev, 
-                          companyId: value,
-                          companyName: selectedCompany?.name || '',
-                          // Reset department when company changes
-                          departmentId: '',
-                          department: ''
-                        }));
-                      }}
-                    >
-                      <SelectTrigger className={`w-full ${validationErrors.companyName ? 'border-red-500' : ''}`}>
-                        <SelectValue placeholder="Select company" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {companies.map((company) => (
-                          <SelectItem key={company.company_id} value={company.company_id}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {validationErrors.companyName && (
-                      <p className="text-sm text-red-500">{validationErrors.companyName}</p>
-                    )}
-                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="status" className="text-sm font-medium">Status *</Label>
                     <Select 
@@ -1771,6 +1822,34 @@ const EmployeeList = () => {
                 <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Work Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label htmlFor="edit-companyName" className="text-sm font-medium">Company Name *</Label>
+                    <Select 
+                      value={editingEmployee.company_id || ''} 
+                      onValueChange={(value) => {
+                        const selectedCompany = companies.find(company => company.company_id === value);
+                        setEditingEmployee(prev => prev ? { 
+                          ...prev, 
+                          company_id: value,
+                          companyName: selectedCompany?.name || ''
+                        } : null);
+                      }}
+                    >
+                      <SelectTrigger className={`w-full ${editValidationErrors.companyName ? 'border-red-500' : ''}`}>
+                        <SelectValue placeholder="Select company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.company_id} value={company.company_id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {editValidationErrors.companyName && (
+                      <p className="text-sm text-red-500">{editValidationErrors.companyName}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="edit-department" className="text-sm font-medium">Department *</Label>
                     <Select 
                       value={editingEmployee.department} 
@@ -1847,34 +1926,6 @@ const EmployeeList = () => {
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Company Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-companyName" className="text-sm font-medium">Company Name *</Label>
-                    <Select 
-                      value={editingEmployee.company_id || ''} 
-                      onValueChange={(value) => {
-                        const selectedCompany = companies.find(company => company.company_id === value);
-                        setEditingEmployee(prev => prev ? { 
-                          ...prev, 
-                          company_id: value,
-                          companyName: selectedCompany?.name || ''
-                        } : null);
-                      }}
-                    >
-                      <SelectTrigger className={`w-full ${editValidationErrors.companyName ? 'border-red-500' : ''}`}>
-                        <SelectValue placeholder="Select company" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {companies.map((company) => (
-                          <SelectItem key={company.company_id} value={company.company_id}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {editValidationErrors.companyName && (
-                      <p className="text-sm text-red-500">{editValidationErrors.companyName}</p>
-                    )}
-                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-status" className="text-sm font-medium">Status *</Label>
                     <Select 

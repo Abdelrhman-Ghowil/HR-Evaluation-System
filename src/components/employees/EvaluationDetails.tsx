@@ -132,7 +132,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
     if (!obj.description?.trim()) errors.description = 'Description is required';
     if (!obj.target || obj.target < 1 || obj.target > 10) errors.target = 'Target must be between 1-10';
     if (!obj.achieved || obj.achieved < 1 || obj.achieved > 10) errors.achieved = 'Achieved must be between 1-10';
-    if (!obj.weight || obj.weight < 1 || obj.weight > 100) errors.weight = 'Weight must be between 1-100%';
     return errors;
   };
 
@@ -142,7 +141,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
     if (!comp.description?.trim()) errors.description = 'Description is required';
     if (!comp.required_level || comp.required_level < 1 || comp.required_level > 10) errors.required_level = 'Required level must be between 1-10';
     if (!comp.actual_level || comp.actual_level < 1 || comp.actual_level > 10) errors.actual_level = 'Actual level must be between 1-10';
-    if (!comp.weight || comp.weight < 1 || comp.weight > 100) errors.weight = 'Weight must be between 1-100%';
     return errors;
   };
 
@@ -156,7 +154,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       description: '',
       target: 10,
       achieved: 1,
-      weight: 1,
       status: 'Not started'
     });
     setObjectiveErrors({});
@@ -185,7 +182,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
            description: objectiveForm.description!,
            target: objectiveForm.target!,
            achieved: objectiveForm.achieved!,
-           weight: objectiveForm.weight!,
            status: objectiveForm.status!
          };
          await updateObjectiveMutation.mutateAsync({
@@ -203,7 +199,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
            description: objectiveForm.description!,
            target: objectiveForm.target!,
            achieved: objectiveForm.achieved!,
-           weight: objectiveForm.weight!,
            status: objectiveForm.status!
          };
          await createObjectiveMutation.mutateAsync(createData);
@@ -242,7 +237,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       category: 'Core',
       required_level: 10,
       actual_level: 1,
-      weight: 1,
       description: ''
     });
     setCompetencyErrors({});
@@ -273,7 +267,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
             category: competencyForm.category!,
             required_level: competencyForm.required_level!,
             actual_level: competencyForm.actual_level!,
-            weight: competencyForm.weight!,
             description: competencyForm.description!
           }
         });
@@ -286,7 +279,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           category: competencyForm.category!,
           required_level: competencyForm.required_level!,
           actual_level: competencyForm.actual_level!,
-          weight: competencyForm.weight!,
           description: competencyForm.description!
         });
       }
@@ -528,8 +520,8 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                               <h4 className="font-semibold text-gray-900 text-lg mb-2 truncate">{objective.title}</h4>
                               <p className="text-sm text-gray-600 mb-3 line-clamp-2">{objective.description}</p>
                               <div className="flex flex-wrap items-center gap-2">
-                                <Badge 
-                                  variant={objective.status === 'Completed' ? 'default' : 'secondary'}
+                                <Badge
+                                  variant="outline"
                                   className={`font-medium ${
                                     objective.status === 'Completed' ? 'bg-green-100 text-green-800 border-green-200' :
                                     objective.status === 'In-progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
@@ -537,9 +529,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                                   }`}
                                 >
                                   {objective.status}
-                                </Badge>
-                                <Badge variant="outline" className="text-xs">
-                                  Weight: {objective.weight}%
                                 </Badge>
                               </div>
                             </div>
@@ -644,7 +633,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                             <h4 className="font-semibold text-gray-900 text-lg mb-2 truncate">{competency.name}</h4>
                             <p className="text-sm text-gray-600 mb-3 line-clamp-2">{competency.description}</p>
                             <div className="flex flex-wrap items-center gap-2">
-                              <Badge 
+                              <Badge
                                 variant="outline"
                                 className={`font-medium ${
                                   competency.category === 'Core' ? 'bg-blue-100 text-blue-800 border-blue-200' :
@@ -653,9 +642,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                                 }`}
                               >
                                 {competency.category}
-                              </Badge>
-                              <Badge variant="outline" className="text-xs">
-                                Weight: {competency.weight}%
                               </Badge>
                             </div>
                           </div>
@@ -818,28 +804,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="weight" className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                  Weight (1-100%)
-                  <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="weight"
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={objectiveForm.weight || 1}
-                  onChange={(e) => setObjectiveForm(prev => ({ ...prev, weight: parseInt(e.target.value) || 1 }))}
-                  className={`transition-all duration-200 ${objectiveErrors.weight ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
-                />
-                {objectiveErrors.weight && (
-                  <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
-                    <span className="w-1 h-1 bg-red-500 rounded-full"></span>
-                    {objectiveErrors.weight}
-                  </p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
                 <Label htmlFor="status" className="text-sm font-medium text-gray-700 flex items-center gap-1">
                   Status
                   <span className="text-red-500">*</span>
@@ -979,28 +943,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                     </p>
                   )}
                 </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="comp_weight" className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                  Weight (1-100%)
-                  <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="comp_weight"
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={competencyForm.weight || 1}
-                  onChange={(e) => setCompetencyForm(prev => ({ ...prev, weight: parseInt(e.target.value) || 1 }))}
-                  className={`transition-all duration-200 ${competencyErrors.weight ? 'border-red-500 focus:ring-red-500' : 'focus:ring-purple-500 focus:border-purple-500'}`}
-                />
-                {competencyErrors.weight && (
-                  <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
-                    <span className="w-1 h-1 bg-red-500 rounded-full"></span>
-                    {competencyErrors.weight}
-                  </p>
-                )}
               </div>
               
               <div className="space-y-2">

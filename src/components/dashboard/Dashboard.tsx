@@ -12,13 +12,14 @@ import WeightsConfiguration from '../admin/WeightsConfiguration';
 import UserManagement from '../admin/UserManagement';
 import DashboardHome from './DashboardHome';
 import ProfilePage from '../profile/ProfilePage';
+import EmployeeProfile from '../profile/EmployeeProfile';
 import SubDepartmentsPage from '../departments/SubDepartmentsPage';
 import SectionsPage from '../departments/SectionsPage';
 import SubSectionsPage from '../departments/SubSectionsPage';
 import ReplacementPage from '../replacements/ReplacementPage';
 import { OrganizationalProvider } from '../../contexts/OrganizationalContext';
 
-type ActiveView = 'dashboard' | 'employees' | 'evaluations' | 'companies' | 'departments' | 'admin' | 'weights-configuration' | 'user-management' | 'profile' | 'sub-departments' | 'sections' | 'sub-sections' | 'replacements';
+type ActiveView = 'dashboard' | 'employees' | 'evaluations' | 'companies' | 'departments' | 'admin' | 'weights-configuration' | 'user-management' | 'profile' | 'employee-profile' | 'sub-departments' | 'sections' | 'sub-sections' | 'replacements';
 
 const Dashboard = () => {
   const location = useLocation();
@@ -44,6 +45,8 @@ const Dashboard = () => {
         return 'sub-sections';
       case '/replacements':
         return 'replacements';
+      case '/employee-profile':
+        return 'employee-profile';
       case '/admin':
         return 'admin';
       case '/admin/weights-configuration':
@@ -98,6 +101,8 @@ const Dashboard = () => {
         return <SubSectionsPage onViewChange={handleViewChange} />;
       case 'replacements':
         return <ReplacementPage />;
+      case 'employee-profile':
+        return <EmployeeProfile />;
       case 'admin':
         return <AdminTools onNavigateToWeights={handleNavigateToWeights} onNavigateToUserManagement={handleNavigateToUserManagement} />;
       case 'weights-configuration':
