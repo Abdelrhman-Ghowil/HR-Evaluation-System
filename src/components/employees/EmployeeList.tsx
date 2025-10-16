@@ -75,7 +75,7 @@ const EmployeeList = () => {
     department: '',
     departmentId: '',
     position: '',
-    role: 'EMP' as 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP',
+    role: 'Employee' as 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP',
     managerialLevel: 'Individual Contributor',
     status: 'Active' as 'Active' | 'Inactive',
     companyName: 'Ninja',
@@ -114,7 +114,7 @@ const EmployeeList = () => {
       department: '',
       departmentId: '',
       position: '',
-      role: 'EMP',
+      role: 'Employee',
       managerialLevel: 'Individual Contributor',
       status: 'Active',
       companyName: 'Ninja',
@@ -542,6 +542,28 @@ const EmployeeList = () => {
     }
   }, [editingEmployee?.company_id]);
 
+  // Function to trigger auto-generation manually
+  const triggerAutoGeneration = () => {
+    if (newEmployee.name.trim()) {
+      const nameParts = newEmployee.name.trim().split(' ').filter(part => part.length > 0);
+      
+      // Generate username (lowercase, no spaces)
+      const generatedUsername = newEmployee.name.toLowerCase().replace(/\s+/g, '');
+      
+      // Split name into first and last name
+      const generatedFirstName = nameParts[0] || '';
+      const generatedLastName = nameParts.slice(1).join(' ') || '';
+      
+      // Update fields regardless of current values when triggered manually
+      setNewEmployee(prev => ({
+        ...prev,
+        username: generatedUsername,
+        firstName: generatedFirstName,
+        lastName: generatedLastName
+      }));
+    }
+  };
+
   // Auto-populate Username, First Name, and Last Name based on Full Name
   useEffect(() => {
     if (newEmployee.name.trim()) {
@@ -754,8 +776,7 @@ const EmployeeList = () => {
         
         // Check other top-level fields
         if (editingEmployee.company_id !== originalEmployee.company_id) {
-          updateData.company_id = editingEmployee.company_id;
-        }
+          updateData.company_id = editingEmployee.company_id;}
         
         // Check if department has changed
         if (editingEmployee.department !== originalEmployee.department) {
@@ -940,7 +961,7 @@ const EmployeeList = () => {
           department: '',
           departmentId: '',
           position: '',
-          role: 'EMP' as const,
+          role: 'Employee' as const,
           managerialLevel: 'Individual Contributor' as const,
           status: 'Active' as const,
           companyName: 'Ninja',
@@ -1044,9 +1065,14 @@ const EmployeeList = () => {
                       id="name"
                       value={newEmployee.name || ''}
                       onChange={(e) => setNewEmployee(prev => ({ ...prev, name: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          triggerAutoGeneration();
+                        }
+                      }}
                       placeholder="Enter full name"
-                      className={`w-full ${validationErrors.name ? 'border-red-500' : ''}`}
-                    />
+                      className={`w-full ${validationErrors.name ? 'border-red-500' : ''}`}/>
                     {validationErrors.name && (
                       <p className="text-sm text-red-500">{validationErrors.name}</p>
                     )}
@@ -1097,6 +1123,7 @@ const EmployeeList = () => {
                       onChange={(e) => setNewEmployee(prev => ({ ...prev, firstName: e.target.value }))}
                       placeholder="Auto-extracted from full name if empty"
                       className={`w-full ${newEmployee.name && !newEmployee.firstName ? 'bg-green-50 border-green-200' : ''}`}
+                      disabled
                     />
                   </div>
                   <div className="space-y-2">
@@ -1114,6 +1141,7 @@ const EmployeeList = () => {
                       onChange={(e) => setNewEmployee(prev => ({ ...prev, lastName: e.target.value }))}
                       placeholder="Auto-extracted from full name if empty"
                       className={`w-full ${newEmployee.name && !newEmployee.lastName ? 'bg-green-50 border-green-200' : ''}`}
+                      disabled
                     />
                   </div>
                   <div className="space-y-2">
@@ -1355,9 +1383,7 @@ const EmployeeList = () => {
                     <Select 
                       value={newEmployee.status} 
                       onValueChange={(value: typeof newEmployee.status) => 
-                        setNewEmployee(prev => ({ ...prev, status: value }))
-                      }
-                    >
+                        setNewEmployee(prev => ({ ...prev, status: value }))}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
@@ -1381,8 +1407,7 @@ const EmployeeList = () => {
                     <Label htmlFor="jobType" className="text-sm font-medium">Job Type</Label>
                     <Select 
                       value={newEmployee.jobType} 
-                      onValueChange={(value) => setNewEmployee(prev => ({ ...prev, jobType: value }))}
-                    >
+                      onValueChange={(value) => setNewEmployee(prev => ({ ...prev, jobType: value }))}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select job type" />
                       </SelectTrigger>
@@ -1419,6 +1444,19 @@ const EmployeeList = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="joinDate" className="text-sm font-medium">Join Date *</Label>
+                    <Input
+                      id="joinDate"
+                      type="date"
+                      value={newEmployee.joinDate || ''}
+                      onChange={(e) => setNewEmployee(prev => ({ ...prev, joinDate: e.target.value }))}
+                      className={`w-full ${validationErrors.joinDate ? 'border-red-500' : ''}`}
+                    />
+                    {validationErrors.joinDate && (
+                      <p className="text-sm text-red-500">{validationErrors.joinDate}</p>
+                    )}
+                  </div>
 
                   {/* <div className="space-y-2">
                     <Label htmlFor="directManager" className="text-sm font-medium">Direct Manager</Label>
@@ -1430,19 +1468,6 @@ const EmployeeList = () => {
                       className="w-full"
                     />
                   </div> */}
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="joinDate" className="text-sm font-medium">Join Date *</Label>
-                    <Input
-                      id="joinDate"
-                      type="date"
-                      value={newEmployee.joinDate || ''}
-                      onChange={(e) => setNewEmployee(prev => ({ ...prev, joinDate: e.target.value }))}
-                      className={`w-full md:w-1/2 ${validationErrors.joinDate ? 'border-red-500' : ''}`}
-                    />
-                    {validationErrors.joinDate && (
-                      <p className="text-sm text-red-500">{validationErrors.joinDate}</p>
-                    )}
-                  </div>
 
                   {/* Warnings Section */}
                   <div className="space-y-2 md:col-span-2">
@@ -1539,8 +1564,7 @@ const EmployeeList = () => {
             placeholder="Search employees..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+            className="pl-10"/>
         </div>
         <div className="flex gap-2">
           <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
@@ -1602,15 +1626,13 @@ const EmployeeList = () => {
                   ) : (
                     <Switch
                       checked={employee.status === 'Active'}
-                      onCheckedChange={() => handleToggleStatus(employee.id)}
-                    />
+                      onCheckedChange={() => handleToggleStatus(employee.id)}/>
                   )}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleEditEmployee(employee)}
-                    className="h-8 w-8 p-0"
-                  >
+                    className="h-8 w-8 p-0">
                     <Edit className="h-4 w-4" />
                   </Button>
                 </div>
@@ -1621,8 +1643,7 @@ const EmployeeList = () => {
                   <div className="flex gap-2 flex-wrap min-w-0 flex-1">
                     <Badge 
                       variant={employee.status === 'Active' ? 'default' : 'secondary'}
-                      className={employee.status === 'Active' ? 'bg-green-100 text-green-800' : ''}
-                    >
+                      className={employee.status === 'Active' ? 'bg-green-100 text-green-800' : ''}>
                       {employee.status}
                     </Badge>
                     <Badge variant="outline" className="bg-blue-50 text-blue-700">
@@ -1639,8 +1660,7 @@ const EmployeeList = () => {
                           {/* Compact modern badge */}
                           <Badge 
                             variant="outline" 
-                            className="relative bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-300/60 text-[10px] font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 px-1.5 py-0.5"
-                          >
+                            className="relative bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-300/60 text-[10px] font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 px-1.5 py-0.5">
                             <div className="flex items-center space-x-1">
                               <div className="w-1 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full animate-pulse"></div>
                               <span>{employee.warningsCount}</span>
@@ -1657,19 +1677,17 @@ const EmployeeList = () => {
                     <Mail className="h-4 w-4" />
                     <a 
                       href={`mailto:${employee.email}`}
-                      className="truncate text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                    >
+                      className="truncate text-blue-600 hover:text-blue-800 hover:underline transition-colors">
                       {employee.email}
                     </a>
                   </div>
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <Phone className="h-4 w-4" />
                     <a 
-                      href={`https://wa.me/${(employee.countryCode || '+1').replace('+', '')}${employee.phone?.replace(/[^0-9]/g, '')}`}
+                      href={`https://wa.me/${(employee.countryCode || '+966').replace('+', '')}${employee.phone?.replace(/[^0-9]/g, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-green-600 hover:text-green-800 hover:underline transition-colors"
-                    >
+                      className="text-green-600 hover:text-green-800 hover:underline transition-colors">
                       {(employee.countryCode || '+1')} {employee.phone}
                     </a>
                   </div>
@@ -1682,8 +1700,7 @@ const EmployeeList = () => {
                 <Button 
                   variant="outline" 
                   className="w-full mt-3"
-                  onClick={() => setSelectedEmployee(employee)}
-                >
+                  onClick={() => setSelectedEmployee(employee)}>
                   View Profile
                 </Button>
               </div>
@@ -1713,8 +1730,7 @@ const EmployeeList = () => {
                       value={editingEmployee.name}
                       onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, name: e.target.value } : null)}
                       placeholder="Enter full name"
-                      className={`w-full ${editValidationErrors.name ? 'border-red-500' : ''}`}
-                    />
+                      className={`w-full ${editValidationErrors.name ? 'border-red-500' : ''}`}/>
                     {editValidationErrors.name && (
                       <p className="text-sm text-red-500">{editValidationErrors.name}</p>
                     )}
@@ -1727,11 +1743,9 @@ const EmployeeList = () => {
                       value={editingEmployee.email}
                       onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, email: e.target.value } : null)}
                       placeholder="employee@company.com"
-                      className={`w-full ${editValidationErrors.email ? 'border-red-500' : ''}`}
-                    />
+                      className={`w-full ${editValidationErrors.email ? 'border-red-500' : ''}`}/>
                     {editValidationErrors.email && (
-                      <p className="text-sm text-red-500">{editValidationErrors.email}</p>
-                    )}
+                      <p className="text-sm text-red-500">{editValidationErrors.email}</p>)}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-phone" className="text-sm font-medium">Phone Number *</Label>
@@ -1752,8 +1766,7 @@ const EmployeeList = () => {
                         value={editingEmployee.phone || ''}
                         onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, phone: e.target.value } : null)}
                         placeholder="123-456-7890"
-                        className={`flex-1 ${editValidationErrors.phone ? 'border-red-500' : ''}`}
-                      />
+                        className={`flex-1 ${editValidationErrors.phone ? 'border-red-500' : ''}`}/>
                     {editValidationErrors.phone && (<p className="text-sm text-red-500">{editValidationErrors.phone}</p>)}
                     </div>
                   </div>
@@ -1772,8 +1785,7 @@ const EmployeeList = () => {
                             variant="outline"
                             size="sm"
                             className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                            onClick={() => setEditingEmployee(prev => prev ? { ...prev, avatar: '' } : null)}
-                          >
+                            onClick={() => setEditingEmployee(prev => prev ? { ...prev, avatar: '' } : null)}>
                             <X className="h-3 w-3" />
                           </Button>
                         </div>
@@ -1803,8 +1815,7 @@ const EmployeeList = () => {
                     <Label htmlFor="edit-gender" className="text-sm font-medium">Gender</Label>
                     <Select 
                       value={editingEmployee.gender || ''} 
-                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, gender: value } : null)}
-                    >
+                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, gender: value } : null)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select gender" />
                       </SelectTrigger>
@@ -1930,8 +1941,7 @@ const EmployeeList = () => {
                     <Label htmlFor="edit-status" className="text-sm font-medium">Status *</Label>
                     <Select 
                       value={editingEmployee.status}
-                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, status: value as 'Active' | 'Inactive'} : null)}
-                    >
+                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, status: value as 'Active' | 'Inactive'} : null)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
@@ -1941,14 +1951,14 @@ const EmployeeList = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2 md:col-span-2">
+                  <div className="space-y-2">
                     <Label htmlFor="edit-joinDate" className="text-sm font-medium">Join Date *</Label>
                     <Input
                       id="edit-joinDate"
                       type="date"
                       value={editingEmployee.joinDate || ''}
                       onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, joinDate: e.target.value } : null)}
-                      className={`w-full md:w-1/2 ${editValidationErrors.joinDate ? 'border-red-500' : ''}`}
+                      className={`w-full ${editValidationErrors.joinDate ? 'border-red-500' : ''}`}
                     />
                     {editValidationErrors.joinDate && (
                       <p className="text-sm text-red-500">{editValidationErrors.joinDate}</p>

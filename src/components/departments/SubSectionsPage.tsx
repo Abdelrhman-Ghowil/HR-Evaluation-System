@@ -5,10 +5,13 @@ import { Input } from '../ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Label } from '../ui/label';
 import { useOrganizational } from '../../contexts/OrganizationalContext';
 import { apiService } from '../../services/api';
 import { ApiSubSection, ApiSection, CreateSubSectionRequest } from '../../types/api';
 import { useToast } from '../../hooks/use-toast';
+import { useSubDepartments, useDepartments } from '../../hooks/useApi';
+import { useManagers } from '../../hooks/usemanagers';
 
 interface SubSectionsPageProps {
   onViewChange: (view: string) => void;
@@ -17,6 +20,21 @@ interface SubSectionsPageProps {
 const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
   const { selectedDepartment, selectedSubDepartment, selectedSection } = useOrganizational();
   const { toast } = useToast();
+  const { data: subDepartmentsData, isLoading: subDepartmentsLoading } = useSubDepartments();
+  const { data: departmentsData, isLoading: departmentsLoading } = useDepartments();
+  
+  // State for selected company ID and department ID for manager filtering
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  
+  // Fetch managers for the selected company and/or department
+  const { data: managersData = [], isLoading: managersLoading, error: managersError } = useManagers(selectedCompanyId, selectedDepartmentId);
+  
+  // Ensure managers is always an array
+  const managers = React.useMemo(() => {
+    return Array.isArray(managersData) ? managersData : [];
+  }, [managersData]);
+  
   const [subSections, setSubSections] = useState<ApiSubSection[]>([]);
   const [sections, setSections] = useState<ApiSection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,11 +49,93 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
     manager: ''
   });
 
+  // Get sub-departments list from API response with proper array handling
+  const subDepartments = React.useMemo(() => {
+    if (!subDepartmentsData) return [];
+    // Handle both paginated response and direct array response
+    if (Array.isArray(subDepartmentsData)) {
+      return subDepartmentsData;
+    }
+    return subDepartmentsData.results || [];
+  }, [subDepartmentsData]);
+
+  // Get departments list from API response with proper array handling
+  const departments = React.useMemo(() => {
+    if (!departmentsData) return [];
+    // Handle both paginated response and direct array response
+    if (Array.isArray(departmentsData)) {
+      return departmentsData;
+    }
+    return departmentsData.results || [];
+  }, [departmentsData]);
+
   // Load sub-sections and sections when component mounts - autonomous operation
   useEffect(() => {
     loadSubSections();
     loadSections();
   }, [selectedSection]); // Still react to section changes for filtering
+
+  // Update selectedCompanyId and selectedDepartmentId when newSubSection.section changes
+  React.useEffect(() => {
+    if (newSubSection.section) {
+      const selectedSectionData = sections.find(section => section.section_id === newSubSection.section);
+      if (selectedSectionData) {
+        // Find the sub-department that contains this section
+        const subDepartment = subDepartments.find(subDept => subDept.name === selectedSectionData.sub_department);
+        if (subDepartment) {
+          // Find the department that contains this sub-department
+          const department = departments.find(dept => dept.name === subDepartment.department);
+          const departmentId = department?.department_id || '';
+          
+          // Only update if values are actually different to prevent loops
+          setSelectedDepartmentId(prev => prev !== departmentId ? departmentId : prev);
+          
+          // Set company ID if available
+          if (subDepartment.company_id) {
+            setSelectedCompanyId(prev => prev !== subDepartment.company_id ? subDepartment.company_id : prev);
+          }
+        }
+      }
+    } else {
+      // Clear department ID when no section is selected
+      setSelectedDepartmentId(prev => prev !== '' ? '' : prev);
+    }
+  }, [newSubSection.section, sections, subDepartments, departments]);
+
+  // Handle manager loading for edit form when editingSubSection changes
+  React.useEffect(() => {
+    if (editingSubSection && editingSubSection.section) {
+      console.log('Edit form: useEffect triggered for editingSubSection:', editingSubSection);
+      
+      // Find the selected section to get sub-department info for manager loading
+      const selectedSectionData = sections.find(section => section.section_id === editingSubSection.section || section.name === editingSubSection.section);
+      console.log('Edit form: Found section for manager loading:', selectedSectionData);
+      
+      if (selectedSectionData) {
+        // Find the sub-department that contains this section
+        const subDepartment = subDepartments.find(subDept => subDept.name === selectedSectionData.sub_department);
+        console.log('Edit form: Found sub-department for manager loading:', subDepartment);
+        
+        if (subDepartment) {
+          // Find the department ID for manager filtering
+          const department = departments.find(dept => dept.name === subDepartment.department);
+          const departmentId = department?.department_id || '';
+          console.log('Edit form: Department ID for manager loading:', departmentId);
+          
+          // Update company and department IDs for manager filtering - only if different
+          if (subDepartment.company_id) {
+            console.log('Edit form: Setting company ID for manager loading:', subDepartment.company_id);
+            setSelectedCompanyId(prev => prev !== subDepartment.company_id ? subDepartment.company_id : prev);
+          }
+          
+          if (departmentId) {
+            console.log('Edit form: Setting department ID for manager loading:', departmentId);
+            setSelectedDepartmentId(prev => prev !== departmentId ? departmentId : prev);
+          }
+        }
+      }
+    }
+  }, [editingSubSection?.section, sections, subDepartments, departments]);
 
   const loadSubSections = async () => {
     try {
@@ -513,14 +613,39 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
                 </Select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Manager ID
-                </label>
-                <Input
+                <Label htmlFor="manager-select" className="block text-sm font-medium text-gray-700 mb-1">
+                  Manager
+                </Label>
+                <Select
                   value={newSubSection.manager}
-                  onChange={(e) => setNewSubSection(prev => ({ ...prev, manager: e.target.value }))}
-                  placeholder="Enter manager ID"
-                />
+                  onValueChange={(value) => {
+                    console.log('Create form: Manager selected:', value);
+                    setNewSubSection(prev => ({ ...prev, manager: value }));
+                  }}
+                  disabled={managersLoading || managersData.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      managersLoading 
+                        ? "Loading managers..." 
+                        : managersData.length === 0 
+                          ? "No managers available" 
+                          : "Select a manager"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {managersData.map((manager) => (
+                      <SelectItem key={manager.user_id} value={manager.user_id}>
+                        {manager.name} - {manager.role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {managersData.length === 0 && !managersLoading && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    No managers available for the selected section
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex justify-end space-x-3 mt-6">
@@ -579,14 +704,39 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
                 </Select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Manager ID
-                </label>
-                <Input
+                <Label htmlFor="edit-manager-select" className="block text-sm font-medium text-gray-700 mb-1">
+                  Manager
+                </Label>
+                <Select
                   value={editingSubSection.manager || ''}
-                  onChange={(e) => setEditingSubSection(prev => prev ? { ...prev, manager: e.target.value } : null)}
-                  placeholder="Enter manager ID"
-                />
+                  onValueChange={(value) => {
+                    console.log('Edit form: Manager selected:', value);
+                    setEditingSubSection(prev => prev ? { ...prev, manager: value } : null);
+                  }}
+                  disabled={managersLoading || managersData.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      managersLoading 
+                        ? "Loading managers..." 
+                        : managersData.length === 0 
+                          ? "No managers available" 
+                          : "Select a manager"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {managersData.map((manager) => (
+                      <SelectItem key={manager.user_id} value={manager.user_id}>
+                        {manager.name} - {manager.role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {managersData.length === 0 && !managersLoading && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    No managers available for the selected section
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex justify-end space-x-3 mt-6">

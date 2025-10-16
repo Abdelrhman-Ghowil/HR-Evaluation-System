@@ -63,8 +63,9 @@ export const transformEvaluationForDetails = (evaluationInput: EvaluationInput, 
       period: evaluationInput.period,
       status: evaluationInput.status,
       reviewer_id: evaluationInput.reviewer_id,
+      reviewer: evaluationInput.reviewer,
       date: evaluationInput.date,
-      score: evaluationInput.score
+      score: evaluationInput.score  
     };
   } catch (error) {
     console.error('Error transforming evaluation data:', error);

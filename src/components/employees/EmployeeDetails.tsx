@@ -87,7 +87,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   console.log('Managers data:', managers);
 
   // Transform API data to match the expected format
-  const transformApiEvaluation = (apiEval: any): EvaluationInput => {
+  const transformApiEvaluation = (apiEval: ApiEvaluation): EvaluationInput => {
     // Handle both ApiEvaluation (id) and ApiEvaluationResponse (evaluation_id) formats
     const evaluationId = apiEval.id || apiEval.evaluation_id;
     
@@ -111,8 +111,8 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
       period: apiEval.period,
       status: apiEval.status,
       score: score,
-      reviewer: reviewer_id ? 'Unknown' : undefined,
-      reviewer_id: reviewer_id,
+      reviewer: apiEval.reviewer || 'Unknown',
+      reviewer_id: reviewer_id?.toString(),
       date: new Date(apiEval.created_at).toISOString().split('T')[0]
     };
   };
@@ -843,7 +843,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                             No managers found for this company
                           </SelectItem>
                         ) : (
-                          managers.map((manager) => (
+                      (Array.isArray(managers) ? managers : managers.results || []).map((manager) => (
                             <SelectItem key={manager.employee_id} value={manager.user_id}>
                               {manager.name} ({manager.role})
                             </SelectItem>
@@ -1137,7 +1137,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                          No managers found for this company
                        </SelectItem>
                      ) : (
-                       managers.map((manager) => (
+                       Array.isArray(managers) && managers.map((manager) => (
                          <SelectItem key={manager.user_id} value={manager.user_id}>
                            {manager.name} ({manager.role})
                          </SelectItem>
