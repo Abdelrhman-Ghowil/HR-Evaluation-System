@@ -240,6 +240,7 @@ export interface ApiEvaluation {
   period: string;
   score?: number;
   reviewer_id?: string;
+  reviewer?: string;
   objectives?: ApiObjective[];
   created_at: string;
   updated_at: string;

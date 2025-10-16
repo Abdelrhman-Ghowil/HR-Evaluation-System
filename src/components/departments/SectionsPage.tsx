@@ -80,19 +80,49 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
         // selectedSubDept.department contains the department name, we need to find the department ID
         const department = departments.find(dept => dept.name === selectedSubDept.department);
         const departmentId = department?.department_id || '';
-        if (departmentId !== selectedDepartmentId) {
-          setSelectedDepartmentId(departmentId);
-        }
+        
+        // Only update if values are actually different to prevent loops
+        setSelectedDepartmentId(prev => prev !== departmentId ? departmentId : prev);
+        
         // Set company ID if available
-        if (selectedSubDept.company_id && selectedSubDept.company_id !== selectedCompanyId) {
-          setSelectedCompanyId(selectedSubDept.company_id);
+        if (selectedSubDept.company_id) {
+          setSelectedCompanyId(prev => prev !== selectedSubDept.company_id ? selectedSubDept.company_id : prev);
         }
       }
     } else {
       // Clear department ID when no sub-department is selected
-      setSelectedDepartmentId('');
+      setSelectedDepartmentId(prev => prev !== '' ? '' : prev);
     }
-  }, [newSection.sub_department_id, subDepartments, departments, selectedCompanyId, selectedDepartmentId]);
+  }, [newSection.sub_department_id, subDepartments, departments]);
+
+  // Handle manager loading for edit form when editingSection changes
+  React.useEffect(() => {
+    if (editingSection && editingSection.sub_department_id) {
+      console.log('Edit form: useEffect triggered for editingSection:', editingSection);
+      
+      // Find the selected sub-department to get department info for manager loading
+      const selectedSubDept = subDepartments.find(sd => sd.sub_department_id === editingSection.sub_department_id);
+      console.log('Edit form: Found sub-department for manager loading:', selectedSubDept);
+      
+      if (selectedSubDept) {
+        // Find the department ID for manager filtering
+        const department = departments.find(dept => dept.name === selectedSubDept.department);
+        const departmentId = department?.department_id || '';
+        console.log('Edit form: Department ID for manager loading:', departmentId);
+        
+        // Update company and department IDs for manager filtering - only if different
+        if (selectedSubDept.company_id) {
+          console.log('Edit form: Setting company ID for manager loading:', selectedSubDept.company_id);
+          setSelectedCompanyId(prev => prev !== selectedSubDept.company_id ? selectedSubDept.company_id : prev);
+        }
+        
+        if (departmentId) {
+          console.log('Edit form: Setting department ID for manager loading:', departmentId);
+          setSelectedDepartmentId(prev => prev !== departmentId ? departmentId : prev);
+        }
+      }
+    }
+  }, [editingSection?.sub_department_id, subDepartments, departments]);
 
   // Load sections when component mounts - autonomous operation
   useEffect(() => {
@@ -109,18 +139,18 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
       const response = await apiService.getSections(params);
       
       // Normalize API response - handle single object, array
-      let sectionsData: any[] = [];
+      let sectionsData: ApiSection[] = [];
       
       if (Array.isArray(response)) {
         // Direct array response
         sectionsData = response;
       } else if (response && typeof response === 'object') {
-        if (response.results && Array.isArray(response.results)) {
+        if ('results' in response && response.results && Array.isArray(response.results)) {
           // response with results array
           sectionsData = response.results;
-        } else if (response.section_id || response.id) {
+        } else if ('section_id' in response || 'id' in response) {
           // Single section object
-          sectionsData = [response];
+          sectionsData = [response as ApiSection];
         } else {
           // Empty or invalid response
           sectionsData = [];
@@ -128,10 +158,10 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
       }
       
       // Map API fields to UI expected format
-      const normalizedSections = sectionsData.map((section: any) => ({
+      const normalizedSections = sectionsData.map((section: ApiSection) => ({
         ...section,
-        id: section.section_id || section.id,
-        manager: section.manager_id || section.manager || 'Unassigned'
+        id: section.section_id ,
+        manager:  section.manager || 'Unassigned'
       }));
       
       setSections(normalizedSections);
@@ -190,33 +220,57 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
   };
 
   const handleEditSection = (section: ApiSection) => {
+    console.log('=== DEBUG: handleEditSection ===');
+    console.log('Section data:', section);
+    console.log('Available managers:', managers);
+    console.log('Selected company ID:', selectedCompanyId);
+    console.log('Selected department ID:', selectedDepartmentId);
+    
     // Find the sub-department ID by matching the sub-department name
     const subDepartment = subDepartments.find(sd => sd.name === section.sub_department);
-    const sectionWithId = {
-      ...section,
-      sub_department_id: subDepartment?.sub_department_id || section.sub_department
-    };
+    console.log('Found sub-department:', subDepartment);
     
-    // Update selectedCompanyId and selectedDepartmentId for manager filtering
+    // Use the department_id from the ApiSection directly for manager filtering
+    const departmentId = section.department_id;
+    console.log('Section department ID:', departmentId);
+    
+    // Update selectedCompanyId and selectedDepartmentId for manager filtering FIRST
     if (subDepartment) {
-      // subDepartment.department contains the department name, we need to find the department ID
-      const department = departments.find(dept => dept.name === subDepartment.department);
-      const departmentId = department?.department_id || '';
-      if (departmentId !== selectedDepartmentId) {
-        setSelectedDepartmentId(departmentId);
-      }
-      if (subDepartment.company_id && subDepartment.company_id !== selectedCompanyId) {
+      // Set company and department IDs synchronously
+      if (subDepartment.company_id) {
+        console.log('Setting company ID:', subDepartment.company_id);
         setSelectedCompanyId(subDepartment.company_id);
       }
     }
     
-    setEditingSection(sectionWithId);
+    // Set department ID from section for manager filtering
+    if (departmentId) {
+      console.log('Setting department ID from section:', departmentId);
+      setSelectedDepartmentId(departmentId);
+    }
+    
+    // Find the manager ID by matching the manager user_id
+    const manager = managers.find(m => m.user_id === section.manager_id);
+    console.log('Found manager by user_id:', manager);
+    
+    const managerId = manager ? manager.user_id : (section.manager_id === 'Unassigned' ? 'no-manager' : section.manager_id || 'no-manager');
+    console.log('Resolved manager ID:', managerId);
+    
+    // Create editing section with proper sub_department_id for the form
+    const sectionWithSubDeptId = {
+      ...section,
+      sub_department_id: subDepartment?.sub_department_id || section.sub_department,
+      manager_id: managerId
+    };
+    console.log('Section with sub_department_id:', sectionWithSubDeptId);
+    
+    setEditingSection(sectionWithSubDeptId);
     setShowEditForm(true);
   };
 
   const handleUpdateSection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingSection || !editingSection.sub_department_id) {
+    if (!editingSection || !editingSection.sub_department) {
       toast({
         title: 'Error',
         description: 'Please select a sub-department',
@@ -232,7 +286,7 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
       const updateData: UpdateSectionRequest = {
         name: editingSection.name,
         sub_department_id: editingSection.sub_department_id,
-        manager_id: selectedManager ? selectedManager.user_id : (editingSection.manager === "no-manager" ? undefined : editingSection.manager || '')
+        manager_id: selectedManager ? selectedManager.user_id : (editingSection.manager_id === 'Unassigned' ? '' : editingSection.manager_id || '')
       };
 
       await apiService.updateSection(editingSection.section_id, updateData);
@@ -260,7 +314,7 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
     try {
       const response = await apiService.getSubSections({ section: sectionId });
       const subSectionsCount = Array.isArray(response) ? response.length : 
-        (response?.results ? response.results.length : 0);
+        (response && 'results' in response && response.results ? response.results.length : 0);
       return subSectionsCount > 0;
     } catch (error) {
       console.error('Error checking sub-sections:', error);
@@ -590,7 +644,35 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
                 <Label htmlFor="edit_sub_department">Sub-Department *</Label>
                 <Select 
                   value={editingSection.sub_department_id}
-                  onValueChange={(value) => setEditingSection({ ...editingSection, sub_department_id: value })}
+                  onValueChange={(value) => {
+                    console.log('Edit form: Sub-department changed to:', value);
+                    setEditingSection({ ...editingSection, sub_department_id: value, manager_id: '' });
+                    
+                    // Find the selected sub-department to get department info for manager loading
+                    const selectedSubDept = subDepartments.find(sd => sd.sub_department_id === value);
+                    console.log('Edit form: Selected sub-department:', selectedSubDept);
+                    
+                    if (selectedSubDept) {
+                      // Find the department ID for manager filtering
+                      const department = departments.find(dept => dept.name === selectedSubDept.department);
+                      const departmentId = department?.department_id || '';
+                      console.log('Edit form: Setting department ID for manager loading:', departmentId);
+                      
+                      if (departmentId !== selectedDepartmentId) {
+                        setSelectedDepartmentId(departmentId);
+                      }
+                      
+                      // Set company ID if available
+                      if (selectedSubDept.company_id && selectedSubDept.company_id !== selectedCompanyId) {
+                        console.log('Edit form: Setting company ID:', selectedSubDept.company_id);
+                        setSelectedCompanyId(selectedSubDept.company_id);
+                      }
+                    } else {
+                      // Clear department ID when no sub-department is selected
+                      console.log('Edit form: Clearing department ID');
+                      setSelectedDepartmentId('');
+                    }
+                  }}
                   disabled={subDepartmentsLoading}
                 >
                   <SelectTrigger id="edit_sub_department">
@@ -618,7 +700,12 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
                 <Label htmlFor="edit_manager">Manager</Label>
                 <Select 
                   value={editingSection.manager_id}
-                  onValueChange={(value) => setEditingSection({ ...editingSection, manager_id: value })}
+                  onValueChange={(value) => {
+                    console.log('Edit form: Manager selection changed to:', value);
+                    const selectedManager = managers.find(m => m.user_id === value);
+                    console.log('Edit form: Selected manager details:', selectedManager);
+                    setEditingSection({ ...editingSection, manager_id: value });
+                  }}
                   disabled={!editingSection.sub_department_id || managersLoading}
                 >
                   <SelectTrigger id="edit_manager">
@@ -633,11 +720,14 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
                     ) : managers.length === 0 ? (
                       <SelectItem value="no-managers" disabled>No managers available</SelectItem>
                     ) : (
-                      managers.map((manager) => (
-                        <SelectItem key={manager.employee_id} value={manager.user_id}>
-                          {manager.name} - ({manager.role})
-                        </SelectItem>
-                      ))
+                      managers.map((manager) => {
+                        console.log('Edit form: Rendering manager option:', manager);
+                        return (
+                          <SelectItem key={manager.employee_id} value={manager.user_id}>
+                            {manager.name} - ({manager.role})
+                          </SelectItem>
+                        );
+                      })
                     )}
                   </SelectContent>
                 </Select>
@@ -734,14 +824,14 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
       )}
 
       <ConfirmationDialog
-        isOpen={showDeleteConfirmation}
+        open={showDeleteConfirmation}
         onConfirm={confirmDeleteSection}
         onCancel={cancelDeleteSection}
         title="Delete Section"
-        message={`Are you sure you want to delete the section "${sectionToDelete?.name}"? This action cannot be undone and will permanently remove the section from the system.`}
-        confirmText="Delete Section"
+        message={`Are you sure you want to delete "${sectionToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
         cancelText="Cancel"
-        isLoading={isDeleting}
+        loading={isDeleting}
         variant="destructive"
       />
     </div>

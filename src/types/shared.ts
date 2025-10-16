@@ -15,13 +15,14 @@ export interface Employee {
 
 export interface EmployeeInput {
   id: string;
+  company_id: string;
   employeeCode: string;
   name: string;
   email: string;
   phone: string;
   countryCode: string;
   warnings: string[];
-  warningsCount: number;
+  warningsCount: string;
   avatar: string;
   department: string;
   position: string;
@@ -35,6 +36,7 @@ export interface EmployeeInput {
   jobType: string;
   location: string;
   branch: string;
+  gender: string;
 }
 
 export interface Evaluation {
@@ -43,7 +45,8 @@ export interface Evaluation {
   type: string;
   period: string;
   status: 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed';
-  reviewer_id?: number;
+  reviewer_id?: string;
+  reviewer?: string;
   date: string;
   score?: number;
 }

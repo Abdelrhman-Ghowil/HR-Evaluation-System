@@ -502,8 +502,8 @@ class ApiService {
   }
 
   // Section methods
-  async getSections(params?: SectionQueryParams): Promise<PaginatedResponse<ApiSection>> {
-    const response: AxiosResponse<PaginatedResponse<ApiSection>> = await this.api.get('/api/org/sections/', {
+  async getSections(params?: SectionQueryParams): Promise<ApiSection[]> {
+    const response: AxiosResponse<ApiSection[]> = await this.api.get('/api/org/sections/', {
       params,
     });
     return response.data;
