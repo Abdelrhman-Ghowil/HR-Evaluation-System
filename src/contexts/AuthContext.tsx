@@ -5,7 +5,7 @@ import { ApiUser, UserRole } from '../types/api';
 import { toast } from 'sonner';
 
 interface User {
-  id: string;
+  user_id: string;
   name: string;
   email: string;
   role: 'admin' | 'hr' | 'manager' | 'employee';
@@ -37,7 +37,7 @@ const mapApiRoleToLocalRole = (apiRole: UserRole): User['role'] => {
 // Helper function to convert API user to local user format
 const convertApiUserToLocalUser = (apiUser: ApiUser): User => {
   return {
-    id: apiUser.user_id,
+    user_id: apiUser.user_id,
     name: apiUser.name || `${apiUser.first_name} ${apiUser.last_name}`.trim(),
     email: apiUser.email,
     role: mapApiRoleToLocalRole(apiUser.role),

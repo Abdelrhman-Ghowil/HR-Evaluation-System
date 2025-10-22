@@ -63,6 +63,7 @@ export interface ApiEmployee {
   employee_id: string;
   employee_code: string;
   name: string;
+  username: string;
   email: string;
   phone: string;
   country_code: string;
@@ -74,7 +75,7 @@ export interface ApiEmployee {
   managerial_level: string;
   status: string;
   company_name: string;
-  department: string[];
+  department: string;
   org_path: string;
   direct_manager: string;
   join_date: string;
@@ -85,6 +86,7 @@ export interface ApiEmployee {
   job_type: string;
   location: string;
   branch: string;
+  gender:string;
 }
 
 export type ManagerialLevel = 'Individual Contributor' | 'Supervisory' | 'Middle Management';
@@ -233,13 +235,15 @@ export interface CreatePlacementRequest {
 
 // Evaluation Types
 export interface ApiEvaluation {
-  id: string;
+  // id: string;
+  evaluation_id: string
   employee_id: string;
   type: EvaluationType;
   status: EvaluationStatus;
   period: string;
   score?: number;
   reviewer_id?: string;
+  reviewer?: string;
   objectives?: ApiObjective[];
   created_at: string;
   updated_at: string;
