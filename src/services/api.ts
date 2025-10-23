@@ -312,6 +312,16 @@ class ApiService {
     return response.data;
   }
 
+  async getEmployeeByUserId(userId: string): Promise<ApiEmployee> {
+    console.log('API: Fetching employee data for user_id:', userId);
+    const response: AxiosResponse<ApiEmployee> = await this.api.get('/api/employees/', {
+      params: { user_id: userId },
+    });
+    
+    console.log('API: Raw response:', response.data);
+    return response.data;
+  }
+
   async getEmployee(employeeId: string): Promise<ApiEmployee> {
     const response: AxiosResponse<ApiEmployee> = await this.api.get(`/api/employees/${employeeId}/`);
     return response.data;

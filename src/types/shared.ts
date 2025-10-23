@@ -2,6 +2,7 @@
 
 export interface Employee {
   id: string;
+  employee_id: string; 
   name: string;
   position: string;
   department: string;
@@ -15,6 +16,7 @@ export interface Employee {
 
 export interface EmployeeInput {
   id: string;
+  employee_id: string; 
   company_id: string;
   employeeCode: string;
   name: string;
@@ -22,7 +24,7 @@ export interface EmployeeInput {
   phone: string;
   countryCode: string;
   warnings: string[];
-  warningsCount: string;
+  warningsCount: number;
   avatar: string;
   department: string;
   position: string;
@@ -41,6 +43,7 @@ export interface EmployeeInput {
 
 export interface Evaluation {
   id: string;
+  evaluation_id: string;
   employee_id: string;
   type: string;
   period: string;
@@ -53,13 +56,14 @@ export interface Evaluation {
 
 export interface EvaluationInput {
   id: string;
+  evaluation_id: string;
   type: string;
   status: 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed';
   score?: number;
   date: string;
   reviewer: string;
-  period: string;
   reviewer_id?: string;
+  period: string;
 }
 
 export interface Objective {

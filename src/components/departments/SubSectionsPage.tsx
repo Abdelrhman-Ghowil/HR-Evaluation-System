@@ -45,8 +45,8 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
   const [editingSubSection, setEditingSubSection] = useState<ApiSubSection | null>(null);
   const [newSubSection, setNewSubSection] = useState<CreateSubSectionRequest>({
     name: '',
-    section: '',
-    manager: ''
+    section_id: '',
+    manager_id: ''
   });
 
   // Get sub-departments list from API response with proper array handling
@@ -73,12 +73,12 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
   useEffect(() => {
     loadSubSections();
     loadSections();
-  }, [selectedSection]); // Still react to section changes for filtering
+  }, [selectedSection?.section_id]); // Still react to section changes for filtering
 
   // Update selectedCompanyId and selectedDepartmentId when newSubSection.section changes
   React.useEffect(() => {
-    if (newSubSection.section) {
-      const selectedSectionData = sections.find(section => section.section_id === newSubSection.section);
+    if (newSubSection.section_id) {
+      const selectedSectionData = sections.find(section => section.section_id === newSubSection.section_id);
       if (selectedSectionData) {
         // Find the sub-department that contains this section
         const subDepartment = subDepartments.find(subDept => subDept.name === selectedSectionData.sub_department);
@@ -100,7 +100,7 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
       // Clear department ID when no section is selected
       setSelectedDepartmentId(prev => prev !== '' ? '' : prev);
     }
-  }, [newSubSection.section, sections, subDepartments, departments]);
+  }, [newSubSection.section_id, sections, subDepartments, departments]);
 
   // Handle manager loading for edit form when editingSubSection changes
   React.useEffect(() => {
@@ -169,7 +169,7 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
       const normalizedSubSections = subSectionsData.map((subSection: any) => ({
         ...subSection,
         id: subSection.sub_section_id || subSection.id,
-        manager: subSection.manager_id || subSection.manager || 'Unassigned'
+        manager: subSection.manager || 'Unassigned'
       }));
       
       setSubSections(normalizedSubSections);
@@ -237,14 +237,14 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
     try {
       const subSectionData = {
         name: newSubSection.name,
-        section_id: selectedSection?.section_id || newSubSection.section,
-        manager_id: newSubSection.manager || null
+        section_id: selectedSection?.section_id || newSubSection.section_id,
+        manager_id: newSubSection.manager_id || null
       };
 
       const response = await apiService.createSubSection(subSectionData);
       setSubSections(prev => [...prev, response]);
       setShowCreateForm(false);
-      setNewSubSection({ name: '', section: '', manager: '' });
+      setNewSubSection({ name: '', section_id: '', manager_id: '' });
       
       toast({
         title: 'Success',
@@ -596,8 +596,8 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
                   Section <span className="text-red-500">*</span>
                 </label>
                 <Select
-                  value={newSubSection.section}
-                  onValueChange={(value) => setNewSubSection(prev => ({ ...prev, section: value }))}
+                  value={newSubSection.section_id}
+                  onValueChange={(value) => setNewSubSection(prev => ({ ...prev, section_id: value }))}
                   disabled={!!selectedSection || sectionsLoading}
                 >
                   <SelectTrigger>
@@ -617,10 +617,10 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
                   Manager
                 </Label>
                 <Select
-                  value={newSubSection.manager}
+                  value={newSubSection.manager_id}
                   onValueChange={(value) => {
                     console.log('Create form: Manager selected:', value);
-                    setNewSubSection(prev => ({ ...prev, manager: value }));
+                    setNewSubSection(prev => ({ ...prev, manager_id: value }));
                   }}
                   disabled={managersLoading || managersData.length === 0}
                 >
@@ -724,7 +724,7 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
                           : "Select a manager"
                     } />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent>Sub-Sections
                     {managersData.map((manager) => (
                       <SelectItem key={manager.user_id} value={manager.user_id}>
                         {manager.name} - {manager.role}

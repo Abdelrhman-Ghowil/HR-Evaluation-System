@@ -36,7 +36,7 @@ interface NewEvaluation {
 }
 
 interface Reviewer {
-  id: string;
+  reviewer_id: string;
   name: string;
   role: 'LM' | 'HOD' | 'HR';
 }
@@ -75,7 +75,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const { data: usersData, isLoading: usersLoading, error: usersError } = useUsers();
   
   // Get company ID from employee for manager filtering
-  const employeeCompanyId = employee.company_id || employee.company;
+  const employeeCompanyId = employee.company_id ;
   
   // Fetch managers (employees with roles LM, HOD, HR) for the employee's company
   const { data: managers = [], isLoading: managersLoading, error: managersError } = useManagers(employeeCompanyId);
@@ -98,15 +98,13 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
       score = typeof apiEval.score === 'string' ? parseFloat(apiEval.score) : apiEval.score;
     }
     
+    
     // Parse reviewer_id safely
-    let reviewer_id: number | undefined;
-    if (apiEval.reviewer_id) {
-      const parsedReviewerId = parseInt(apiEval.reviewer_id, 10);
-      reviewer_id = isNaN(parsedReviewerId) ? undefined : parsedReviewerId;
-    }
+    const reviewer_id = apiEval.reviewer_id;
     
     return {
       id: evaluationId,
+      evaluation_id: evaluationId,
       type: apiEval.type,
       period: apiEval.period,
       status: apiEval.status,
@@ -285,7 +283,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
         type: editingEvaluation.type,
         period: editingEvaluation.period,
         status: editingEvaluation.status, // Send status as-is without transformation
-        reviewer_id: editingEvaluation.reviewer_id?.toString() || null
+        reviewer_id: editingEvaluation.reviewer_id || null
         // Note: score field is intentionally excluded to make it non-editable
       };
       
@@ -1031,12 +1029,12 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                   <SelectItem value="Quarterly">Quarterly</SelectItem>
+                    <SelectItem value="Quarterly">Quarterly</SelectItem>
                     <SelectItem value="Annual">Annual</SelectItem>
-                   <SelectItem value="Optional">Optional</SelectItem>
-                   </SelectContent>
-                 </Select>
-               </div>
+                    <SelectItem value="Optional">Optional</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-period" className="text-right">
@@ -1054,27 +1052,26 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
               </div>
               
               <div className="grid grid-cols-4 items-center gap-4">
-                   <Label htmlFor="edit-status" className="text-right">
-                     Status
-                   </Label>
-                   <div className="col-span-3 space-y-2">
-                     <Select
-                       value={editingEvaluation.status}
-                       onValueChange={(value) => setEditingEvaluation({
-                         ...editingEvaluation,
-                         status: value as 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed'
-                       })}
-                     >
-                       <SelectTrigger id="edit-status">
-                         <SelectValue />
-                       </SelectTrigger>
-                       <SelectContent>
-                         {(() => {
-                           const originalEvaluation = evaluationList.find(e => e.id === editingEvaluation.id);
-                           const currentStatus = originalEvaluation?.status || editingEvaluation.status;
-                           const validTransitions = [currentStatus, ...getValidStatusTransitions(currentStatus)];
-                           
-                           return [
+                  <Label htmlFor="edit-status" className="text-right">
+                    Status
+                  </Label>
+                  <div className="col-span-3 space-y-2">
+                    <Select
+                      value={editingEvaluation.status}
+                      onValueChange={(value) => setEditingEvaluation({
+                        ...editingEvaluation,
+                        status: value as 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed'
+                      })}>
+                      <SelectTrigger id="edit-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(() => {
+                          const originalEvaluation = evaluationList.find(e => e.id === editingEvaluation.id);
+                          const currentStatus = originalEvaluation?.status || editingEvaluation.status;
+                          const validTransitions = [currentStatus, ...getValidStatusTransitions(currentStatus)];
+                        
+                          return [
                              { value: 'Draft', label: 'Draft' },
                              { value: 'Pending HoD Approval', label: 'Pending HoD Approval' },
                              { value: 'Pending HR Approval', label: 'Pending HR Approval' },
