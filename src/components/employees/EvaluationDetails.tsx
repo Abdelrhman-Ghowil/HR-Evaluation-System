@@ -199,7 +199,8 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
            description: objectiveForm.description!,
            target: objectiveForm.target!,
            achieved: objectiveForm.achieved!,
-           status: objectiveForm.status!
+           status: objectiveForm.status!,
+           weight: objectiveForm.weight!
          };
          await createObjectiveMutation.mutateAsync(createData);
          // Explicitly refetch objectives to ensure UI updates immediately

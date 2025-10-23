@@ -12,12 +12,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Users, Plus, Edit, Mail, Phone, X, Search, Filter, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import EmployeeDetails from './EmployeeDetails';
 import { apiService } from '@/services/api';
-import { ApiEmployee, ApiDepartment, ApiCompany, CreateEmployeeRequest, ImportResponse } from '@/types/api';
+import { ApiEmployee, ApiDepartment, ApiCompany, CreateEmployeeRequest, ImportResponse, ApiError } from '@/types/api';
 import { parsePhoneNumber, formatDate } from '@/utils/dataTransformers';
 
 
 interface Employee {
   id: string;
+  employee_id: string;
   employeeCode: string;
   name: string;
   email: string;
@@ -75,7 +76,7 @@ const EmployeeList = () => {
     department: '',
     departmentId: '',
     position: '',
-    role: 'Employee' as 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP',
+    role: 'EMP' as 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP',
     managerialLevel: 'Individual Contributor',
     status: 'Active' as 'Active' | 'Inactive',
     companyName: 'Ninja',
@@ -114,7 +115,7 @@ const EmployeeList = () => {
       department: '',
       departmentId: '',
       position: '',
-      role: 'Employee',
+      role: 'EMP',
       managerialLevel: 'Individual Contributor',
       status: 'Active',
       companyName: 'Ninja',
@@ -133,6 +134,71 @@ const EmployeeList = () => {
     setValidationErrors({});
   };
 
+  // Utility functions for name processing
+  const processFullName = (fullName: string) => {
+    // Clean and normalize the input
+    const cleanName = fullName.trim().replace(/\s+/g, ' ');
+    
+    if (!cleanName) {
+      return { firstName: '', lastName: '', username: '' };
+    }
+
+    // Split the name into parts
+    const nameParts = cleanName.split(' ').filter(part => part.length > 0);
+    
+    let firstName = '';
+    let lastName = '';
+    let username = '';
+
+    if (nameParts.length === 1) {
+      // Single word name - use as first name
+      firstName = nameParts[0];
+      lastName = '';
+      // Generate username from first name only
+      username = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    } else if (nameParts.length === 2) {
+      // Two words - first and last name
+      firstName = nameParts[0];
+      lastName = nameParts[1];
+      // Generate username: first initial + last name
+      const firstInitial = firstName.charAt(0).toLowerCase();
+      const cleanLastName = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      username = firstInitial + cleanLastName;
+    } else {
+      // Multiple words - first word as first name, rest as last name
+      firstName = nameParts[0];
+      lastName = nameParts.slice(1).join(' ');
+      // Generate username: first initial + first word of last name
+      const firstInitial = firstName.charAt(0).toLowerCase();
+      const lastNameFirstWord = nameParts[1].toLowerCase().replace(/[^a-z0-9]/g, '');
+      username = firstInitial + lastNameFirstWord;
+    }
+
+    // Ensure username is not empty and has reasonable length
+    if (username.length < 2) {
+      username = firstName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
+    }
+    
+    // Limit username length to 20 characters
+    username = username.substring(0, 20);
+
+    return { firstName, lastName, username };
+  };
+
+  // Handle name input change with auto-population
+  const handleNameChange = (fullName: string) => {
+    const { firstName, lastName, username } = processFullName(fullName);
+    
+    setNewEmployee(prev => ({
+      ...prev,
+      name: fullName,
+      // Only auto-populate if fields are empty or were previously auto-populated
+      firstName: prev.firstName === '' || prev.firstName === processFullName(prev.name).firstName ? firstName : prev.firstName,
+      lastName: prev.lastName === '' || prev.lastName === processFullName(prev.name).lastName ? lastName : prev.lastName,
+      username: prev.username === '' || prev.username === processFullName(prev.name).username ? username : prev.username
+    }));
+  };
+
 
 
 
@@ -143,6 +209,7 @@ const EmployeeList = () => {
     
     return {
       id: apiEmployee.employee_id,
+      employee_id: apiEmployee.employee_id,
       employeeCode: apiEmployee.employee_code,
       name: apiEmployee.name,
       email: apiEmployee.email,
@@ -165,7 +232,8 @@ const EmployeeList = () => {
       user_id: apiEmployee.user_id,
       jobType: apiEmployee.job_type || '',
       location: apiEmployee.location || '',
-      branch: apiEmployee.branch || ''
+      branch: apiEmployee.branch || '',
+      gender: apiEmployee.gender || '',
     };
   };
 
@@ -542,58 +610,6 @@ const EmployeeList = () => {
     }
   }, [editingEmployee?.company_id]);
 
-  // Function to trigger auto-generation manually
-  const triggerAutoGeneration = () => {
-    if (newEmployee.name.trim()) {
-      const nameParts = newEmployee.name.trim().split(' ').filter(part => part.length > 0);
-      
-      // Generate username (lowercase, no spaces)
-      const generatedUsername = newEmployee.name.toLowerCase().replace(/\s+/g, '');
-      
-      // Split name into first and last name
-      const generatedFirstName = nameParts[0] || '';
-      const generatedLastName = nameParts.slice(1).join(' ') || '';
-      
-      // Update fields regardless of current values when triggered manually
-      setNewEmployee(prev => ({
-        ...prev,
-        username: generatedUsername,
-        firstName: generatedFirstName,
-        lastName: generatedLastName
-      }));
-    }
-  };
-
-  // Auto-populate Username, First Name, and Last Name based on Full Name
-  useEffect(() => {
-    if (newEmployee.name.trim()) {
-      const nameParts = newEmployee.name.trim().split(' ').filter(part => part.length > 0);
-      
-      // Generate username (lowercase, no spaces)
-      const generatedUsername = newEmployee.name.toLowerCase().replace(/\s+/g, '');
-      
-      // Split name into first and last name
-      const generatedFirstName = nameParts[0] || '';
-      const generatedLastName = nameParts.slice(1).join(' ') || '';
-      
-      // Only update if the fields are empty (don't overwrite user input)
-      setNewEmployee(prev => ({
-        ...prev,
-        username: prev.username === '' ? generatedUsername : prev.username,
-        firstName: prev.firstName === '' ? generatedFirstName : prev.firstName,
-        lastName: prev.lastName === '' ? generatedLastName : prev.lastName
-      }));
-    } else {
-      // Clear auto-populated fields when name is empty
-      setNewEmployee(prev => ({
-        ...prev,
-        username: '',
-        firstName: '',
-        lastName: ''
-      }));
-    }
-  }, [newEmployee.name]);
-
   // Auto-refresh mechanism when no employees are found
   useEffect(() => {
     let refreshInterval: NodeJS.Timeout;
@@ -776,7 +792,8 @@ const EmployeeList = () => {
         
         // Check other top-level fields
         if (editingEmployee.company_id !== originalEmployee.company_id) {
-          updateData.company_id = editingEmployee.company_id;}
+          updateData.company_id = editingEmployee.company_id;
+        }
         
         // Check if department has changed
         if (editingEmployee.department !== originalEmployee.department) {
@@ -961,7 +978,7 @@ const EmployeeList = () => {
           department: '',
           departmentId: '',
           position: '',
-          role: 'Employee' as const,
+          role: 'EMP' as const,
           managerialLevel: 'Individual Contributor' as const,
           status: 'Active' as const,
           companyName: 'Ninja',
@@ -1064,17 +1081,16 @@ const EmployeeList = () => {
                     <Input
                       id="name"
                       value={newEmployee.name || ''}
-                      onChange={(e) => setNewEmployee(prev => ({ ...prev, name: e.target.value }))}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          triggerAutoGeneration();
-                        }
-                      }}
+                      onChange={(e) => handleNameChange(e.target.value)}
                       placeholder="Enter full name"
-                      className={`w-full ${validationErrors.name ? 'border-red-500' : ''}`}/>
+                      className={`w-full ${validationErrors.name ? 'border-red-500' : ''}`}
+                      aria-describedby={validationErrors.name ? "name-error" : "name-help"}
+                    />
+                    <p id="name-help" className="text-xs text-gray-500">
+                      First name, last name, and username will be auto-populated
+                    </p>
                     {validationErrors.name && (
-                      <p className="text-sm text-red-500">{validationErrors.name}</p>
+                      <p id="name-error" className="text-sm text-red-500" role="alert">{validationErrors.name}</p>
                     )}
                   </div>
                   <div className="space-y-2">
@@ -1092,57 +1108,48 @@ const EmployeeList = () => {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="username" className="text-sm font-medium">
-                      Username
-                      {newEmployee.name && !newEmployee.username && (
-                        <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                          Auto-generated
-                        </span>
-                      )}
-                    </Label>
+                    <Label htmlFor="username" className="text-sm font-medium">Username</Label>
                     <Input
                       id="username"
                       value={newEmployee.username || ''}
                       onChange={(e) => setNewEmployee(prev => ({ ...prev, username: e.target.value }))}
-                      placeholder="Auto-generated from name if empty"
-                      className={`w-full ${newEmployee.name && !newEmployee.username ? 'bg-blue-50 border-blue-200' : ''}`}
+                      placeholder="Auto-generated from name"
+                      className="w-full"
+                      aria-describedby="username-help"
                     />
+                    <p id="username-help" className="text-xs text-gray-500">
+                      Auto-generated from full name, can be manually overridden
+                    </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="firstName" className="text-sm font-medium">
-                      First Name
-                      {newEmployee.name && !newEmployee.firstName && (
-                        <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                          Auto-extracted
-                        </span>
-                      )}
-                    </Label>
+                    <Label htmlFor="firstName" className="text-sm font-medium">First Name</Label>
                     <Input
                       id="firstName"
                       value={newEmployee.firstName || ''}
                       onChange={(e) => setNewEmployee(prev => ({ ...prev, firstName: e.target.value }))}
-                      placeholder="Auto-extracted from full name if empty"
-                      className={`w-full ${newEmployee.name && !newEmployee.firstName ? 'bg-green-50 border-green-200' : ''}`}
+                      placeholder="Auto-extracted from full name"
+                      className="w-full bg-gray-50 cursor-not-allowed"
+                      aria-describedby="firstName-help"
                       disabled
                     />
+                    <p id="firstName-help" className="text-xs text-gray-500">
+                      Auto-extracted from full name (read-only)
+                    </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName" className="text-sm font-medium">
-                      Last Name
-                      {newEmployee.name && !newEmployee.lastName && (
-                        <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                          Auto-extracted
-                        </span>
-                      )}
-                    </Label>
+                    <Label htmlFor="lastName" className="text-sm font-medium">Last Name</Label>
                     <Input
                       id="lastName"
                       value={newEmployee.lastName || ''}
                       onChange={(e) => setNewEmployee(prev => ({ ...prev, lastName: e.target.value }))}
-                      placeholder="Auto-extracted from full name if empty"
-                      className={`w-full ${newEmployee.name && !newEmployee.lastName ? 'bg-green-50 border-green-200' : ''}`}
+                      placeholder="Auto-extracted from full name"
+                      className="w-full bg-gray-50 cursor-not-allowed"
+                      aria-describedby="lastName-help"
                       disabled
                     />
+                    <p id="lastName-help" className="text-xs text-gray-500">
+                      Auto-extracted from full name (read-only)
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="gender" className="text-sm font-medium">Gender</Label>
@@ -1342,13 +1349,13 @@ const EmployeeList = () => {
                       }
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select role" />
+                        <SelectValue placeholder="Employee *" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Admin">Admin</SelectItem>
                         <SelectItem value="HR">HR</SelectItem>
                         <SelectItem value="Head-of-Dept">Head-of-Dept</SelectItem>
-            <SelectItem value="Line Manager">Line Manager</SelectItem>
+                        <SelectItem value="Line Manager">Line Manager</SelectItem>
                         <SelectItem value="Employee">Employee</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1383,7 +1390,9 @@ const EmployeeList = () => {
                     <Select 
                       value={newEmployee.status} 
                       onValueChange={(value: typeof newEmployee.status) => 
-                        setNewEmployee(prev => ({ ...prev, status: value }))}>
+                        setNewEmployee(prev => ({ ...prev, status: value }))
+                      }
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
@@ -1407,7 +1416,8 @@ const EmployeeList = () => {
                     <Label htmlFor="jobType" className="text-sm font-medium">Job Type</Label>
                     <Select 
                       value={newEmployee.jobType} 
-                      onValueChange={(value) => setNewEmployee(prev => ({ ...prev, jobType: value }))}>
+                      onValueChange={(value) => setNewEmployee(prev => ({ ...prev, jobType: value }))}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select job type" />
                       </SelectTrigger>
@@ -1444,6 +1454,8 @@ const EmployeeList = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                
                   <div className="space-y-2">
                     <Label htmlFor="joinDate" className="text-sm font-medium">Join Date *</Label>
                     <Input
@@ -1451,23 +1463,11 @@ const EmployeeList = () => {
                       type="date"
                       value={newEmployee.joinDate || ''}
                       onChange={(e) => setNewEmployee(prev => ({ ...prev, joinDate: e.target.value }))}
-                      className={`w-full ${validationErrors.joinDate ? 'border-red-500' : ''}`}
-                    />
+                      className={`w-full ${validationErrors.joinDate ? 'border-red-500' : ''}`}/>
                     {validationErrors.joinDate && (
                       <p className="text-sm text-red-500">{validationErrors.joinDate}</p>
                     )}
                   </div>
-
-                  {/* <div className="space-y-2">
-                    <Label htmlFor="directManager" className="text-sm font-medium">Direct Manager</Label>
-                    <Input
-                      id="directManager"
-                      value={newEmployee.directManager || ''}
-                      onChange={(e) => setNewEmployee(prev => ({ ...prev, directManager: e.target.value }))}
-                      placeholder="Manager's name"
-                      className="w-full"
-                    />
-                  </div> */}
 
                   {/* Warnings Section */}
                   <div className="space-y-2 md:col-span-2">
@@ -1564,7 +1564,8 @@ const EmployeeList = () => {
             placeholder="Search employees..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"/>
+            className="pl-10"
+          />
         </div>
         <div className="flex gap-2">
           <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
@@ -1626,13 +1627,15 @@ const EmployeeList = () => {
                   ) : (
                     <Switch
                       checked={employee.status === 'Active'}
-                      onCheckedChange={() => handleToggleStatus(employee.id)}/>
+                      onCheckedChange={() => handleToggleStatus(employee.id)}
+                    />
                   )}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleEditEmployee(employee)}
-                    className="h-8 w-8 p-0">
+                    className="h-8 w-8 p-0"
+                  >
                     <Edit className="h-4 w-4" />
                   </Button>
                 </div>
@@ -1643,7 +1646,8 @@ const EmployeeList = () => {
                   <div className="flex gap-2 flex-wrap min-w-0 flex-1">
                     <Badge 
                       variant={employee.status === 'Active' ? 'default' : 'secondary'}
-                      className={employee.status === 'Active' ? 'bg-green-100 text-green-800' : ''}>
+                      className={employee.status === 'Active' ? 'bg-green-100 text-green-800' : ''}
+                    >
                       {employee.status}
                     </Badge>
                     <Badge variant="outline" className="bg-blue-50 text-blue-700">
@@ -1660,7 +1664,8 @@ const EmployeeList = () => {
                           {/* Compact modern badge */}
                           <Badge 
                             variant="outline" 
-                            className="relative bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-300/60 text-[10px] font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 px-1.5 py-0.5">
+                            className="relative bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-300/60 text-[10px] font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 px-1.5 py-0.5"
+                          >
                             <div className="flex items-center space-x-1">
                               <div className="w-1 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full animate-pulse"></div>
                               <span>{employee.warningsCount}</span>
@@ -1677,17 +1682,19 @@ const EmployeeList = () => {
                     <Mail className="h-4 w-4" />
                     <a 
                       href={`mailto:${employee.email}`}
-                      className="truncate text-blue-600 hover:text-blue-800 hover:underline transition-colors">
+                      className="truncate text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                    >
                       {employee.email}
                     </a>
                   </div>
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <Phone className="h-4 w-4" />
                     <a 
-                      href={`https://wa.me/${(employee.countryCode || '+966').replace('+', '')}${employee.phone?.replace(/[^0-9]/g, '')}`}
+                      href={`https://wa.me/${(employee.countryCode || '+1').replace('+', '')}${employee.phone?.replace(/[^0-9]/g, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-green-600 hover:text-green-800 hover:underline transition-colors">
+                      className="text-green-600 hover:text-green-800 hover:underline transition-colors"
+                    >
                       {(employee.countryCode || '+1')} {employee.phone}
                     </a>
                   </div>
@@ -1700,7 +1707,8 @@ const EmployeeList = () => {
                 <Button 
                   variant="outline" 
                   className="w-full mt-3"
-                  onClick={() => setSelectedEmployee(employee)}>
+                  onClick={() => setSelectedEmployee(employee)}
+                >
                   View Profile
                 </Button>
               </div>
@@ -1730,7 +1738,8 @@ const EmployeeList = () => {
                       value={editingEmployee.name}
                       onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, name: e.target.value } : null)}
                       placeholder="Enter full name"
-                      className={`w-full ${editValidationErrors.name ? 'border-red-500' : ''}`}/>
+                      className={`w-full ${editValidationErrors.name ? 'border-red-500' : ''}`}
+                    />
                     {editValidationErrors.name && (
                       <p className="text-sm text-red-500">{editValidationErrors.name}</p>
                     )}
@@ -1743,9 +1752,11 @@ const EmployeeList = () => {
                       value={editingEmployee.email}
                       onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, email: e.target.value } : null)}
                       placeholder="employee@company.com"
-                      className={`w-full ${editValidationErrors.email ? 'border-red-500' : ''}`}/>
+                      className={`w-full ${editValidationErrors.email ? 'border-red-500' : ''}`}
+                    />
                     {editValidationErrors.email && (
-                      <p className="text-sm text-red-500">{editValidationErrors.email}</p>)}
+                      <p className="text-sm text-red-500">{editValidationErrors.email}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-phone" className="text-sm font-medium">Phone Number *</Label>
@@ -1766,7 +1777,8 @@ const EmployeeList = () => {
                         value={editingEmployee.phone || ''}
                         onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, phone: e.target.value } : null)}
                         placeholder="123-456-7890"
-                        className={`flex-1 ${editValidationErrors.phone ? 'border-red-500' : ''}`}/>
+                        className={`flex-1 ${editValidationErrors.phone ? 'border-red-500' : ''}`}
+                      />
                     {editValidationErrors.phone && (<p className="text-sm text-red-500">{editValidationErrors.phone}</p>)}
                     </div>
                   </div>
@@ -1785,7 +1797,8 @@ const EmployeeList = () => {
                             variant="outline"
                             size="sm"
                             className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                            onClick={() => setEditingEmployee(prev => prev ? { ...prev, avatar: '' } : null)}>
+                            onClick={() => setEditingEmployee(prev => prev ? { ...prev, avatar: '' } : null)}
+                          >
                             <X className="h-3 w-3" />
                           </Button>
                         </div>
@@ -1941,7 +1954,8 @@ const EmployeeList = () => {
                     <Label htmlFor="edit-status" className="text-sm font-medium">Status *</Label>
                     <Select 
                       value={editingEmployee.status}
-                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, status: value as 'Active' | 'Inactive'} : null)}>
+                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, status: value as 'Active' | 'Inactive'} : null)}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
@@ -1958,11 +1972,9 @@ const EmployeeList = () => {
                       type="date"
                       value={editingEmployee.joinDate || ''}
                       onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, joinDate: e.target.value } : null)}
-                      className={`w-full ${editValidationErrors.joinDate ? 'border-red-500' : ''}`}
-                    />
+                      className={`w-full ${editValidationErrors.joinDate ? 'border-red-500' : ''}`}/>
                     {editValidationErrors.joinDate && (
-                      <p className="text-sm text-red-500">{editValidationErrors.joinDate}</p>
-                    )}
+                      <p className="text-sm text-red-500">{editValidationErrors.joinDate}</p>)}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-employeeCode" className="text-sm font-medium">Employee Code</Label>
@@ -1971,8 +1983,7 @@ const EmployeeList = () => {
                       value={editingEmployee.employeeCode || ''}
                       onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, employeeCode: e.target.value } : null)}
                       placeholder="Enter employee code"
-                      className="w-full"
-                    />
+                      className="w-full"/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-jobType" className="text-sm font-medium">Job Type</Label>
