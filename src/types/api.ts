@@ -2,8 +2,8 @@
 
 // Authentication Types
 export interface LoginRequest {
-  email: string;
-  username: string;
+  email?: string;
+  username?: string;
   password: string;
 }
 

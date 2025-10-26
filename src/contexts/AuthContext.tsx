@@ -52,7 +52,7 @@ const convertApiUserToLocalUser = (apiUser: ApiUser): User => {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, username: string, password: string) => Promise<boolean>;
+  login: (credentials: { email?: string; username?: string; password: string }) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -69,12 +69,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const login = async (email: string, username: string, password: string): Promise<boolean> => {
+  const login = async (credentials: { email?: string; username?: string; password: string }): Promise<boolean> => {
     setIsLoading(true);
     
     try {
-      console.log('Attempting login with:', { email, username, password: '***' });
-      const response = await apiService.login({ email, username, password });
+      console.log('Attempting login with:', { 
+        email: credentials.email, 
+        username: credentials.username, 
+        password: '***' 
+      });
+      
+      const response = await apiService.login(credentials);
       console.log('Login response:', response);
       
       if (response.user) {

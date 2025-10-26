@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Building2, Users, Shield, BarChart3, Loader2, Settings } from 'lucide-react';
+import { Building2, Users, Shield, BarChart3, Loader2, Settings, Mail, User, Eye, EyeOff } from 'lucide-react';
 import NetworkDiagnostic from '../debug/NetworkDiagnostic';
 
 const LoginPage = () => {
@@ -16,19 +16,122 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showDiagnostic, setShowDiagnostic] = useState(false);
+  
+  // New state for flexible authentication system
+  const [loginMethod, setLoginMethod] = useState<'email' | 'username' | 'both'>('email');
+  const [emailError, setEmailError] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  
+  // Password visibility state
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Email validation function
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Username validation function
+  const validateUsername = (username: string): boolean => {
+    // Username should be at least 3 characters, alphanumeric and underscores allowed
+    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+    return usernameRegex.test(username);
+  };
+
+  // Handle input validation
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    setEmailError('');
+    if (value && !validateEmail(value)) {
+      setEmailError('Please enter a valid email address');
+    }
+  };
+
+  const handleUsernameChange = (value: string) => {
+    setUsername(value);
+    setUsernameError('');
+    if (value && !validateUsername(value)) {
+      setUsernameError('Username must be 3-20 characters, letters, numbers, and underscores only');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setEmailError('');
+    setUsernameError('');
     
-    if (!email || !username || !password) {
-      setError('Please fill in all fields.');
+    // Validate based on selected login method
+    let hasValidEmail = false;
+    let hasValidUsername = false;
+    
+    if (loginMethod === 'email' || loginMethod === 'both') {
+      if (!email) {
+        setEmailError('Email is required');
+        return;
+      }
+      if (!validateEmail(email)) {
+        setEmailError('Please enter a valid email address');
+        return;
+      }
+      hasValidEmail = true;
+    }
+    
+    if (loginMethod === 'username' || loginMethod === 'both') {
+      if (!username) {
+        setUsernameError('Username is required');
+        return;
+      }
+      if (!validateUsername(username)) {
+        setUsernameError('Username must be 3-20 characters, letters, numbers, and underscores only');
+        return;
+      }
+      hasValidUsername = true;
+    }
+    
+    if (!password) {
+      setError('Password is required');
       return;
     }
     
-    const success = await login(email, username, password);
-    if (!success) {
-      setError('Invalid credentials. Please try again.');
+    // Additional validation for 'both' method: ensure username and email refer to the same user
+    if (loginMethod === 'both' && hasValidEmail && hasValidUsername) {
+      // Note: This validation will be handled by the backend API
+      // The backend should verify that the provided username and email belong to the same user
+      // If they don't match, the API will return an authentication error
+      // We include both in the payload and let the backend handle the validation
+    }
+    
+    // Construct credentials object based on what's provided
+    const credentials: { email?: string; username?: string; password: string } = {
+      password
+    };
+    
+    if (hasValidEmail) {
+      credentials.email = email;
+    }
+    
+    if (hasValidUsername) {
+      credentials.username = username;
+    }
+    
+    try {
+      const success = await login(credentials);
+      if (!success) {
+        // Enhanced error message for 'both' method
+        if (loginMethod === 'both') {
+          setError('Invalid credentials or username and email do not belong to the same user. Please try again.');
+        } else {
+          setError('Invalid credentials. Please try again.');
+        }
+      }
+    } catch (error) {
+      // Handle any network or other errors
+      if (loginMethod === 'both') {
+        setError('Authentication failed. Please verify that your username and email belong to the same account.');
+      } else {
+        setError('Authentication failed. Please check your credentials and try again.');
+      }
     }
   };
 
@@ -120,49 +223,157 @@ const LoginPage = () => {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="h-11"
-                  />
+                {/* Login Method Toggle */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">Login Method</Label>
+                  <div className="relative bg-gray-100 rounded-lg p-1 grid grid-cols-3 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setLoginMethod('email')}
+                      className={`
+                        relative flex items-center justify-center px-2 py-2 rounded-md text-xs font-medium transition-all duration-300 ease-in-out
+                        ${loginMethod === 'email' 
+                          ? 'bg-white text-blue-600 shadow-sm ring-1 ring-blue-200' 
+                          : 'text-gray-600 hover:text-gray-900'
+                        }
+                      `}
+                      aria-pressed={loginMethod === 'email'}
+                      aria-label="Login with email only"
+                    >
+                      <Mail className="h-3 w-3 mr-1" />
+                      Email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLoginMethod('username')}
+                      className={`
+                        relative flex items-center justify-center px-2 py-2 rounded-md text-xs font-medium transition-all duration-300 ease-in-out
+                        ${loginMethod === 'username' 
+                          ? 'bg-white text-blue-600 shadow-sm ring-1 ring-blue-200' 
+                          : 'text-gray-600 hover:text-gray-900'
+                        }
+                      `}
+                      aria-pressed={loginMethod === 'username'}
+                      aria-label="Login with username only"
+                    >
+                      <User className="h-3 w-3 mr-1" />
+                      Username
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLoginMethod('both')}
+                      className={`
+                        relative flex items-center justify-center px-2 py-2 rounded-md text-xs font-medium transition-all duration-300 ease-in-out
+                        ${loginMethod === 'both' 
+                          ? 'bg-white text-blue-600 shadow-sm ring-1 ring-blue-200' 
+                          : 'text-gray-600 hover:text-gray-900'
+                        }
+                      `}
+                      aria-pressed={loginMethod === 'both'}
+                      aria-label="Login with both email and username"
+                    >
+                      <div className="flex items-center">
+                        <Mail className="h-3 w-3" />
+                        <User className="h-3 w-3 -ml-1" />
+                      </div>
+                      <span className="ml-1">Both</span>
+                    </button>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
-                  <Input
-                    id="username"
-                    type="text"
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="h-11"
-                  />
+
+                {/* Dynamic Input Fields */}
+                <div className="space-y-4">
+                  {/* Email Input - Show for 'email' and 'both' methods */}
+                  {(loginMethod === 'email' || loginMethod === 'both') && (
+                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                      <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                        Email Address *
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="Enter your email address"
+                          value={email}
+                          onChange={(e) => handleEmailChange(e.target.value)}
+                          disabled={isLoading}
+                          className={`h-11 pl-10 ${emailError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
+                          aria-describedby={emailError ? "email-error" : undefined}
+                          aria-invalid={!!emailError}
+                        />
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      </div>
+                      {emailError && (
+                        <p id="email-error" className="text-red-600 text-sm mt-1" role="alert">
+                          {emailError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Username Input - Show for 'username' and 'both' methods */}
+                  {(loginMethod === 'username' || loginMethod === 'both') && (
+                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                      <Label htmlFor="username" className="text-sm font-medium text-gray-700">
+                        Username *
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="username"
+                          type="text"
+                          placeholder="Enter your username"
+                          value={username}
+                          onChange={(e) => handleUsernameChange(e.target.value)}
+                          disabled={isLoading}
+                          className={`h-11 pl-10 ${usernameError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
+                          aria-describedby={usernameError ? "username-error" : undefined}
+                          aria-invalid={!!usernameError}
+                        />
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      </div>
+                      {usernameError && (
+                        <p id="username-error" className="text-red-600 text-sm mt-1" role="alert">
+                          {usernameError}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                {/* Password Input - Always visible */}
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="h-11"
-                  />
+                  <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password *</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      disabled={isLoading}
+                      className="h-11 pr-10"
+                      aria-describedby={error ? "form-error" : undefined}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors duration-200"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      tabIndex={0}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
                 
                 {error && (
                   <Alert className="border-red-200 bg-red-50">
-                    <AlertDescription className="text-red-700">
+                    <AlertDescription className="text-red-700" id="form-error" role="alert">
                       {error}
                     </AlertDescription>
                   </Alert>
