@@ -201,7 +201,29 @@ class ApiService {
 
   // Authentication methods
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const response: AxiosResponse<{access: string, refresh: string}> = await this.api.post('/api/auth/login/', credentials);
+    // Construct dynamic payload based on provided fields
+    const payload: any = {
+      password: credentials.password
+    };
+    
+    // Add username if provided
+    if (credentials.username) {
+      payload.username = credentials.username;
+    }
+    
+    // Add email if provided
+    if (credentials.email) {
+      payload.email = credentials.email;
+    }
+    
+    // Validate that at least one identifier is provided
+    if (!credentials.username && !credentials.email) {
+      throw new Error('Either username or email must be provided');
+    }
+    
+    console.log('Login payload:', payload);
+    
+    const response: AxiosResponse<{access: string, refresh: string}> = await this.api.post('/api/auth/login/', payload);
     const { access, refresh } = response.data;
 
     this.saveToken(access);
@@ -223,7 +245,7 @@ class ApiService {
   private extractUserFromToken(token: string): ApiUser {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      
+      console.error('user from token:', payload);
       return {
         user_id: payload.user_id || payload.id || 'unknown',
         username: payload.username || payload.name?.split(' ')[0] || 'user',
@@ -302,6 +324,10 @@ class ApiService {
   async getUsers(): Promise<ApiUser[]> {
     const response: AxiosResponse<ApiUser[]> = await this.api.get('/api/accounts/users/');
     return response.data;
+  }
+
+  async changePassword(passwordData: { old_password: string; new_password: string; new_password_confirm: string }): Promise<void> {
+    await this.api.post('/api/accounts/users/change-password/', passwordData);
   }
 
   // Employee methods

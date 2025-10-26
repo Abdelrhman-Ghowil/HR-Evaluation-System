@@ -106,6 +106,21 @@ const ProfilePage: React.FC = () => {
   const [isLoadingObjectives, setIsLoadingObjectives] = useState(false);
   const [isLoadingCompetencies, setIsLoadingCompetencies] = useState(false);
 
+  // Password change state
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordErrors, setPasswordErrors] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+    general: ''
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState(false);
+
   // Fetch evaluations data
   useEffect(() => {
     const fetchEvaluations = async () => {
@@ -185,6 +200,8 @@ const ProfilePage: React.FC = () => {
         if (user) {
           console.log('Using fallback user data:', user);
           const fallbackData: ProfileData = {
+            employee_id: '',
+            employee_code: '',
             name: user.name || '',
             email: user.email || '',
             phone: user.phone || '',
@@ -355,6 +372,162 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  // Password validation functions
+  const validatePasswordStrength = (password: string): string | null => {
+  const minLength = password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /\d/.test(password);
+
+  if (!minLength)
+    return "Password is too short (less than 8 characters)";
+  else if (!hasUppercase)
+    return "Password does not contain any uppercase letter (A–Z)";
+  else if (!hasNumber)
+    return "Password does not include any numeric digit (0–9)";
+  else return null; // ✅ strong password
+};
+
+  // const validatePasswordStrength = (password: string): boolean => {
+  //   const minLength = password.length >= 8;
+  //   const hasUppercase = /[A-Z]/.test(password);
+  //   const hasNumber = /\d/.test(password);
+
+  //   // return minLength && hasUppercase && hasNumber;
+  // };
+
+  const getPasswordStrength = (password: string): { score: number; label: string; color: string } => {
+    if (password.length === 0) return { score: 0, label: '', color: '' };
+    
+    let score = 0;
+    if (password.length >= 8) score += 25;
+    if (/[A-Z]/.test(password)) score += 25;
+    if (/[a-z]/.test(password)) score += 25;
+    if (/\d/.test(password)) score += 25;
+    
+    if (score < 50) return { score, label: 'Weak', color: 'bg-red-500' };
+    if (score < 75) return { score, label: 'Fair', color: 'bg-yellow-500' };
+    if (score < 100) return { score, label: 'Good', color: 'bg-blue-500' };
+    return { score, label: 'Strong', color: 'bg-green-500' };
+  };
+
+  // Password change handlers
+  const handlePasswordChange = (field: string, value: string) => {
+    setPasswordData(prev => ({ ...prev, [field]: value }));
+    
+    // Clear specific field errors when user starts typing
+    if (passwordErrors[field as keyof typeof passwordErrors]) {
+      setPasswordErrors(prev => ({ ...prev, [field]: '', general: '' }));
+    }
+    
+    // Clear success message when user starts editing
+    if (passwordChangeSuccess) {
+      setPasswordChangeSuccess(false);
+    }
+  };
+
+  const validatePasswordForm = (): boolean => {
+    const errors = {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+      general: ''
+    };
+
+    // Validate current password
+    if (!passwordData.currentPassword) {
+      errors.currentPassword = 'Current password is required';
+    }
+
+    // Validate new password strength
+    if (!passwordData.newPassword) {
+      errors.newPassword = 'New password is required';
+    } else if (validatePasswordStrength(passwordData.newPassword)) {
+      errors.newPassword = validatePasswordStrength(passwordData.newPassword);
+    }
+
+    // Validate password confirmation
+    if (!passwordData.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your new password';
+    } else if (passwordData.newPassword !== passwordData.confirmPassword) {
+      errors.confirmPassword = 'Error: Passwords do not match';
+    }
+
+    setPasswordErrors(errors);
+    return !Object.values(errors).some(error => error !== '');
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validatePasswordForm()) {
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setPasswordErrors(prev => ({ ...prev, general: '' }));
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}api/accounts/users/change-password/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          old_password: passwordData.currentPassword,
+          new_password: passwordData.newPassword,
+          new_password_confirm: passwordData.confirmPassword
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        
+        // Handle specific error cases
+        if (response.status === 400) {
+          if (errorData.old_password) {
+            setPasswordErrors(prev => ({ ...prev, currentPassword: 'Error: Current Password Incorrect' }));
+          } else if (errorData.new_password) {
+            setPasswordErrors(prev => ({ ...prev, newPassword: errorData.new_password[0] || 'Error: Password too weak' }));
+          } else {
+            setPasswordErrors(prev => ({ ...prev, general: errorData.detail || 'Password change failed' }));
+          }
+        } else {
+          setPasswordErrors(prev => ({ ...prev, general: 'Password change failed. Please try again.' }));
+        }
+        return;
+      }
+
+      // Success
+      setPasswordChangeSuccess(true);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      setPasswordErrors({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+        general: ''
+      });
+
+      // Auto-hide success message after 5 seconds
+      setTimeout(() => {
+        setPasswordChangeSuccess(false);
+      }, 5000);
+
+    } catch (error) {
+      console.error('Password change error:', error);
+      setPasswordErrors(prev => ({ 
+        ...prev, 
+        general: 'Network error. Please check your connection and try again.' 
+      }));
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -515,8 +688,7 @@ const ProfilePage: React.FC = () => {
                         <Input
                           id="username"
                           value={editData.username || ''}
-                          onChange={(e) => setEditData({...editData, username: e.target.value})}
-                        />
+                          onChange={(e) => setEditData({...editData, username: e.target.value})}/>
                       ) : (
                         <p className="text-gray-900">{profileData.username || 'Not specified'}</p>
                       )}
@@ -738,7 +910,7 @@ const ProfilePage: React.FC = () => {
                   <div className="space-y-4">
                     {evaluations.map((evaluation) => (
                       <Card 
-                        key={evaluation.id} 
+                        key={evaluation.evaluation_id } 
                         className="hover:shadow-md transition-all duration-200 border-l-4 border-l-blue-500 cursor-pointer"
                         onClick={() => handleEvaluationClick(evaluation)}
                       >
@@ -813,23 +985,122 @@ const ProfilePage: React.FC = () => {
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Change Password</h3>
                     <p className="text-gray-600 text-sm mb-4">Update your password to keep your account secure</p>
-                    <div className="space-y-3">
-                      <div>
-                        <Label htmlFor="current-password">Current Password</Label>
-                        <Input id="current-password" type="password" />
+                    
+                    {/* Success Message */}
+                    {passwordChangeSuccess && (
+                      <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-green-800">
+                          <Award className="h-5 w-5" />
+                          <span className="font-medium">Password Changed Successfully</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPasswordChangeSuccess(false)}
+                          className="text-green-600 hover:text-green-800"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <div>
-                        <Label htmlFor="new-password">New Password</Label>
-                        <Input id="new-password" type="password" />
+                    )}
+
+                    {/* General Error Message */}
+                    {passwordErrors.general && (
+                      <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-red-800">
+                          <AlertCircle className="h-5 w-5" />
+                          <span className="font-medium">{passwordErrors.general}</span>
+                        </div>
                       </div>
+                    )}
+
+                    <form onSubmit={handlePasswordSubmit} className="space-y-4">
                       <div>
-                        <Label htmlFor="confirm-password">Confirm New Password</Label>
-                        <Input id="confirm-password" type="password" />
+                        <Label htmlFor="current-password">Current Password *</Label>
+                        <Input 
+                          id="current-password" 
+                          type="password" 
+                          value={passwordData.currentPassword}
+                          onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
+                          className={passwordErrors.currentPassword ? 'border-red-500' : ''}
+                          disabled={isChangingPassword}
+                        />
+                        {passwordErrors.currentPassword && (
+                          <p className="text-red-600 text-sm mt-1">{passwordErrors.currentPassword}</p>
+                        )}
                       </div>
-                      <Button className="bg-red-600 hover:bg-red-700">
-                        Update Password
+
+                      <div>
+                        <Label htmlFor="new-password">New Password *</Label>
+                        <Input 
+                          id="new-password" 
+                          type="password" 
+                          value={passwordData.newPassword}
+                          onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
+                          className={passwordErrors.newPassword ? 'border-red-500' : ''}
+                          disabled={isChangingPassword}
+                        />
+                        {passwordErrors.newPassword && (
+                          <p className="text-red-600 text-sm mt-1">{passwordErrors.newPassword}</p>
+                        )}
+                        
+                        {/* Password Strength Meter */}
+                        {passwordData.newPassword && (
+                          <div className="mt-2">
+                            <div className="flex items-center justify-between text-sm mb-1">
+                              <span className="text-gray-600">Password Strength:</span>
+                              <span className={`font-medium ${
+                                getPasswordStrength(passwordData.newPassword).score < 50 ? 'text-red-600' :
+                                getPasswordStrength(passwordData.newPassword).score < 75 ? 'text-yellow-600' :
+                                getPasswordStrength(passwordData.newPassword).score < 100 ? 'text-blue-600' :
+                                'text-green-600'
+                              }`}>
+                                {getPasswordStrength(passwordData.newPassword).label}
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className={`h-2 rounded-full transition-all duration-300 ${getPasswordStrength(passwordData.newPassword).color}`}
+                                style={{ width: `${getPasswordStrength(passwordData.newPassword).score}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Password must be at least 8 characters with uppercase letter and number
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="confirm-password">Confirm New Password *</Label>
+                        <Input 
+                          id="confirm-password" 
+                          type="password" 
+                          value={passwordData.confirmPassword}
+                          onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
+                          className={passwordErrors.confirmPassword ? 'border-red-500' : ''}
+                          disabled={isChangingPassword}
+                        />
+                        {passwordErrors.confirmPassword && (
+                          <p className="text-red-600 text-sm mt-1">{passwordErrors.confirmPassword}</p>
+                        )}
+                      </div>
+
+                      <Button 
+                        type="submit"
+                        className="bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                        disabled={isChangingPassword}
+                      >
+                        {isChangingPassword ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Updating Password...
+                          </>
+                        ) : (
+                          'Update Password'
+                        )}
                       </Button>
-                    </div>
+                    </form>
                   </div>
                 </div>
               </CardContent>

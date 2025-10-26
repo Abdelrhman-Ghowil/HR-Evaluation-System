@@ -33,7 +33,7 @@ interface Evaluation {
   type: string;
   period: string;
   status: 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed';
-  reviewer_id?: number;
+  reviewer_id?: string;
   date: string;
   score?: number;
 }
