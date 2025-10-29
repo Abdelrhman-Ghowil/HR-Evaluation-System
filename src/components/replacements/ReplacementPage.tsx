@@ -859,14 +859,13 @@ const handleSubSectionChange = (subSectionId: string) => {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
+                          {/* <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeletePlacement(placement.placement_id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
+                            className="text-red-600 hover:text-red-700">
                             <Trash2 className="h-4 w-4" />
-                          </Button>
+                          </Button> */}
                         </div>
                       </td>
                     </tr>

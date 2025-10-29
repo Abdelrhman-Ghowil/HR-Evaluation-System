@@ -46,7 +46,8 @@ import {
   SubSectionQueryParams,
   ApiPlacement,
   CreatePlacementRequest,
-  ImportResponse
+  ImportResponse,
+  ApiMyProfile
 } from '../types/api';
 
 // Base API configuration
@@ -328,6 +329,21 @@ class ApiService {
 
   async changePassword(passwordData: { old_password: string; new_password: string; new_password_confirm: string }): Promise<void> {
     await this.api.post('/api/accounts/users/change-password/', passwordData);
+  }
+
+  // My Profile methods
+  async getMyProfile(): Promise<ApiMyProfile> {
+    console.log('API: Fetching my profile data');
+    const response: AxiosResponse<ApiMyProfile> = await this.api.get('/api/my-profile/');
+    console.log('API: My profile response:', response.data);
+    return response.data;
+  }
+
+  async updateMyProfile(profileData: Partial<ApiMyProfile>): Promise<ApiMyProfile> {
+    console.log('API: Updating my profile data', profileData);
+    const response: AxiosResponse<ApiMyProfile> = await this.api.patch('/api/my-profile/', profileData);
+    console.log('API: My profile update response:', response.data);
+    return response.data;
   }
 
   // Employee methods

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   User, 
   Mail, 
@@ -28,11 +29,17 @@ import {
   BarChart3,
   FileText,
   Eye,
-  Award
+  Award,
+  ChevronDown,
+  ChevronUp,
+  Building,
+  UserCheck,
+  Clock,
+  MapIcon
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/api';
-import { ApiEmployee, ApiEvaluation, ApiObjective, ApiCompetency } from '../../types/api';
+import { ApiEmployee, ApiEvaluation, ApiObjective, ApiCompetency, ApiMyProfile } from '../../types/api';
 import { useEvaluations } from '../../hooks/useApi';
 import EvaluationDetails from '../employees/EvaluationDetails';
 import { 
@@ -44,9 +51,9 @@ import { EvaluationInput } from '../../types/shared';
 
 interface ProfileData {
   employee_id: string;
-  employee_code?: string;
+  employee_code: string;
   name: string;
-  username?: string;
+  username: string;
   email: string;
   phone: string;
   role?: string;
@@ -61,6 +68,12 @@ interface ProfileData {
   location: string;
   branch?: string;
   gender?: string;
+  // New fields from my-profile API
+  country_code?: string;
+  avatar?: string;
+  is_default_password?: boolean;
+  password_last_changed?: string;
+  org_path?: string;
 }
 
 const ProfilePage: React.FC = () => {
@@ -90,6 +103,83 @@ const ProfilePage: React.FC = () => {
   });
 
   const [editData, setEditData] = useState<ProfileData>(profileData);
+
+  // Form validation state
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [isFormValid, setIsFormValid] = useState(true);
+
+  // Collapsible sections state for Work Information
+  const [expandedSections, setExpandedSections] = useState({
+    basicInfo: true,
+    organizationalInfo: true,
+    employmentDetails: true
+  });
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  // Validation functions
+  const validateField = (field: string, value: string): string => {
+    switch (field) {
+      case 'name':
+        if (!value.trim()) return 'Full name is required';
+        if (value.trim().length < 2) return 'Name must be at least 2 characters';
+        return '';
+      case 'username':
+        if (!value.trim()) return 'Username is required';
+        if (value.trim().length < 3) return 'Username must be at least 3 characters';
+        if (!/^[a-zA-Z0-9_]+$/.test(value)) return 'Username can only contain letters, numbers, and underscores';
+        return '';
+      case 'email':
+        if (!value.trim()) return 'Email is required';
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(value)) return 'Please enter a valid email address';
+        return '';
+      case 'phone':
+        if (value && !/^[\+]?[1-9][\d]{0,15}$/.test(value.replace(/[\s\-\(\)]/g, ''))) {
+          return 'Please enter a valid phone number';
+        }
+        return '';
+      default:
+        return '';
+    }
+  };
+
+  const validateForm = (data: ProfileData): boolean => {
+    const errors: {[key: string]: string} = {};
+    
+    // Validate required fields
+    errors.name = validateField('name', data.name);
+    errors.username = validateField('username', data.username || '');
+    errors.email = validateField('email', data.email);
+    errors.phone = validateField('phone', data.phone);
+
+    // Remove empty errors
+    Object.keys(errors).forEach(key => {
+      if (!errors[key]) delete errors[key];
+    });
+
+    setValidationErrors(errors);
+    const isValid = Object.keys(errors).length === 0;
+    setIsFormValid(isValid);
+    return isValid;
+  };
+
+  const handleFieldChange = (field: string, value: string) => {
+    const newEditData = { ...editData, [field]: value };
+    setEditData(newEditData);
+    
+    // Real-time validation
+    const fieldError = validateField(field, value);
+    setValidationErrors(prev => ({
+      ...prev,
+      [field]: fieldError
+    }));
+  };
 
   // Evaluation data state
   const [evaluations, setEvaluations] = useState<ApiEvaluation[]>([]);
@@ -161,38 +251,46 @@ const ProfilePage: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        console.log('Fetching employee data for user_id:', user?.user_id);
-        const employeeData = await apiService.getEmployeeByUserId(user?.user_id);
-        console.log('Employee data received:', employeeData[0]);
+        console.log('Fetching my profile data');
+        
+        // Use the new my-profile API endpoint
+        const myProfileData = await apiService.getMyProfile();
+        console.log('My profile data received:', myProfileData);
       
         // Map API response to ProfileData
         const mappedData: ProfileData = {
-          employee_id: employeeData[0].employee_id , 
-          employee_code: employeeData[0].employee_code,
-          name: employeeData[0].name || user.name || '',
-          username: employeeData[0].username,
-          email: employeeData[0].email || user.email || '',
-          phone: employeeData[0].phone || '',
-          role: employeeData[0].role,
-          position: employeeData[0].position || '',
-          managerial_level: employeeData[0].managerial_level,
-          status: employeeData[0].status,
-          company_name: employeeData[0].company_name,
-          department: employeeData[0].department || '',
-          direct_manager: employeeData[0].direct_manager,
-          join_date: employeeData[0].join_date || '',
-          job_type: employeeData[0].job_type,
-          location: employeeData[0].location || '',
-          branch: employeeData[0].branch,
-          gender: employeeData[0].gender
+          employee_id: myProfileData.employee_code || '', // Using employee_code as employee_id
+          employee_code: myProfileData.employee_code || '',
+          name: myProfileData.name || user.name || '',
+          username: myProfileData.username || user.username || '',
+          email: myProfileData.email || user.email || '',
+          phone: myProfileData.phone || '', // Store only the phone number without country code
+          role: myProfileData.role || '',
+          position: myProfileData.position || '',
+          managerial_level: myProfileData.managerial_level || '',
+          status: myProfileData.status || '',
+          company_name: myProfileData.company_name || '',
+          department: myProfileData.department || '',
+          direct_manager: myProfileData.direct_manager || '',
+          join_date: myProfileData.join_date || '',
+          job_type: myProfileData.job_type || '',
+          location: myProfileData.location || '',
+          branch: myProfileData.branch || '',
+          gender: '', // Not available in new API, keeping empty for backward compatibility
+          // New fields from my-profile API
+          country_code: myProfileData.country_code || '',
+          avatar: myProfileData.avatar || '',
+          is_default_password: myProfileData.is_default_password || false,
+          password_last_changed: myProfileData.password_last_changed || '',
+          org_path: myProfileData.org_path || ''
         };
         
         setProfileData(mappedData);
         setEditData(mappedData);
         console.log('Profile data successfully updated:', mappedData);
       } catch (err) {
-        console.error('Error fetching employee data:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch employee data';
+        console.error('Error fetching my profile data:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch profile data';
         console.error('Detailed error:', errorMessage);
         setError(errorMessage);
         
@@ -227,9 +325,58 @@ const ProfilePage: React.FC = () => {
     setIsEditing(true);
   };
 
-  const handleSave = () => {
-    setProfileData(editData);
-    setIsEditing(false);
+  const handleSave = async () => {
+    // Validate form before saving
+    if (!validateForm(editData)) {
+      console.log('Form validation failed');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Prepare the data for PATCH request with only the specified fields
+      const updateData = {
+        phone: editData.phone || '', // Send only the phone number without country code
+        country_code: editData.country_code || '',
+        avatar: editData.avatar || '',
+        position: editData.position || '',
+        gender: editData.gender || '',
+        location: editData.location || ''
+      };
+
+      console.log('Updating profile with data:', updateData);
+
+      // Call the API to update the profile
+      const updatedProfile = await apiService.updateMyProfile(updateData);
+      console.log('Profile updated successfully:', updatedProfile);
+
+      // Update local state with the response
+      const mappedData: ProfileData = {
+        ...profileData,
+        phone: updatedProfile.phone || '', // Store only the phone number without country code
+        country_code: updatedProfile.country_code || '',
+        avatar: updatedProfile.avatar || '',
+        position: updatedProfile.position || '',
+        gender: editData.gender || '', // Keep local gender value as it's not in API response
+        location: updatedProfile.location || ''
+      };
+
+      setProfileData(mappedData);
+      setEditData(mappedData);
+      setIsEditing(false);
+
+      // Show success message (you can add a toast notification here)
+      console.log('Profile updated successfully!');
+
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update profile';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
@@ -658,100 +805,280 @@ const ProfilePage: React.FC = () => {
           </TabsList>
 
           {/* Personal Information Tab */}
-          <TabsContent value="personal" className="space-y-6">
-            <div className="grid grid-cols-1 gap-6">
-              <Card className="shadow-lg border-0">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5 text-blue-600" />
+          <TabsContent value="personal" className="space-y-8">
+            <div className="grid grid-cols-1 gap-8">
+              <Card className="shadow-xl border-0 bg-gradient-to-br from-white to-blue-50/30 dark:from-gray-900 dark:to-blue-950/30 transition-all duration-300 hover:shadow-2xl">
+                <CardHeader className="pb-6">
+                  <CardTitle className="flex items-center gap-3 text-2xl font-bold text-gray-900 dark:text-white">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                      <User className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                    </div>
                     Personal Information
                   </CardTitle>
+                  <p className="text-gray-600 dark:text-gray-300 mt-2">
+                    Manage your personal details and contact information
+                  </p>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name</Label>
-                      {isEditing ? (
-                        <Input
-                          id="name"
-                          value={editData.name}
-                          onChange={(e) => setEditData({...editData, name: e.target.value})}
-                        />
-                      ) : (
-                        <p className="text-gray-900 font-medium">{profileData.name || 'Not specified'}</p>
-                      )}
+                <CardContent className="space-y-8">
+                  {/* Basic Information Section */}
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Basic Information</h3>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="username">Username</Label>
-                      {isEditing ? (
-                        <Input
-                          id="username"
-                          value={editData.username || ''}
-                          onChange={(e) => setEditData({...editData, username: e.target.value})}/>
-                      ) : (
-                        <p className="text-gray-900">{profileData.username || 'Not specified'}</p>
-                      )}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="space-y-3 group">
+                        <Label htmlFor="name" className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                          Full Name
+                          <span className="text-red-500">*</span>
+                          <Badge variant="secondary" className="text-xs">Read Only</Badge>
+                        </Label>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors duration-200 opacity-75">
+                          <p className="text-gray-900 dark:text-white font-medium text-base">
+                            {profileData.name || (
+                              <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3 group">
+                        <Label htmlFor="username" className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                          Username
+                          <span className="text-red-500">*</span>
+                          <Badge variant="secondary" className="text-xs">Read Only</Badge>
+                        </Label>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors duration-200 opacity-75">
+                          <p className="text-gray-900 dark:text-white font-medium text-base">
+                            {profileData.username || (
+                              <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email Address</Label>
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-gray-400" />
+                  </div>
+
+                  {/* Contact Information Section */}
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Contact Information</h3>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="space-y-3 group">
+                        <Label htmlFor="email" className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-blue-500" />
+                          Email Address
+                          <span className="text-red-500">*</span>
+                          <Badge variant="secondary" className="text-xs">Read Only</Badge>
+                        </Label>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors duration-200 opacity-75">
+                          <p className="text-gray-900 dark:text-white font-medium text-base break-all">
+                            {profileData.email || (
+                              <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3 group">
+                        <Label htmlFor="phone" className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-green-500" />
+                          Phone Number
+                        </Label>
                         {isEditing ? (
-                          <Input
-                            id="email"
-                            type="email"
-                            value={editData.email}
-                            onChange={(e) => setEditData({...editData, email: e.target.value})}
-                          />
+                          <div className="space-y-4">
+                            {/* Country Code Field */}
+                            <div className="space-y-2">
+                              <Label className="text-xs font-medium text-gray-600 dark:text-gray-400">Country Code</Label>
+                              <Select
+                                value={editData.country_code || ''}
+                                onValueChange={(value) => setEditData({...editData, country_code: value})}
+                              >
+                                <SelectTrigger className="pl-4 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-all duration-200 bg-white dark:bg-gray-800">
+                                  <SelectValue placeholder="Select country code" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="+1">+1 (United States)</SelectItem>
+                                  <SelectItem value="+20">+20 (Egypt)</SelectItem>
+                                  <SelectItem value="+44">+44 (United Kingdom)</SelectItem>
+                                  <SelectItem value="+49">+49 (Germany)</SelectItem>
+                                  <SelectItem value="+33">+33 (France)</SelectItem>
+                                  <SelectItem value="+39">+39 (Italy)</SelectItem>
+                                  <SelectItem value="+34">+34 (Spain)</SelectItem>
+                                  <SelectItem value="+31">+31 (Netherlands)</SelectItem>
+                                  <SelectItem value="+41">+41 (Switzerland)</SelectItem>
+                                  <SelectItem value="+43">+43 (Austria)</SelectItem>
+                                  <SelectItem value="+32">+32 (Belgium)</SelectItem>
+                                  <SelectItem value="+45">+45 (Denmark)</SelectItem>
+                                  <SelectItem value="+46">+46 (Sweden)</SelectItem>
+                                  <SelectItem value="+47">+47 (Norway)</SelectItem>
+                                  <SelectItem value="+358">+358 (Finland)</SelectItem>
+                                  <SelectItem value="+351">+351 (Portugal)</SelectItem>
+                                  <SelectItem value="+30">+30 (Greece)</SelectItem>
+                                  <SelectItem value="+48">+48 (Poland)</SelectItem>
+                                  <SelectItem value="+420">+420 (Czech Republic)</SelectItem>
+                                  <SelectItem value="+36">+36 (Hungary)</SelectItem>
+                                  <SelectItem value="+91">+91 (India)</SelectItem>
+                                  <SelectItem value="+86">+86 (China)</SelectItem>
+                                  <SelectItem value="+81">+81 (Japan)</SelectItem>
+                                  <SelectItem value="+82">+82 (South Korea)</SelectItem>
+                                  <SelectItem value="+65">+65 (Singapore)</SelectItem>
+                                  <SelectItem value="+60">+60 (Malaysia)</SelectItem>
+                                  <SelectItem value="+62">+62 (Indonesia)</SelectItem>
+                                  <SelectItem value="+66">+66 (Thailand)</SelectItem>
+                                  <SelectItem value="+63">+63 (Philippines)</SelectItem>
+                                  <SelectItem value="+84">+84 (Vietnam)</SelectItem>
+                                  <SelectItem value="+61">+61 (Australia)</SelectItem>
+                                  <SelectItem value="+64">+64 (New Zealand)</SelectItem>
+                                  <SelectItem value="+27">+27 (South Africa)</SelectItem>
+                                  <SelectItem value="+234">+234 (Nigeria)</SelectItem>
+                                  <SelectItem value="+254">+254 (Kenya)</SelectItem>
+                                  <SelectItem value="+212">+212 (Morocco)</SelectItem>
+                                  <SelectItem value="+213">+213 (Algeria)</SelectItem>
+                                  <SelectItem value="+216">+216 (Tunisia)</SelectItem>
+                                  <SelectItem value="+218">+218 (Libya)</SelectItem>
+                                  <SelectItem value="+249">+249 (Sudan)</SelectItem>
+                                  <SelectItem value="+966">+966 (Saudi Arabia)</SelectItem>
+                                  <SelectItem value="+971">+971 (UAE)</SelectItem>
+                                  <SelectItem value="+974">+974 (Qatar)</SelectItem>
+                                  <SelectItem value="+965">+965 (Kuwait)</SelectItem>
+                                  <SelectItem value="+973">+973 (Bahrain)</SelectItem>
+                                  <SelectItem value="+968">+968 (Oman)</SelectItem>
+                                  <SelectItem value="+962">+962 (Jordan)</SelectItem>
+                                  <SelectItem value="+961">+961 (Lebanon)</SelectItem>
+                                  <SelectItem value="+963">+963 (Syria)</SelectItem>
+                                  <SelectItem value="+964">+964 (Iraq)</SelectItem>
+                                  <SelectItem value="+98">+98 (Iran)</SelectItem>
+                                  <SelectItem value="+90">+90 (Turkey)</SelectItem>
+                                  <SelectItem value="+92">+92 (Pakistan)</SelectItem>
+                                  <SelectItem value="+880">+880 (Bangladesh)</SelectItem>
+                                  <SelectItem value="+94">+94 (Sri Lanka)</SelectItem>
+                                  <SelectItem value="+977">+977 (Nepal)</SelectItem>
+                                  <SelectItem value="+55">+55 (Brazil)</SelectItem>
+                                  <SelectItem value="+54">+54 (Argentina)</SelectItem>
+                                  <SelectItem value="+56">+56 (Chile)</SelectItem>
+                                  <SelectItem value="+57">+57 (Colombia)</SelectItem>
+                                  <SelectItem value="+51">+51 (Peru)</SelectItem>
+                                  <SelectItem value="+58">+58 (Venezuela)</SelectItem>
+                                  <SelectItem value="+52">+52 (Mexico)</SelectItem>
+                                  <SelectItem value="+1">+1 (Canada)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            {/* Phone Number Field */}
+                            <div className="space-y-2">
+                              <Label className="text-xs font-medium text-gray-600 dark:text-gray-400">Phone Number</Label>
+                              <Input
+                                id="phone"
+                                value={editData.phone?.replace(/^\+\d+/, '') || ''}
+                                onChange={(e) => {
+                                  const phoneOnly = e.target.value.replace(/[^\d]/g, '');
+                                  setEditData({...editData, phone: phoneOnly});
+                                }}
+                                className={`pl-4 pr-4 py-3 border-2 rounded-lg focus:ring-2 transition-all duration-200 bg-white dark:bg-gray-800 ${
+                                  validationErrors.phone 
+                                    ? 'border-red-500 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-800' 
+                                    : 'border-gray-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-200 dark:focus:ring-blue-800'
+                                }`}
+                                placeholder="Enter phone number (digits only)"
+                                aria-describedby={validationErrors.phone ? "phone-error" : undefined}
+                              />
+                              {validationErrors.phone && (
+                                <div className="flex items-center gap-2 mt-2 text-red-600 dark:text-red-400">
+                                  <AlertCircle className="h-4 w-4" />
+                                  <span className="text-sm" id="phone-error">{validationErrors.phone}</span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Preview of complete phone number */}
+                            {(editData.country_code || editData.phone) && (
+                              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+                                <Label className="text-xs font-medium text-blue-700 dark:text-blue-300">Complete Phone Number:</Label>
+                                <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mt-1">
+                                  {(editData.country_code || '') + (editData.phone?.replace(/^\+\d+/, '') || '')}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         ) : (
-                          <p className="text-gray-900">{profileData.email || 'Not specified'}</p>
+                          <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors duration-200 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50">
+                            <p className="text-gray-900 dark:text-white font-medium text-base">
+                              {(profileData.country_code && profileData.phone) ? 
+                                `${profileData.country_code}${profileData.phone?.replace(/^\+\d+/, '') || ''}` :
+                                profileData.phone || (
+                                  <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                                )}
+                            </p>
+                          </div>
                         )}
                       </div>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-gray-400" />
+                  </div>
+
+                  {/* Additional Information Section */}
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Additional Information</h3>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="space-y-3 group">
+                        <Label htmlFor="gender" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Gender
+                        </Label>
                         {isEditing ? (
-                          <Input
-                            id="phone"
-                            value={editData.phone}
-                            onChange={(e) => setEditData({...editData, phone: e.target.value})}
-                          />
+                          <div className="relative">
+                            <Select
+                              value={editData.gender || ''}
+                              onValueChange={(value) => setEditData({...editData, gender: value})}
+                            >
+                              <SelectTrigger className="pl-4 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-all duration-200 bg-white dark:bg-gray-800">
+                                <SelectValue placeholder="Select your gender" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Male">Male</SelectItem>
+                                <SelectItem value="Female">Female</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         ) : (
-                          <p className="text-gray-900">{profileData.phone || 'Not specified'}</p>
+                          <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors duration-200 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50">
+                            <p className="text-gray-900 dark:text-white font-medium text-base">
+                              {profileData.gender || (
+                                <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                              )}
+                            </p>
+                          </div>
                         )}
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="gender">Gender</Label>
-                      {isEditing ? (
-                        <Input
-                          id="gender"
-                          value={editData.gender || ''}
-                          onChange={(e) => setEditData({...editData, gender: e.target.value})}
-                        />
-                      ) : (
-                        <p className="text-gray-900">{profileData.gender || 'Not specified'}</p>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="location">Location</Label>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-gray-400" />
+                      
+                      <div className="space-y-3 group">
+                        <Label htmlFor="location" className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-purple-500" />
+                          Location
+                        </Label>
                         {isEditing ? (
-                          <Input
-                            id="location"
-                            value={editData.location}
-                            onChange={(e) => setEditData({...editData, location: e.target.value})}
-                          />
+                          <div className="relative">
+                            <Input
+                              id="location"
+                              value={editData.location}
+                              onChange={(e) => setEditData({...editData, location: e.target.value})}
+                              className="pl-4 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-all duration-200 bg-white dark:bg-gray-800"
+                              placeholder="Enter your location (optional)"
+                            />
+                          </div>
                         ) : (
-                          <p className="text-gray-900">{profileData.location || 'Not specified'}</p>
+                          <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors duration-200 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50">
+                            <p className="text-gray-900 dark:text-white font-medium text-base">
+                              {profileData.location || (
+                                <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                              )}
+                            </p>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -762,68 +1089,267 @@ const ProfilePage: React.FC = () => {
           </TabsContent>
 
           {/* Professional Tab */}
-          <TabsContent value="professional" className="space-y-6">
-            <div className="grid grid-cols-1 gap-6">
-              <Card className="shadow-lg border-0">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Briefcase className="h-5 w-5 text-green-600" />
+          <TabsContent value="professional" className="space-y-8">
+            <div className="grid grid-cols-1 gap-8">
+              <Card className="shadow-xl border-0 bg-gradient-to-br from-white to-green-50/30 dark:from-gray-900 dark:to-green-950/30 transition-all duration-300 hover:shadow-2xl">
+                <CardHeader className="pb-6">
+                  <CardTitle className="flex items-center gap-3 text-2xl font-bold text-gray-900 dark:text-white">
+                    <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
+                      <Briefcase className="h-6 w-6 text-green-600 dark:text-green-400" />
+                    </div>
                     Work Information
                   </CardTitle>
+                  <p className="text-gray-600 dark:text-gray-300 mt-2">
+                    Your professional details and organizational information
+                  </p>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Employee Code</Label>
-                      <p className="text-gray-900 font-medium">{profileData.employee_code || 'Not specified'}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Position</Label>
-                      <p className="text-gray-900 font-medium">{profileData.position || 'Not specified'}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Role</Label>
-                      <p className="text-gray-900 font-medium">{profileData.role || 'Not specified'}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Department</Label>
-                      <p className="text-gray-900 font-medium">{profileData.department || 'Not specified'}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Managerial Level</Label>
-                      <p className="text-gray-900 font-medium">{profileData.managerial_level || 'Not specified'}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Status</Label>
-                      {profileData.status ? (
-                        <Badge className="bg-green-100 text-green-800">{profileData.status}</Badge>
-                      ) : (
-                        <p className="text-gray-500">Not specified</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Company</Label>
-                      <p className="text-gray-900 font-medium">{profileData.company_name || 'Not specified'}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Direct Manager</Label>
-                      <p className="text-gray-900 font-medium">{profileData.direct_manager || 'Not specified'}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Join Date</Label>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        <p className="text-gray-900">{profileData.join_date ? formatDate(profileData.join_date) : 'Not specified'}</p>
+                <CardContent className="space-y-8">
+                  {/* Basic Work Information Section */}
+                  <div className="space-y-4">
+                    <button
+                      onClick={() => toggleSection('basicInfo')}
+                      className="flex items-center justify-between w-full p-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg border border-blue-200 dark:border-blue-700 hover:from-blue-100 hover:to-blue-150 dark:hover:from-blue-800/30 dark:hover:to-blue-700/30 transition-all duration-200 group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-500 rounded-lg">
+                          <User className="h-5 w-5 text-white" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Basic Information</h3>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Job Type</Label>
-                      <p className="text-gray-900 font-medium">{profileData.job_type || 'Not specified'}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Branch</Label>
-                      <p className="text-gray-900 font-medium">{profileData.branch || 'Not specified'}</p>
-                    </div>
+                      {expandedSections.basicInfo ? (
+                        <ChevronUp className="h-5 w-5 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-200" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-200" />
+                      )}
+                    </button>
+                    
+                    {expandedSections.basicInfo && (
+                      <div className="overflow-hidden">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 bg-white dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transform transition-all duration-500 ease-out animate-in slide-in-from-top-4 fade-in">
+                          <div className="space-y-3 group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                              Employee Code
+                            </Label>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50 group-hover:shadow-md group-hover:scale-[1.02]">
+                              <p className="text-gray-900 dark:text-white font-medium text-base">
+                                {profileData.employee_code || (
+                                  <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3 group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                              Position
+                            </Label>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50 group-hover:shadow-md group-hover:scale-[1.02]">
+                              <p className="text-gray-900 dark:text-white font-medium text-base">
+                                {profileData.position || (
+                                  <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3 group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                              Role
+                            </Label>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50 group-hover:shadow-md group-hover:scale-[1.02]">
+                              <p className="text-gray-900 dark:text-white font-medium text-base">
+                                {profileData.role || (
+                                  <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3 group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <UserCheck className="h-4 w-4 text-orange-500" />
+                              Status
+                            </Label>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50 group-hover:shadow-md group-hover:scale-[1.02]">
+                              {profileData.status ? (
+                                <Badge className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 px-3 py-1 text-sm font-medium transition-all duration-200 hover:scale-105">
+                                  {profileData.status}
+                                </Badge>
+                              ) : (
+                                <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Organizational Information Section */}
+                  <div className="space-y-4">
+                    <button
+                      onClick={() => toggleSection('organizationalInfo')}
+                      className="flex items-center justify-between w-full p-4 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg border border-green-200 dark:border-green-700 hover:from-green-100 hover:to-green-150 dark:hover:from-green-800/30 dark:hover:to-green-700/30 transition-all duration-200 group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-500 rounded-lg">
+                          <Building className="h-5 w-5 text-white" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Organizational Information</h3>
+                      </div>
+                      {expandedSections.organizationalInfo ? (
+                        <ChevronUp className="h-5 w-5 text-green-600 dark:text-green-400 group-hover:scale-110 transition-transform duration-200" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-green-600 dark:text-green-400 group-hover:scale-110 transition-transform duration-200" />
+                      )}
+                    </button>
+                    
+                    {expandedSections.organizationalInfo && (
+                      <div className="overflow-hidden">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 bg-white dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transform transition-all duration-500 ease-out animate-in slide-in-from-top-4 fade-in">
+                          <div className="space-y-3 group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <Building className="h-4 w-4 text-blue-500" />
+                              Company
+                            </Label>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50 group-hover:shadow-md group-hover:scale-[1.02]">
+                              <p className="text-gray-900 dark:text-white font-medium text-base">
+                                {profileData.company_name || (
+                                  <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3 group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <Users className="h-4 w-4 text-green-500" />
+                              Department
+                            </Label>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50 group-hover:shadow-md group-hover:scale-[1.02]">
+                              <p className="text-gray-900 dark:text-white font-medium text-base">
+                                {profileData.department || (
+                                  <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3 group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <Target className="h-4 w-4 text-purple-500" />
+                              Managerial Level
+                            </Label>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50 group-hover:shadow-md group-hover:scale-[1.02]">
+                              <p className="text-gray-900 dark:text-white font-medium text-base">
+                                {profileData.managerial_level || (
+                                  <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3 group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <User className="h-4 w-4 text-orange-500" />
+                              Direct Manager
+                            </Label>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50 group-hover:shadow-md group-hover:scale-[1.02]">
+                              <p className="text-gray-900 dark:text-white font-medium text-base">
+                                {profileData.direct_manager || (
+                                  <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3 group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-red-500" />
+                              Branch
+                            </Label>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50 group-hover:shadow-md group-hover:scale-[1.02]">
+                              <p className="text-gray-900 dark:text-white font-medium text-base">
+                                {profileData.branch || (
+                                  <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {profileData.org_path && (
+                            <div className="space-y-3 group lg:col-span-2">
+                              <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                <MapIcon className="h-4 w-4 text-indigo-500" />
+                                Organizational Path
+                              </Label>
+                              <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50 group-hover:shadow-md group-hover:scale-[1.02]">
+                                <p className="text-gray-900 dark:text-white font-medium text-base break-all">
+                                  {profileData.org_path}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Employment Details Section */}
+                  <div className="space-y-4">
+                    <button
+                      onClick={() => toggleSection('employmentDetails')}
+                      className="flex items-center justify-between w-full p-4 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg border border-purple-200 dark:border-purple-700 hover:from-purple-100 hover:to-purple-150 dark:hover:from-purple-800/30 dark:hover:to-purple-700/30 transition-all duration-200 group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-purple-500 rounded-lg">
+                          <Clock className="h-5 w-5 text-white" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Employment Details</h3>
+                      </div>
+                      {expandedSections.employmentDetails ? (
+                        <ChevronUp className="h-5 w-5 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform duration-200" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform duration-200" />
+                      )}
+                    </button>
+                    
+                    {expandedSections.employmentDetails && (
+                      <div className="overflow-hidden">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 bg-white dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transform transition-all duration-500 ease-out animate-in slide-in-from-top-4 fade-in">
+                          <div className="space-y-3 group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-blue-500" />
+                              Join Date
+                            </Label>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50 group-hover:shadow-md group-hover:scale-[1.02]">
+                              <p className="text-gray-900 dark:text-white font-medium text-base">
+                                {profileData.join_date ? formatDate(profileData.join_date) : (
+                                  <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3 group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                              <Briefcase className="h-4 w-4 text-green-500" />
+                              Job Type
+                            </Label>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-700/50 group-hover:shadow-md group-hover:scale-[1.02]">
+                              <p className="text-gray-900 dark:text-white font-medium text-base">
+                                {profileData.job_type || (
+                                  <span className="text-gray-500 dark:text-gray-400 italic">Not specified</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -981,6 +1507,46 @@ const ProfilePage: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Password Status Information */}
+                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                  <h3 className="text-lg font-semibold text-gray-900">Password Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Default Password Status</Label>
+                      <div className="flex items-center gap-2">
+                        {profileData.is_default_password ? (
+                          <>
+                            <AlertCircle className="h-4 w-4 text-amber-500" />
+                            <Badge className="bg-amber-100 text-amber-800">Using Default Password</Badge>
+                          </>
+                        ) : (
+                          <>
+                            <Shield className="h-4 w-4 text-green-500" />
+                            <Badge className="bg-green-100 text-green-800">Custom Password Set</Badge>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {profileData.password_last_changed && (
+                      <div className="space-y-2">
+                        <Label>Last Password Change</Label>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-gray-400" />
+                          <p className="text-gray-900">{formatDate(profileData.password_last_changed)}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {profileData.is_default_password && (
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex items-center gap-2 text-amber-800">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">Security Recommendation: Please change your default password for better security.</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Change Password</h3>
