@@ -407,11 +407,37 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
         <nav className="flex" aria-label="Breadcrumb">
           <ol className="inline-flex items-center space-x-1 md:space-x-3">
             <li className="inline-flex items-center">
-              <span className="inline-flex items-center text-sm font-medium text-gray-700">
+              <button
+                onClick={() => {
+                  setDepartment(null);
+                  onViewChange?.('companies');
+                }}
+                className="inline-flex items-center text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              >
                 <Building2 className="w-4 h-4 mr-2" />
-                Organization
-              </span>
+                Companies
+              </button>
             </li>
+            {selectedDepartment && (
+              <li>
+                <div className="flex items-center">
+                  <span className="mx-2 text-gray-400">/</span>
+                  <button
+                    onClick={() => {
+                      setDepartment(null);
+                      onViewChange?.('departments');
+                      // Navigate to the specific company's departments page
+                      if (selectedDepartment.company_id) {
+                        window.location.href = `/departments?company_id=${selectedDepartment.company_id}`;
+                      }
+                    }}
+                    className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    {selectedDepartment.company}
+                  </button>
+                </div>
+              </li>
+            )}
             <li>
               <div className="flex items-center">
                 <span className="mx-2 text-gray-400">/</span>
@@ -420,6 +446,10 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
                     onClick={() => {
                       setDepartment(null);
                       onViewChange?.('departments');
+                      // Navigate to the specific company's departments page
+                      if (selectedDepartment.company_id) {
+                        window.location.href = `/departments?company_id=${selectedDepartment.company_id}`;
+                      }
                     }}
                     className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
                   >

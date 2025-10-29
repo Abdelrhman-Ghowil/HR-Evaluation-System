@@ -31,6 +31,42 @@ export interface ApiUser {
 
 export type UserRole = 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP';
 
+// My Profile API Response Types
+export interface ApiMyProfile {
+  // Basic info
+  username: string;
+  email: string;
+  name: string;
+  
+  // Contact details
+  country_code: string;
+  phone: string;
+  avatar?: string;
+  
+  // Employment details
+  role: UserRole;
+  position: string;
+  managerial_level: string;
+  
+  // Status info
+  status: string;
+  is_default_password: boolean;
+  password_last_changed?: string;
+  
+  // Organizational info
+  employee_code: string;
+  job_type: string;
+  location: string;
+  branch: string;
+  
+  // Company details
+  join_date: string;
+  company_name: string;
+  department: string;
+  direct_manager: string;
+  org_path: string;
+}
+
 // User Management Types
 export interface CreateUserRequest {
   username: string;

@@ -25,7 +25,9 @@ import {
   Mail,
   Phone,
   Loader2,
-  X
+  X,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useUsers } from '../../hooks/useApi';
@@ -68,6 +70,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole | ''>('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Fetch users from API
   const { data: apiUsers, isLoading, error } = useUsers();
@@ -582,8 +585,31 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                     <Input id="position" defaultValue={selectedUser.position} />
                   </div>
                   <div>
-                    <Label htmlFor="password">Password</Label>
-                    <Input id="password" type="password" placeholder="Enter new password (leave blank to keep current)" />
+                   <div>
+                     <Label htmlFor="password">Password</Label>
+                     <div className="relative">
+                       <Input 
+                         id="password" 
+                         type={showPassword ? "text" : "password"} 
+                         placeholder="Enter new password (leave blank to keep current)" 
+                         className="pr-10"
+                       />
+                       <Button
+                         type="button"
+                         variant="ghost"
+                         size="sm"
+                         className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                         onClick={() => setShowPassword(!showPassword)}
+                         aria-label={showPassword ? "Hide password" : "Show password"}
+                       >
+                         {showPassword ? (
+                           <EyeOff className="h-4 w-4 text-gray-400" />
+                         ) : (
+                           <Eye className="h-4 w-4 text-gray-400" />
+                         )}
+                       </Button>
+                     </div>
+                   </div>
                   </div>
                 </div>
               </TabsContent>

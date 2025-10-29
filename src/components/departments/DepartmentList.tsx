@@ -534,10 +534,26 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
           <Home className="h-4 w-4" />
           Companies
         </Button>
-        <span className="text-gray-400">/</span>
-        <span className="text-gray-900 font-medium">
-          {selectedCompany ? `${selectedCompany.name} - Departments` : 'Departments'}
-        </span>
+        {selectedCompany ? (
+          <>
+            <span className="text-gray-400">/</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate(`/departments?company_id=${selectedCompany.company_id}`)}
+              className="text-gray-600 hover:text-gray-900 p-2"
+            >
+              {selectedCompany.name}
+            </Button>
+            <span className="text-gray-400">/</span>
+            <span className="text-gray-900 font-medium">Departments</span>
+          </>
+        ) : (
+          <>
+            <span className="text-gray-400">/</span>
+            <span className="text-gray-900 font-medium">Departments</span>
+          </>
+        )}
       </nav>
 
       <div className="flex items-center justify-between">
