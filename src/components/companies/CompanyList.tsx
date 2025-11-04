@@ -198,7 +198,7 @@ const CompanyList = () => {
     setEditCompany({
       name: company.name,
       industry: company.industry || '',
-      size: company.size || 'MEDIUM',
+      size: company.size || '',
       address: company.address || ''
     });
     setValidationErrors({});
