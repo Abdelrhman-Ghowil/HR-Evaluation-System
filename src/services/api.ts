@@ -170,9 +170,10 @@ class ApiService {
       return {
         message: errorMessage,
         status: error.response.status,
-        details: error.response.data?.details,
+        details: error.response.data?.errors,
       };
-    } else if (error?.request) {
+    } else
+     if (error?.request) {
       // Request was made but no response received
       const errorCode = error?.code;
       let networkMessage = 'Network error - please check your connection';
@@ -476,7 +477,34 @@ class ApiService {
       });
       
       // Ensure we return the expected format even if backend returns different structure
-      const data = response.data;
+      const data = response.data as any;
+
+      // Normalize errors to ApiError[] if backend returns strings or a keyed object
+      let normalizedErrors: ApiError[] | undefined;
+      const rawErrors = data?.errors;
+      if (Array.isArray(rawErrors)) {
+        normalizedErrors = rawErrors.map((item: any) => {
+          if (typeof item === 'string') {
+            return { message: item, status: 400 } as ApiError;
+          }
+          if (item && typeof item === 'object') {
+            return {
+              message: item.message ?? 'Import error',
+              status: item.status ?? 400,
+              details: item.details,
+            } as ApiError;
+          }
+          return { message: String(item), status: 400 } as ApiError;
+        });
+      } else if (rawErrors && typeof rawErrors === 'object') {
+        // Preserve nested error object under details so UI can show a nested JSON
+        normalizedErrors = [{
+          message: 'Import validation errors',
+          status: 400,
+          details: rawErrors,
+        } as ApiError];
+      }
+
       return {
         status: 'imported',
         created: data.created || 0,
@@ -485,10 +513,12 @@ class ApiService {
         to_create: data.to_create,
         to_update: data.to_update,
         message: data.message,
-        errors: data.errors
+        errors: normalizedErrors,
       };
-    } catch (error: any) {
-      throw this.handleError(error);
+    } 
+    catch (error: any) {
+      const apiError = (error);
+      throw apiError;
     }
   }
 

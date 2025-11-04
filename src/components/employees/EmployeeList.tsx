@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, Plus, Edit, Mail, Phone, X, Search, Filter, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Users, Plus, Edit, Mail, Phone, X, Search, Filter, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle, Copy, Download } from 'lucide-react';
 import EmployeeDetails from './EmployeeDetails';
 import { apiService } from '@/services/api';
 import { ApiEmployee, ApiDepartment, ApiCompany, CreateEmployeeRequest, ImportResponse, ApiError } from '@/types/api';
@@ -99,7 +99,57 @@ const EmployeeList = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResults, setImportResults] = useState<ImportResponse | null>(null);
+  const [errorView, setErrorView] = useState<'summary' | 'fields' | 'raw'>('summary');
+  const [errorFilter, setErrorFilter] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Build a map of field -> messages from nested error.details
+  const fieldErrors = React.useMemo(() => {
+    const map: Record<string, string[]> = {};
+    (importResults?.errors || []).forEach((err) => {
+      const walk = (obj: any, base = '') => {
+        if (!obj || typeof obj !== 'object') return;
+        Object.entries(obj).forEach(([k, v]) => {
+          const path = base ? `${base}.${k}` : k;
+          if (Array.isArray(v)) {
+            map[path] = (map[path] || []).concat(v.map((x) => String(x)));
+          } else if (typeof v === 'object' && v !== null) {
+            walk(v, path);
+          } else {
+            map[path] = (map[path] || []).concat(String(v));
+          }
+        });
+      };
+      if (err && typeof err === 'object' && (err as ApiError).details) {
+        walk((err as ApiError).details as Record<string, any>);
+      } else if (err && typeof err === 'object' && (err as ApiError).message) {
+        map['general'] = (map['general'] || []).concat((err as ApiError).message);
+      } else if (typeof err === 'string') {
+        map['general'] = (map['general'] || []).concat(String(err));
+      }
+    });
+    return map;
+  }, [importResults?.errors]);
+
+  const copyErrors = () => {
+    try {
+      const text = JSON.stringify(importResults?.errors || [], null, 2);
+      navigator.clipboard?.writeText(text);
+    } catch {}
+  };
+
+  const downloadErrors = () => {
+    try {
+      const text = JSON.stringify(importResults?.errors || [], null, 2);
+      const blob = new Blob([text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'employee-import-errors.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {}
+  };
 
   // Clear auto-filled form data
   const clearAutoFilledData = () => {
@@ -314,6 +364,10 @@ const EmployeeList = () => {
     
     if (file && validateFile(file)) {
       setSelectedFile(file);
+      // Clear previous results and error view when a new file is dropped
+      setImportResults(null);
+      setErrorView('summary');
+      setErrorFilter('');
     }
   }, []);
 
@@ -327,11 +381,19 @@ const EmployeeList = () => {
 
     if (validateFile(file)) {
       setSelectedFile(file);
+      // Clear previous results and error view when a new file is selected
+      setImportResults(null);
+      setErrorView('summary');
+      setErrorFilter('');
     }
   };
 
   const handleRemoveFile = () => {
     setSelectedFile(null);
+    // Clear messages and views when file is removed
+    setImportResults(null);
+    setErrorView('summary');
+    setErrorFilter('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -348,13 +410,14 @@ const EmployeeList = () => {
     } catch (error: unknown) {
       console.error('Dry run failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Validation failed. Please try again.';
-      const errorDetails = (error as any)?.details?.errors || [];
+      const apiErr = error as ApiError;
+      const normalizedErrors: ApiError[] = [apiErr];
       setImportResults({  
         status: 'imported',
         created: 0,
         updated: 0,
         message: errorMessage,
-        errors: errorDetails
+        errors: normalizedErrors
       });
     } finally {
       setIsImporting(false);
@@ -373,16 +436,17 @@ const EmployeeList = () => {
       if (result.status === 'imported' && (result.created > 0 || result.updated > 0)) {
         fetchEmployees(); // Refresh the employees list
       }
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error('Import failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Import failed. Please try again.';
-      const errorDetails = (error as any)?.details?.errors || [];
+      const apiErr = error as ApiError;
+      const normalizedErrors: ApiError[] = [apiErr];
       setImportResults({
         status: 'imported',
         created: 0,
         updated: 0,
         message: errorMessage,
-        errors: errorDetails
+        errors: normalizedErrors
       });
     } finally {
       setIsImporting(false);
@@ -2289,16 +2353,74 @@ const EmployeeList = () => {
                       </p>
                     )}
                     {importResults.errors && importResults.errors.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {importResults.errors.slice(0, 5).map((error, index) => (
-                          <p key={index} className="text-sm text-red-600">
-                            • {error}
-                          </p>
-                        ))}
-                        {importResults.errors.length > 5 && (
-                          <p className="text-sm text-red-600">
-                            ... and {importResults.errors.length - 5} more errors
-                          </p>
+                      <div className="mt-3 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant={errorView === 'summary' ? 'default' : 'outline'} onClick={() => setErrorView('summary')}>Summary</Button>
+                          <Button size="sm" variant={errorView === 'fields' ? 'default' : 'outline'} onClick={() => setErrorView('fields')}>By Field</Button>
+                          <Button size="sm" variant={errorView === 'raw' ? 'default' : 'outline'} onClick={() => setErrorView('raw')}>Raw JSON</Button>
+                          <div className="ml-auto flex items-center gap-2">
+                            <Button size="sm" variant="outline" onClick={copyErrors}><Copy className="h-4 w-4 mr-1" />Copy</Button>
+                            <Button size="sm" variant="outline" onClick={downloadErrors}><Download className="h-4 w-4 mr-1" />Download</Button>
+                          </div>
+                        </div>
+
+                        {errorView === 'summary' && (
+                          <div className="bg-gray-50 border rounded p-3">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                              <div><span className="text-gray-600">Total errors:</span> <span className="font-medium text-gray-900">{importResults.errors.length}</span></div>
+                              <div><span className="text-gray-600">Distinct fields:</span> <span className="font-medium text-gray-900">{Object.keys(fieldErrors).length}</span></div>
+                              <div><span className="text-gray-600">Created:</span> <span className="font-medium text-gray-900">{importResults.created || 0}</span></div>
+                              <div><span className="text-gray-600">Updated:</span> <span className="font-medium text-gray-900">{importResults.updated || 0}</span></div>
+                            </div>
+                            <div className="mt-3">
+                              <div className="flex flex-wrap gap-2">
+                                {Object.keys(fieldErrors).slice(0, 10).map((key) => (
+                                  <Badge key={key} variant="secondary" className="text-xs">{key} ({fieldErrors[key].length})</Badge>
+                                ))}
+                                {Object.keys(fieldErrors).length > 10 && (
+                                  <span className="text-xs text-gray-500">+{Object.keys(fieldErrors).length - 10} more</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {errorView === 'fields' && (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={errorFilter}
+                                onChange={(e) => setErrorFilter(e.target.value)}
+                                placeholder="Filter by field name"
+                                className="h-8"
+                              />
+                            </div>
+                            <div className="space-y-2 max-h-72 overflow-auto pr-1">
+                              {Object.entries(fieldErrors)
+                                .filter(([key]) => key.toLowerCase().includes(errorFilter.toLowerCase()))
+                                .map(([key, messages]) => (
+                                  <div key={key} className="border rounded p-2 bg-white">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-semibold text-gray-800">{key}</span>
+                                      <Badge variant="outline" className="text-[10px]">{messages.length} issue{messages.length > 1 ? 's' : ''}</Badge>
+                                    </div>
+                                    <ul className="mt-2 text-xs text-red-700 list-disc list-inside space-y-1">
+                                      {messages.map((m, i) => (
+                                        <li key={i}>{m}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {errorView === 'raw' && (
+                          <div className="bg-gray-50 border rounded p-2">
+                            <pre className="text-xs font-mono text-gray-800 whitespace-pre-wrap break-words">
+{JSON.stringify(importResults.errors, null, 2)}
+                            </pre>
+                          </div>
                         )}
                       </div>
                     )}
