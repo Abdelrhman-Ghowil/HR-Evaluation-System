@@ -170,10 +170,10 @@ class ApiService {
       return {
         message: errorMessage,
         status: error.response.status,
-        details: error.response.data?.errors,
+        details: error.response.data,
       };
     } else
-     if (error?.request) {
+    if (error?.request) {
       // Request was made but no response received
       const errorCode = error?.code;
       let networkMessage = 'Network error - please check your connection';
@@ -791,12 +791,12 @@ class ApiService {
 
   // Weights Configuration Methods
   async getWeightsConfiguration(level: WeightsConfigurationLevel): Promise<WeightsConfiguration> {
-    const response: AxiosResponse<WeightsConfiguration> = await this.api.get(`/api/weights-configuration/${level}`);
+    const response: AxiosResponse<WeightsConfiguration> = await this.api.get(`/api/weights-configuration/${level}/`);
     return response.data;
   }
 
   async updateWeightsConfiguration(level: WeightsConfigurationLevel, configData: UpdateWeightsConfigurationRequest): Promise<WeightsConfiguration> {
-    const response: AxiosResponse<WeightsConfiguration> = await this.api.put(`/api/weights-configuration/${level}`, configData);
+    const response: AxiosResponse<WeightsConfiguration> = await this.api.put(`/api/weights-configuration/${level}/`, configData);
     return response.data;
   }
 

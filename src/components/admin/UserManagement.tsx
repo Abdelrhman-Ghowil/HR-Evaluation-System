@@ -71,6 +71,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole | ''>('');
   const [showPassword, setShowPassword] = useState(false);
+  const PERMISSIONS_COMING_SOON = true;
 
   // Fetch users from API
   const { data: apiUsers, isLoading, error } = useUsers();
@@ -614,6 +615,14 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                 </div>
               </TabsContent>
               <TabsContent value="permissions" className="space-y-4">
+                {PERMISSIONS_COMING_SOON && (
+                  <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-yellow-600" />
+                    <span>
+                      Permissions management is coming soon. Controls are disabled in this preview.
+                    </span>
+                  </div>
+                )}
                 <div className="space-y-4">
                   {Object.entries(
                     permissions.reduce((acc, permission) => {
@@ -623,13 +632,20 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                     }, {} as Record<string, Permission[]>)
                   ).map(([category, categoryPermissions]) => (
                     <div key={category}>
-                      <h4 className="font-medium text-gray-900 mb-2 capitalize">{category}</h4>
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-medium text-gray-900 capitalize">{category}</h4>
+                        {PERMISSIONS_COMING_SOON && (
+                          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Coming Soon</Badge>
+                        )}
+                      </div>
                       <div className="space-y-2">
                         {categoryPermissions.map((permission) => (
                           <div key={permission.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={permission.id}
                               defaultChecked={selectedUser.permissions.includes(permission.id)}
+                              disabled={PERMISSIONS_COMING_SOON}
+                              title={PERMISSIONS_COMING_SOON ? 'Coming soon' : undefined}
                             />
                             <div className="flex-1">
                               <Label htmlFor={permission.id} className="font-medium">

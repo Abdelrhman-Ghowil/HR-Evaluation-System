@@ -37,7 +37,7 @@ interface Employee {
   directManager: string;
   joinDate: string;
   company_id: string;
-  departments_ids: string[];
+  department_id: string;
   user_id: string;
   jobType: string;
   location: string;
@@ -102,6 +102,58 @@ const EmployeeList = () => {
   const [errorView, setErrorView] = useState<'summary' | 'fields' | 'raw'>('summary');
   const [errorFilter, setErrorFilter] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Persist selected employee in URL so refresh keeps user on profile
+  const handleOpenEmployeeDetails = React.useCallback((employee: Employee) => {
+    setSelectedEmployee(employee);
+    try {
+      const url = new URL(window.location.href);
+      const idToUse = employee.employee_id || employee.id;
+      url.searchParams.set('employee', String(idToUse));
+      window.history.replaceState(null, '', url.toString());
+    } catch {}
+  }, []);
+
+  const handleBackToList = React.useCallback(() => {
+    setSelectedEmployee(null);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('employee');
+      window.history.replaceState(null, '', url.toString());
+    } catch {}
+  }, []);
+
+  // Rehydrate selected employee from URL after data loads (supports refresh/deep link)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const eid = params.get('employee');
+      if (eid && !selectedEmployee && employees && employees.length > 0) {
+        const match = employees.find(e => String(e.employee_id) === eid || String(e.id) === eid);
+        if (match) {
+          setSelectedEmployee(match);
+        }
+      }
+    } catch {}
+  }, [employees, selectedEmployee]);
+
+  // Keep state in sync with browser navigation (back/forward)
+  useEffect(() => {
+    const onPopState = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const eid = params.get('employee');
+        if (!eid) {
+          setSelectedEmployee(null);
+        } else if (employees && employees.length > 0) {
+          const match = employees.find(e => String(e.employee_id) === eid || String(e.id) === eid);
+          setSelectedEmployee(match || null);
+        }
+      } catch {}
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [employees]);
 
   // Build a map of field -> messages from nested error.details
   const fieldErrors = React.useMemo(() => {
@@ -278,7 +330,7 @@ const EmployeeList = () => {
       directManager: apiEmployee.direct_manager || '',
       joinDate: apiEmployee.join_date,
       company_id: apiEmployee.company_id,
-      departments_ids: [], // Will be populated from department names if needed
+      department_id: '',
       user_id: apiEmployee.user_id,
       jobType: apiEmployee.job_type || '',
       location: apiEmployee.location || '',
@@ -436,7 +488,7 @@ const EmployeeList = () => {
       if (result.status === 'imported' && (result.created > 0 || result.updated > 0)) {
         fetchEmployees(); // Refresh the employees list
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Import failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Import failed. Please try again.';
       const apiErr = error as ApiError;
@@ -785,6 +837,9 @@ const EmployeeList = () => {
     if (!editingEmployee?.joinDate?.trim()) {
       errors.joinDate = 'Join date is required';
     }
+    if (!editingEmployee?.employeeCode?.trim()) {
+      errors.employeeCode = 'Employee code is required and unique.';
+    }
     
     setEditValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -829,7 +884,7 @@ const EmployeeList = () => {
         }
         
         if (editingEmployee.position !== originalEmployee.position) {
-          userDataChanges.title = editingEmployee.position;
+          userDataChanges.position = editingEmployee.position;
         }
         
         // Check if phone has changed
@@ -841,7 +896,8 @@ const EmployeeList = () => {
           editingEmployee.phone;
         
         if (newFullPhone !== originalFullPhone) {
-          userDataChanges.phone = newFullPhone;
+          userDataChanges.phone = editingEmployee.phone;
+          userDataChanges.countryCode = editingEmployee.countryCode;
         }
         
         // Check if gender has changed
@@ -861,10 +917,10 @@ const EmployeeList = () => {
         
         // Check if department has changed
         if (editingEmployee.department !== originalEmployee.department) {
-          const departmentIds = departments
-            .filter(dept => editingEmployee.department.includes(dept.name))
-            .map(dept => dept.department_id);
-          updateData.departments_ids = departmentIds.length > 0 ? departmentIds : editingEmployee.departments_ids;
+          const deptMatch = departments.find(dept => dept.name === editingEmployee.department);
+          if (deptMatch && deptMatch.department_id) {
+            updateData.department_id = deptMatch.department_id;
+          }
         }
         
         if (editingEmployee.managerialLevel !== originalEmployee.managerialLevel) {
@@ -975,6 +1031,9 @@ const EmployeeList = () => {
     if (!newEmployee.joinDate?.trim()) {
       errors.joinDate = 'Join date is required';
     }
+    if (!newEmployee.employeeCode?.trim()) {
+      errors.employeeCode = 'Employee code is required and unique.';
+    }
     
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -1004,12 +1063,12 @@ const EmployeeList = () => {
             avatar: newEmployee.avatar || '',
             first_name: firstName,
             last_name: lastName,
-            title: newEmployee.position || '',
+            position: newEmployee.position || '',
             phone: fullPhoneNumber,
             gender: newEmployee.gender || ''
           },
           company_id: newEmployee.companyId,
-          departments_ids: newEmployee.departmentId ? [newEmployee.departmentId] : [],
+          department_id: newEmployee.departmentId,
           managerial_level: newEmployee.managerialLevel,
           status: newEmployee.status,
           join_date: newEmployee.joinDate,
@@ -1091,7 +1150,7 @@ const EmployeeList = () => {
     return (
       <EmployeeDetails 
         employee={{...selectedEmployee, status: selectedEmployee.status === 'Active' ? 'Active' : 'Inactive'}}
-        onBack={() => setSelectedEmployee(null)} 
+        onBack={handleBackToList} 
       />
     );
   }
@@ -1473,8 +1532,12 @@ const EmployeeList = () => {
                       value={newEmployee.employeeCode || ''}
                       onChange={(e) => setNewEmployee(prev => ({ ...prev, employeeCode: e.target.value }))}
                       placeholder="Employee ID/Code"
-                      className="w-full"
+                      className={`w-full ${validationErrors.employeeCode ? 'border-red-500' : ''}`}
+                      required
                     />
+                    {validationErrors.employeeCode && (
+                      <p className="text-sm text-red-500">{validationErrors.employeeCode}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="jobType" className="text-sm font-medium">Job Type</Label>
@@ -1771,7 +1834,7 @@ const EmployeeList = () => {
                 <Button 
                   variant="outline" 
                   className="w-full mt-3"
-                  onClick={() => setSelectedEmployee(employee)}
+                  onClick={() => handleOpenEmployeeDetails(employee)}
                 >
                   View Profile
                 </Button>
@@ -2046,8 +2109,13 @@ const EmployeeList = () => {
                       id="edit-employeeCode"
                       value={editingEmployee.employeeCode || ''}
                       onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, employeeCode: e.target.value } : null)}
-                      placeholder="Enter employee code"
-                      className="w-full"/>
+                      placeholder="Enter unique employee code"
+                      className={`w-full ${editValidationErrors.employeeCode ? 'border-red-500' : ''}`}
+                      required
+                    />
+                    {editValidationErrors.employeeCode && (
+                      <p className="text-sm text-red-500">{editValidationErrors.employeeCode}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-jobType" className="text-sm font-medium">Job Type</Label>

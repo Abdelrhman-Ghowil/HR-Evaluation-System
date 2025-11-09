@@ -3,13 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Separator } from '../ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { AlertCircle, Save, RotateCcw, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { AlertCircle, Save, RotateCcw, ArrowLeft, Pencil, X } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/alert';
 import { toast } from 'sonner';
 import { apiService } from '../../services/api';
-import { WeightsConfiguration as WeightsConfigType, WeightsConfigurationLevel, ScoringRule } from '../../types/api';
+import { WeightsConfigurationLevel } from '../../types/api';
 
 interface WeightsConfigurationProps {
   onBack?: () => void;
@@ -24,22 +23,25 @@ const LEVEL_LABELS: Record<WeightsConfigurationLevel, string> = {
 const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) => {
   const [selectedLevel, setSelectedLevel] = useState<WeightsConfigurationLevel>('IC');
   const [weights, setWeights] = useState({
-    core: 40,
+    core: 0,
     leadership: 0,
-    functional: 60,
-    competency: 40,
-    objective: 60,
+    functional: 0,
+    competency: 0,
+    objective: 0,
   });
-  const [scoringRules, setScoringRules] = useState<ScoringRule[]>([
-    { min_score: 90, max_score: 100, grade: 'A+', description: 'Exceptional Performance' },
-    { min_score: 80, max_score: 89, grade: 'A', description: 'Excellent Performance' },
-    { min_score: 70, max_score: 79, grade: 'B', description: 'Good Performance' },
-    { min_score: 60, max_score: 69, grade: 'C', description: 'Satisfactory Performance' },
-    { min_score: 0, max_score: 59, grade: 'D', description: 'Needs Improvement' },
-  ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [originalWeights, setOriginalWeights] = useState({
+    core: 0,
+    leadership: 0,
+    functional: 0,
+    competency: 0,
+    objective: 0,
+  });
+  const [showValidation, setShowValidation] = useState(false);
+  const [editedBreakdown, setEditedBreakdown] = useState({ core: false, leadership: false, functional: false });
 
   const loadConfiguration = useCallback(async () => {
     setLoading(true);
@@ -47,40 +49,25 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
     try {
       const config = await apiService.getWeightsConfiguration(selectedLevel);
       console.log('API Response:', config); // Debug log
-      setWeights({
+      const loaded = {
         core: config.core_weight,
         leadership: config.leadership_weight,
         functional: config.functional_weight,
         competency: config.competency_weight,
         objective: config.objective_weight,
-      });
-      setScoringRules(config.scoring_rules || [
-        { min_score: 90, max_score: 100, grade: 'A+', description: 'Exceptional Performance' },
-        { min_score: 80, max_score: 89, grade: 'A', description: 'Excellent Performance' },
-        { min_score: 70, max_score: 79, grade: 'B', description: 'Good Performance' },
-        { min_score: 60, max_score: 69, grade: 'C', description: 'Satisfactory Performance' },
-        { min_score: 0, max_score: 59, grade: 'D', description: 'Needs Improvement' },
-      ]);
+      };
+      setWeights(loaded);
+      setOriginalWeights(loaded);
+      setEditedBreakdown({ core: false, leadership: false, functional: false });
     } catch (err) {
-      // If API fails, use default values instead of showing error
-      console.warn('Failed to load configuration, using defaults:', err);
-      setWeights({
-        core: 40,
-        leadership: 0,
-        functional: 60,
-        competency: 40,
-        objective: 60,
-      });
-      setScoringRules([
-        { min_score: 90, max_score: 100, grade: 'A+', description: 'Exceptional Performance' },
-        { min_score: 80, max_score: 89, grade: 'A', description: 'Excellent Performance' },
-        { min_score: 70, max_score: 79, grade: 'B', description: 'Good Performance' },
-        { min_score: 60, max_score: 69, grade: 'C', description: 'Satisfactory Performance' },
-        { min_score: 0, max_score: 59, grade: 'D', description: 'Needs Improvement' },
-      ]);
+      // If API fails, do not use hard-coded defaults; surface the error
+      console.warn('Failed to load configuration:', err);
+      setError('Failed to load configuration. Please try again.');
+      toast.error('Failed to load configuration');
     } finally {
       setLoading(false);
       setInitialized(true);
+      setIsEditing(false);
     }
   }, [selectedLevel]);
 
@@ -90,60 +77,74 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
   }, [loadConfiguration]);
 
   const handleWeightChange = (field: 'core' | 'leadership' | 'functional' | 'competency' | 'objective', value: number) => {
-    setWeights(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+    const clamped = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
 
-  const handleScoringRuleChange = (index: number, field: keyof ScoringRule, value: string | number) => {
-    setScoringRules(prev => prev.map((rule, i) => 
-      i === index ? { ...rule, [field]: value } : rule
-    ));
-  };
-
-  const addScoringRule = () => {
-    setScoringRules(prev => [...prev, {
-      min_score: 0,
-      max_score: 0,
-      grade: '',
-      description: ''
-    }]);
-  };
-
-  const removeScoringRule = (index: number) => {
-    setScoringRules(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const validateWeights = (): boolean => {
-    // Core + Leadership + Functional should equal Competency Weight
-    const totalCompetencyBreakdown = weights.core + weights.leadership + weights.functional;
-    const competencyWeightValid = totalCompetencyBreakdown === weights.competency;
-    
-    // Competency + Objective should equal 100%
-    const totalEvaluationWeight = weights.competency + weights.objective;
-    const totalWeightValid = totalEvaluationWeight === 100;
-    
-    return competencyWeightValid && totalWeightValid;
-  };
-
-  const validateScoringRules = (): boolean => {
-    for (let i = 0; i < scoringRules.length; i++) {
-      const rule = scoringRules[i];
-      if (rule.min_score >= rule.max_score) return false;
-      if (!rule.grade.trim() || !rule.description.trim()) return false;
+    // Auto-balance for main evaluation weights
+    if (field === 'competency') {
+      setWeights(prev => {
+        const newCompetency = clamped;
+        const newObjective = Math.max(0, Math.min(100, 100 - newCompetency));
+        return { ...prev, competency: newCompetency, objective: newObjective };
+      });
+      return;
     }
-    return true;
-  };
-
-  const handleSave = async () => {
-    if (!validateWeights()) {
-      toast.error('Weights must total 100%');
+    if (field === 'objective') {
+      setWeights(prev => {
+        const newObjective = clamped;
+        const newCompetency = Math.max(0, Math.min(100, 100 - newObjective));
+        return { ...prev, objective: newObjective, competency: newCompetency };
+      });
       return;
     }
 
-    if (!validateScoringRules()) {
-      toast.error('Invalid scoring rules configuration');
+    // Competency breakdown logic: auto-fill the third when any two are entered
+    if (field === 'core' || field === 'leadership' || field === 'functional') {
+      const newEdited = { ...editedBreakdown, [field]: true } as const;
+      setEditedBreakdown(newEdited);
+
+      setWeights(prev => {
+        let next = { ...prev, [field]: clamped } as typeof prev;
+        const sum = (a: number, b: number) => a + b;
+        const clamp = (n: number) => Math.max(0, Math.min(100, n));
+
+        const twoEnteredCoreLeadership = newEdited.core && newEdited.leadership && !newEdited.functional;
+        const twoEnteredCoreFunctional = newEdited.core && newEdited.functional && !newEdited.leadership;
+        const twoEnteredLeadershipFunctional = newEdited.leadership && newEdited.functional && !newEdited.core;
+
+        if (twoEnteredCoreLeadership) {
+          const remaining = clamp(100 - sum(next.core, next.leadership));
+          next.functional = remaining;
+        } else if (twoEnteredCoreFunctional) {
+          const remaining = clamp(100 - sum(next.core, next.functional));
+          next.leadership = remaining;
+        } else if (twoEnteredLeadershipFunctional) {
+          const remaining = clamp(100 - sum(next.leadership, next.functional));
+          next.core = remaining;
+        }
+        return next;
+      });
+      return;
+    }
+  };
+
+
+  const validateWeights = (): boolean => {
+    // Core + Leadership + Functional should total 100%
+    const totalCompetencyBreakdown = weights.core + weights.leadership + weights.functional;
+    const competencyBreakdownValid = totalCompetencyBreakdown === 100;
+
+    // Competency + Objective should total 100%
+    const totalEvaluationWeight = weights.competency + weights.objective;
+    const totalWeightValid = totalEvaluationWeight === 100;
+
+    return competencyBreakdownValid && totalWeightValid;
+  };
+
+
+  const handleSave = async () => {
+    if (!validateWeights()) {
+      setShowValidation(true);
+      toast.error('Both totals must equal 100% (competency breakdown and evaluation).');
       return;
     }
 
@@ -155,10 +156,12 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
         functional_weight: weights.functional,
         competency_weight: weights.competency,
         objective_weight: weights.objective,
-        scoring_rules: scoringRules
       });
       
       toast.success('Configuration saved successfully');
+      setOriginalWeights(weights);
+      setIsEditing(false);
+      setShowValidation(false);
     } catch (error) {
       toast.error('Failed to save configuration');
       console.error('Error saving weights configuration:', error);
@@ -171,11 +174,31 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
     loadConfiguration();
   };
 
+  const startEdit = () => {
+    setIsEditing(true);
+    setShowValidation(false);
+    setEditedBreakdown({ core: false, leadership: false, functional: false });
+  };
+
+  const cancelEdit = () => {
+    setWeights(originalWeights);
+    setIsEditing(false);
+    setShowValidation(false);
+    setEditedBreakdown({ core: false, leadership: false, functional: false });
+    toast.info('Changes discarded');
+  };
+
   const totalCompetencyBreakdown = weights.core + weights.leadership + weights.functional;
   const totalEvaluationWeight = weights.competency + weights.objective;
-  const isCompetencyBreakdownValid = totalCompetencyBreakdown === weights.competency;
+  const isCompetencyBreakdownValid = totalCompetencyBreakdown === 100;
   const isTotalWeightValid = totalEvaluationWeight === 100;
   const isWeightValid = isCompetencyBreakdownValid && isTotalWeightValid;
+  const breakdownClass = showValidation
+    ? (isCompetencyBreakdownValid ? 'text-green-600' : 'text-red-600')
+    : 'text-muted-foreground';
+  const totalClass = showValidation
+    ? (isTotalWeightValid ? 'text-green-600' : 'text-red-600')
+    : 'text-muted-foreground';
 
   if (loading && !initialized) {
     return (
@@ -201,7 +224,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
           )}
           <div>
             <h1 className="text-2xl font-bold">Weights Configuration</h1>
-            <p className="text-muted-foreground">Configure evaluation weights and scoring rules by managerial level</p>
+            <p className="text-muted-foreground">Configure evaluation weights by managerial level</p>
           </div>
         </div>
       </div>
@@ -244,7 +267,9 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
       <Card>
         <CardHeader>
           <CardTitle>Main Evaluation Weights</CardTitle>
-          <CardDescription>Configure the primary weight distribution for {LEVEL_LABELS[selectedLevel]} evaluations</CardDescription>
+          <CardDescription>
+            Configure the primary weight distribution for {LEVEL_LABELS[selectedLevel]} evaluations. The other field auto-adjusts to keep total 100%.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -257,7 +282,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
                 max="100"
                 value={weights.competency}
                 onChange={(e) => handleWeightChange('competency', parseInt(e.target.value) || 0)}
-                disabled={loading}
+                disabled={loading || !isEditing}
               />
             </div>
             <div className="space-y-2">
@@ -269,7 +294,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
                 max="100"
                 value={weights.objective}
                 onChange={(e) => handleWeightChange('objective', parseInt(e.target.value) || 0)}
-                disabled={loading}
+                disabled={loading || !isEditing}
               />
             </div>
           </div>
@@ -280,7 +305,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
       <Card>
         <CardHeader>
           <CardTitle>Competency Weight Breakdown</CardTitle>
-          <CardDescription>Break down the competency weight into specific categories</CardDescription>
+          <CardDescription>Enter any two fields; the third auto-fills to total 100%</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -293,7 +318,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
                 max="100"
                 value={weights.core}
                 onChange={(e) => handleWeightChange('core', parseInt(e.target.value) || 0)}
-                disabled={loading}
+                disabled={loading || !isEditing}
               />
             </div>
             <div className="space-y-2">
@@ -305,7 +330,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
                 max="100"
                 value={weights.leadership}
                 onChange={(e) => handleWeightChange('leadership', parseInt(e.target.value) || 0)}
-                disabled={loading}
+                disabled={loading || !isEditing}
               />
             </div>
             <div className="space-y-2">
@@ -317,7 +342,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
                 max="100"
                 value={weights.functional}
                 onChange={(e) => handleWeightChange('functional', parseInt(e.target.value) || 0)}
-                disabled={loading}
+                disabled={loading || !isEditing}
               />
             </div>
           </div>
@@ -325,29 +350,29 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
               <span className="font-medium">Competency Breakdown (Core + Leadership + Functional):</span>
-              <span className={`font-bold ${isCompetencyBreakdownValid ? 'text-green-600' : 'text-red-600'}`}>
-                {totalCompetencyBreakdown}% / {weights.competency}%
+              <span className={`font-bold ${breakdownClass}`}>
+                {totalCompetencyBreakdown}%
               </span>
             </div>
             
             <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
               <span className="font-medium">Total Evaluation Weight (Competency + Objective):</span>
-              <span className={`font-bold ${isTotalWeightValid ? 'text-green-600' : 'text-red-600'}`}>
+              <span className={`font-bold ${totalClass}`}>
                 {totalEvaluationWeight}%
               </span>
             </div>
           </div>
 
-          {!isCompetencyBreakdownValid && (
+          {showValidation && !isCompetencyBreakdownValid && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Competency breakdown (Core + Leadership + Functional) must equal Competency Weight. Current: {totalCompetencyBreakdown}% ≠ {weights.competency}%
+                Competency breakdown (Core + Leadership + Functional) must total 100%. Current total: {totalCompetencyBreakdown}%
               </AlertDescription>
             </Alert>
           )}
           
-          {!isTotalWeightValid && (
+          {showValidation && !isTotalWeightValid && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
@@ -362,14 +387,29 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
 
       {/* Actions */}
       <div className="flex justify-end space-x-4">
-        <Button variant="outline" onClick={handleReset} disabled={loading}>
-          <RotateCcw className="h-4 w-4 mr-2" />
-          Reset
-        </Button>
-        <Button onClick={handleSave} disabled={loading || !isWeightValid}>
-          <Save className="h-4 w-4 mr-2" />
-          {loading ? 'Saving...' : 'Save Configuration'}
-        </Button>
+        {!isEditing ? (
+          <>
+            <Button variant="outline" onClick={handleReset} disabled={loading}>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset
+            </Button>
+            <Button onClick={startEdit} disabled={loading}>
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit Configuration
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="outline" onClick={cancelEdit} disabled={loading}>
+              <X className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={loading}>
+              <Save className="h-4 w-4 mr-2" />
+              {loading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
