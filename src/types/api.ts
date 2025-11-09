@@ -138,7 +138,7 @@ export interface CreateEmployeeRequest {
     avatar?: string;
     first_name: string;
     last_name: string;
-    title?: string;
+    position?: string;
     phone?: string;
     gender?: string;
   };
@@ -147,7 +147,7 @@ export interface CreateEmployeeRequest {
   warnings?: string[];
   warnings_count?: number;
   company_id: string;
-  departments_ids: string[];
+  department_id: string;
   managerial_level: string;
   status: string;
   org_path?: string;
@@ -168,7 +168,7 @@ export interface UpdateEmployeeRequest {
     avatar?: string;
     first_name?: string;
     last_name?: string;
-    title?: string;
+    position?: string;
     phone?: string;
     gender?: string;
   };
@@ -177,7 +177,7 @@ export interface UpdateEmployeeRequest {
   warnings?: string[];
   warnings_count?: number;
   company_id?: string;
-  departments_ids?: string[];
+  department_id?: string;
   managerial_level?: string;
   status?: string;
   org_path?: string;
@@ -464,7 +464,6 @@ export interface WeightsConfiguration {
   functional_weight: number;
   competency_weight: number;
   objective_weight: number;
-  scoring_rules?: ScoringRule[];
   created_at?: string;
   updated_at?: string;
 }
@@ -482,7 +481,6 @@ export interface UpdateWeightsConfigurationRequest {
   functional_weight: number;
   competency_weight: number;
   objective_weight: number;
-  scoring_rules: ScoringRule[];
 }
 
 // Organizational Structure Types
