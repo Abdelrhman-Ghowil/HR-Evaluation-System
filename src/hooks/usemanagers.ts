@@ -28,7 +28,7 @@ export const useManagers = (
     (companyId || departmentId) ? { 
       ...(companyId && { company_id: companyId }),
       ...(departmentId && { department_id: departmentId }),
-      role: "LM,HOD,HR" // Filter by multiple roles at API level including HR
+      role: "LM,HOD" // Filter by multiple roles at API level including HR
     } : undefined,
     {
       enabled: !!(companyId || departmentId), // Only fetch when companyId or departmentId is provided

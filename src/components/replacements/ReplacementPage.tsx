@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Search, Edit, Trash2, Eye, UserCheck, Building, Users, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -19,6 +20,8 @@ import { useQueryClient } from '@tanstack/react-query';
 const ReplacementPage: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -45,10 +48,15 @@ const ReplacementPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // API Hooks
-  const { data: placements = [], isLoading: loading, error } = usePlacements();
+  // Force immediate freshness so invalidation/refetch always pulls latest data
+  const { data: placements = [], isLoading: loading, error } = usePlacements({
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  });
   const { data: companiesData, isLoading: companiesLoading } = useCompanies();
   const { data: departmentsData, isLoading: departmentsLoading } = useDepartments(
-    selectedCompanyId ? { company: selectedCompanyId } : undefined
+    selectedCompanyId ? { company_id: selectedCompanyId } : undefined
   );
   const { data: subDepartmentsData, isLoading: subDepartmentsLoading, error: subDepartmentsError } = useSubDepartments(
     selectedDepartmentId ? { department: selectedDepartmentId } : undefined
@@ -236,6 +244,24 @@ const handleSubSectionChange = (subSectionId: string) => {
   console.log('Loading state:', loading);
   console.log('Error state:', error);
 
+  // Prefill search term from URL query parameters (e.g., ?employee=John Doe)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const prefill = params.get('employee') || params.get('q') || '';
+    if (prefill && prefill !== searchTerm) {
+      setSearchTerm(prefill);
+    }
+  }, [location.search]);
+
+  // Clear filter and remove related URL params
+  const clearSearchFilter = () => {
+    setSearchTerm('');
+    const params = new URLSearchParams(location.search);
+    params.delete('employee');
+    params.delete('q');
+    navigate({ pathname: location.pathname, search: params.toString() ? `?${params.toString()}` : '' }, { replace: true });
+  };
+
 
 
   const handleCreatePlacement = () => {
@@ -292,6 +318,13 @@ const handleSubSectionChange = (subSectionId: string) => {
 
           // Update the individual placement cache
           queryClient.setQueryData(queryKeys.placement(editingPlacement.employee_id), updatedPlacement);
+
+          // Invalidate and refetch placements to ensure latest media (images) are loaded
+          queryClient.invalidateQueries({ queryKey: queryKeys.placements });
+          queryClient.invalidateQueries({ queryKey: queryKeys.placement(editingPlacement.employee_id) });
+          // Proactively refetch active queries so the UI updates immediately
+          queryClient.refetchQueries({ queryKey: queryKeys.placements, type: 'active' });
+          queryClient.refetchQueries({ queryKey: queryKeys.placement(editingPlacement.employee_id), type: 'active' });
 
           setShowEditForm(false);
           setEditingPlacement(null);
@@ -767,6 +800,17 @@ const handleSubSectionChange = (subSectionId: string) => {
                 className="pl-10"
               />
             </div>
+            {searchTerm && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={clearSearchFilter}
+                className="whitespace-nowrap"
+                aria-label="Clear search filter"
+              >
+                Clear Filter
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

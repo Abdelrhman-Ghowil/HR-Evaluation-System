@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ interface Employee {
 }
 
 const EmployeeList = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [selectedCompany, setSelectedCompany] = useState('all');
@@ -149,7 +151,8 @@ const EmployeeList = () => {
           const match = employees.find(e => String(e.employee_id) === eid || String(e.id) === eid);
           setSelectedEmployee(match || null);
         }
-      } catch {}
+      } 
+      catch {}
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -805,6 +808,14 @@ const EmployeeList = () => {
     setIsEditModalOpen(true);
   };
 
+  // Navigate to Replacements page with employee prefilled in search
+  const goToPlacementForEmployee = () => {
+    if (!editingEmployee) return;
+    const employeeName = editingEmployee.name || '';
+    const target = `/replacements?employee=${encodeURIComponent(employeeName)}`;
+    navigate(target);
+  };
+
   const validateEditForm = () => {
     const errors: {[key: string]: string} = {};
     
@@ -822,9 +833,7 @@ const EmployeeList = () => {
       errors.phone = 'Phone number is required';
     }
     
-    if (!editingEmployee?.department?.trim()) {
-      errors.department = 'Department is required';
-    }
+    // Department is read-only in edit; changes happen via placement dialog
     
     if (!editingEmployee?.position?.trim()) {
       errors.position = 'Position is required';
@@ -1016,9 +1025,9 @@ const EmployeeList = () => {
       errors.phone = 'Phone number is required';
     }
     
-    if (!newEmployee.department?.trim()) {
-      errors.department = 'Department is required';
-    }
+    // if (!newEmployee.department?.trim()) {
+    //   errors.department = 'Department is required';
+    // }
     
     if (!newEmployee.position?.trim()) {
       errors.position = 'Position is required';
@@ -2001,30 +2010,18 @@ const EmployeeList = () => {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="edit-department" className="text-sm font-medium">Department *</Label>
-                    <Select 
-                      value={editingEmployee.department} 
-                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, department: value } : null)}>
-                      <SelectTrigger className={`w-full ${editValidationErrors.department ? 'border-red-500' : ''}`}>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.length > 0 ? (
-                          departments.map((dept) => (
-                            <SelectItem key={dept.department_id} value={dept.name}>
-                              {dept.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-department" disabled>
-                            No departments in selected company
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {editValidationErrors.department && (
-                      <p className="text-sm text-red-500">{editValidationErrors.department}</p>
-                    )}
+                    <Label htmlFor="edit-department" className="text-sm font-medium">Department (read-only)</Label>
+                    <Input
+                      id="edit-department"
+                      value={editingEmployee.department}
+                      disabled
+                      className="w-full"
+                    />
+                    <div className="flex justify-end">
+                      <Button variant="outline" onClick={goToPlacementForEmployee}>
+                        Change via Placement
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-position" className="text-sm font-medium">Position *</Label>
@@ -2557,3 +2554,5 @@ const EmployeeList = () => {
 };
 
 export default EmployeeList;
+              {/* Change Department via Placement Dialog */}
+              {/* Department changes are now done via Replacements page navigation */}
