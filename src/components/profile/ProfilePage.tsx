@@ -83,6 +83,7 @@ const ProfilePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<ProfileData>({
     employee_id: '',
+    company_id: '',
     employee_code: '',
     name: '',
     username: '',

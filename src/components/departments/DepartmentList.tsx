@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { Building, Users, Plus, Eye, Edit, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle, ArrowLeft, Home } from 'lucide-react';
+import { Building, Users, Plus, Eye, Edit, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle, ArrowLeft, Home, Search } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { ApiDepartment, ApiCompany, CreateDepartmentRequest, UpdateDepartmentRequest, ApiEmployee } from '@/types/api';
 import { useOrganizational } from '@/contexts/OrganizationalContext';
@@ -54,6 +54,16 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [uploadMessage, setUploadMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Filters state
+  const [nameFilter, setNameFilter] = useState('');
+  const [companyFilterId, setCompanyFilterId] = useState<string>('');
+
+  // Clear both the search and company filters
+  const clearFilters = () => {
+    setNameFilter('');
+    setCompanyFilterId('all');
+  };
 
   // Fetch employees for manager dropdown - replaced with useManagers hook
   // const { data: employeesData } = useEmployees();
@@ -140,6 +150,13 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       setSelectedCompany(company || null);
     }
   }, [companyIdFromUrl, companies]);
+
+  // Prefill company filter based on selected company context
+  useEffect(() => {
+    if (selectedCompany?.company_id) {
+      setCompanyFilterId(selectedCompany.company_id);
+    }
+  }, [selectedCompany]);
 
   // Validation function
   const validateDepartmentForm = () => {
@@ -464,6 +481,23 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       fileInputRef.current.value = '';
     }
   };
+
+  // Apply filters to departments list
+  const filteredDepartments = departments.filter((dept) => {
+    const matchesName = nameFilter
+      ? (dept.name || '').toLowerCase().includes(nameFilter.toLowerCase())
+      : true;
+
+    if (!companyFilterId || companyFilterId === 'all') {
+      return matchesName;
+    }
+
+    // Try matching by company_id, fallback to name
+    const byIdMatch = (dept as { company_id?: string }).company_id === companyFilterId;
+    const selectedCompanyName = companies.find(c => c.company_id === companyFilterId)?.name;
+    const byNameMatch = selectedCompanyName ? (dept.company || '') === selectedCompanyName : false;
+    return matchesName && (byIdMatch || byNameMatch);
+  });
 
   if (loading) {
     return (
@@ -927,7 +961,45 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
         </DialogContent>
       </Dialog>
 
-      {departments.length === 0 ? (
+      {/* Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="md:col-span-2 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            placeholder="Search departments by name..."
+            value={nameFilter}
+            onChange={(e) => setNameFilter(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Select
+            value={companyFilterId}
+            onValueChange={(value) => setCompanyFilterId(value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by company" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Companies</SelectItem>
+              {companies.map((company) => (
+                <SelectItem key={company.company_id} value={company.company_id}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            onClick={clearFilters}
+            disabled={!nameFilter && (!companyFilterId || companyFilterId === 'all')}
+          >
+            Clear Filters
+          </Button>
+        </div>
+      </div>
+
+      {filteredDepartments.length === 0 ? (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -936,7 +1008,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {departments.map((department) => (
+          {filteredDepartments.map((department) => (
             <Card key={department.department_id} className="hover:shadow-md transition-all duration-200">
               <CardHeader>
                 <div className="flex items-center space-x-3">

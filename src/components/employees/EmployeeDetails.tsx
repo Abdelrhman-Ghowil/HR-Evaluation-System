@@ -630,7 +630,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-amber-500/40 to-orange-500/40 rounded-full blur-md animate-pulse"></div>
               <Badge className="relative bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500 text-white text-sm font-bold px-3 py-1.5 rounded-full shadow-lg border-2 border-amber-300/50 hover:scale-110 transition-transform duration-300">
-                {employee.warnings_count || employee.warnings?.length || 0}
+                {employee.warningsCount || employee.warnings?.length || 0}
               </Badge>
             </div>
           </div>
@@ -689,10 +689,10 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                   
                   <div className="text-right">
                     <div className="text-xl font-bold text-amber-900">
-                      {employee.warnings_count || employee.warnings.length}
+                      {employee.warningsCount || employee.warnings.length}
                     </div>
                     <div className="text-[10px] text-amber-600 font-medium">
-                      Record{(employee.warnings_count || employee.warnings.length) !== 1 ? 's' : ''}
+                      Record{(employee.warningsCount || employee.warnings.length) !== 1 ? 's' : ''}
                     </div>
                   </div>
                 </div>
@@ -896,6 +896,60 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
           </div>
         </CardHeader>
         <CardContent>
+          {/* Performance Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+              <CardContent className="p-6 text-center">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="bg-blue-600 p-3 rounded-full">
+                    <BarChart3 className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-blue-900">
+                  {evaluationList.length > 0
+                    ? (
+                        (
+                          evaluationList.reduce((sum, evaluation) => sum + (evaluation.score || 0), 0) /
+                          evaluationList.length
+                        ).toFixed(1)
+                      )
+                    : 'N/A'}
+                </h3>
+                <p className="text-blue-700 font-medium">Overall Rating</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+              <CardContent className="p-6 text-center">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="bg-green-600 p-3 rounded-full">
+                    <Target className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-green-900">
+                  {evaluationList.filter(evaluation => evaluation.status === 'Completed').length}
+                </h3>
+                <p className="text-green-700 font-medium">Completed Evaluations</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+              <CardContent className="p-6 text-center">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="bg-purple-600 p-3 rounded-full">
+                    <Users className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-purple-900">
+                  {evaluationList.filter(
+                    evaluation => evaluation.status === 'Employee Review' || evaluation.status === 'Pending HR Approval'
+                  ).length}
+                </h3>
+                <p className="text-purple-700 font-medium">Pending Reviews</p>
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="space-y-4">
             {evaluationsLoading ? (
               <div className="flex items-center justify-center py-8">
@@ -1119,30 +1173,30 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                  >
                    <SelectTrigger className="col-span-3">
                      <SelectValue placeholder={
-                       managersLoading ? "Loading managers..." :
-                       managers.length === 0 ? "No managers available" :
-                       "Select a reviewer"
-                     } />
-                   </SelectTrigger>
-                   <SelectContent>
-                     {managersError ? (
-                       <SelectItem value="error" disabled>
-                         Error loading managers
-                       </SelectItem>
-                     ) : managers.length === 0 ? (
-                       <SelectItem value="no-managers" disabled>
-                         No managers found for this company
-                       </SelectItem>
-                     ) : (
-                       Array.isArray(managers) && managers.map((manager) => (
-                         <SelectItem key={manager.user_id} value={manager.user_id}>
-                           {manager.name} ({manager.role})
-                         </SelectItem>
-                       ))
-                     )}
-                   </SelectContent>
-                 </Select>
-               </div>
+                      managersLoading ? "Loading managers..." :
+                      managers.length === 0 ? "No managers available" :
+                      "Select a reviewer"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {managersError ? (
+                      <SelectItem value="error" disabled>
+                        Error loading managers
+                      </SelectItem>
+                    ) : managers.length === 0 ? (
+                      <SelectItem value="no-managers" disabled>
+                        No managers found for this company
+                      </SelectItem>
+                    ) : (
+                      Array.isArray(managers) && managers.map((manager) => (
+                        <SelectItem key={manager.user_id} value={manager.user_id}>
+                          {manager.name} ({manager.role})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
               
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-date" className="text-right">

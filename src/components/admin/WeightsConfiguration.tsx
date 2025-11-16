@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '../ui/alert';
 import { toast } from 'sonner';
 import { apiService } from '../../services/api';
 import { WeightsConfigurationLevel } from '../../types/api';
+import { ConfirmationDialog } from '../ui/confirmation-dialog';
 
 interface WeightsConfigurationProps {
   onBack?: () => void;
@@ -42,6 +43,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
   });
   const [showValidation, setShowValidation] = useState(false);
   const [editedBreakdown, setEditedBreakdown] = useState({ core: false, leadership: false, functional: false });
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const loadConfiguration = useCallback(async () => {
     setLoading(true);
@@ -103,7 +105,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
       setEditedBreakdown(newEdited);
 
       setWeights(prev => {
-        let next = { ...prev, [field]: clamped } as typeof prev;
+        const next = { ...prev, [field]: clamped } as typeof prev;
         const sum = (a: number, b: number) => a + b;
         const clamp = (n: number) => Math.max(0, Math.min(100, n));
 
@@ -159,6 +161,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
       });
       
       toast.success('Configuration saved successfully');
+      toast.info('Warning: This change affects calculations of new evaluations created afterward.');
       setOriginalWeights(weights);
       setIsEditing(false);
       setShowValidation(false);
@@ -404,13 +407,29 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
               <X className="h-4 w-4 mr-2" />
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={loading}>
+            <Button onClick={() => setConfirmOpen(true)} disabled={loading}>
               <Save className="h-4 w-4 mr-2" />
               {loading ? 'Saving...' : 'Save Changes'}
             </Button>
           </>
         )}
       </div>
+
+      {/* Save Confirmation Modal */}
+      <ConfirmationDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Save Weights Configuration"
+        description="Warning: This change affects calculations of new evaluations created afterward."
+        confirmText="Submit"
+        cancelText="Cancel"
+        onConfirm={() => {
+          setConfirmOpen(false);
+          handleSave();
+        }}
+        variant="destructive"
+        loading={loading}
+      />
     </div>
   );
 };

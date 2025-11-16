@@ -30,7 +30,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { useUsers } from '../../hooks/useApi';
+import { useUsers, queryKeys } from '../../hooks/useApi';
 import { ApiUser, UserRole } from '../../types/api';
 import { apiService } from '../../services/api';
 import { useQueryClient } from '@tanstack/react-query';
@@ -264,8 +264,16 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
         console.log('Set selectedRole to:', updatedUser.role || updateData.role || selectedUser.role);
       }
       
-      // Invalidate and refetch users query to update the UI
-      await queryClient.invalidateQueries({ queryKey: ['users'] });
+      // Update React Query cache in-place to keep the row position
+      queryClient.setQueryData<ApiUser[]>(queryKeys.users, (old) => {
+        if (!old) return old as any;
+        const idx = old.findIndex(u => u.user_id === user.id);
+        if (idx === -1) return old as any;
+        const merged = { ...old[idx], ...updatedUser } as ApiUser;
+        const next = old.slice();
+        next[idx] = merged;
+        return next;
+      });
       
       // Close the dialog after successful save
       setIsEditDialogOpen(false);
