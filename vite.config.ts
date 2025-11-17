@@ -8,6 +8,12 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    // Allow Replit preview domains to connect in dev
+    allowedHosts: [
+      "hr-evaluation-system-superpowerss.replit.app",
+      ".replit.app",
+      ".repl.co",
+    ],
     proxy: {
       '/api': {
         target: 'https://hr-eval-sys.vercel.app',
@@ -26,6 +32,16 @@ export default defineConfig(({ mode }) => ({
         },
       }
     }
+  },
+  // Configure preview host checks for hosted environments (Replit)
+  preview: {
+    host: '0.0.0.0',
+    // Port is overridden by CLI (--port $PORT) in scripts/preview.mjs
+    allowedHosts: [
+      "hr-evaluation-system-superpowerss.replit.app",
+      ".replit.app",
+      ".repl.co",
+    ],
   },
   plugins: [
     react(),
