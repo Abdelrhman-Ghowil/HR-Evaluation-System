@@ -12,7 +12,7 @@ import { Building, Users, Plus, Eye, Edit, Trash2, FileSpreadsheet, Upload, Load
 import { apiService } from '@/services/api';
 import { ApiDepartment, ApiCompany, CreateDepartmentRequest, UpdateDepartmentRequest, ApiEmployee } from '@/types/api';
 import { useOrganizational } from '@/contexts/OrganizationalContext';
-import { useEmployees } from '@/hooks/useApi';
+import { useDepartments, useCompanies } from '@/hooks/useApi';
 import { useManagers } from '@/hooks/usemanagers';
 import { useToast } from '@/hooks/use-toast';
 
@@ -84,64 +84,50 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
   // Fetch managers for the add department form
   const { data: newDepartmentManagers = [], isLoading: newDepartmentManagersLoading } = useManagers(newDepartmentCompanyId);
 
-  // Fetch departments from API
-  const fetchDepartments = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('Fetching departments from API...');
-      
-      let response;
-      if (companyIdFromUrl) {
-        // Fetch departments for specific company
-        console.log(`Fetching departments for company ID: ${companyIdFromUrl}`);
-        response = await apiService.getDepartmentsByCompany(companyIdFromUrl);
-      } else {
-        // Fetch all departments
-        response = await apiService.getDepartments();
-      }
-      
-      console.log('Departments API Response:', response);
-      
-      // Handle both paginated response and direct array response
-      if (response && Array.isArray(response.results)) {
-        // Standard paginated response
-        setDepartments(response.results);
-        console.log(`Successfully loaded ${response.results.length} departments from API`);
-      } else if (Array.isArray(response)) {
-        // Direct array response
-        setDepartments(response);
-        console.log(`Successfully loaded ${response.length} departments from API`);
-      } else {
-        console.error('Invalid departments response format:', response);
-        setError('Invalid response format from server');
-      }
-    } catch (err) {
-      console.error('Error fetching departments:', err);
-      setError('Failed to load departments. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Departments via React Query (filter by company when provided)
+  const { data: departmentsData, isLoading: departmentsQueryLoading, error: departmentsQueryError, refetch: refetchDepartments } = useDepartments(
+    companyIdFromUrl ? { company_id: companyIdFromUrl } : undefined
+  );
 
-  // Fetch companies from API
-  const fetchCompanies = async () => {
-    try {
-      const response = await apiService.getCompanies();
-      if (response && Array.isArray(response.results)) {
-        setCompanies(response.results);
-      } else if (Array.isArray(response)) {
-        setCompanies(response);
-      }
-    } catch (err) {
-      console.error('Error fetching companies:', err);
-    }
-  };
+  // Companies via React Query
+  const { data: companiesData, isLoading: companiesQueryLoading, error: companiesQueryError, refetch: refetchCompanies } = useCompanies();
 
+  // Map query loading to local UI state
   useEffect(() => {
-    fetchDepartments();
-    fetchCompanies();
-  }, [companyIdFromUrl]);
+    setLoading(Boolean(departmentsQueryLoading || companiesQueryLoading));
+  }, [departmentsQueryLoading, companiesQueryLoading]);
+
+  // Map query errors to local error state
+  useEffect(() => {
+    const depErrMsg = (departmentsQueryError as any)?.message;
+    const compErrMsg = (companiesQueryError as any)?.message;
+    const msg = depErrMsg || compErrMsg || null;
+    setError(msg);
+  }, [departmentsQueryError, companiesQueryError]);
+
+  // Derive local departments from cached query data (supports paginated/array)
+  useEffect(() => {
+    if (!departmentsData) return;
+    let list: ApiDepartment[] = [];
+    if (Array.isArray(departmentsData)) {
+      list = departmentsData as ApiDepartment[];
+    } else if ((departmentsData as any)?.results && Array.isArray((departmentsData as any).results)) {
+      list = (departmentsData as any).results as ApiDepartment[];
+    }
+    setDepartments(list);
+  }, [departmentsData]);
+
+  // Derive local companies from cached query data (supports paginated/array)
+  useEffect(() => {
+    if (!companiesData) return;
+    let list: ApiCompany[] = [];
+    if (Array.isArray(companiesData)) {
+      list = companiesData as ApiCompany[];
+    } else if ((companiesData as any)?.results && Array.isArray((companiesData as any).results)) {
+      list = (companiesData as any).results as ApiCompany[];
+    }
+    setCompanies(list);
+  }, [companiesData]);
 
   // Set selected company when companies are loaded and companyIdFromUrl is present
   useEffect(() => {
@@ -193,7 +179,10 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       // Send the employee_id as the manager_id value
       if (newDepartment.manager_id && newDepartment.manager_id.trim()) {
         // Find the selected manager to get their employee_id
-        const selectedManager = newDepartmentManagers.find(m => m.user_id === newDepartment.manager_id);
+        const managersArray = Array.isArray(newDepartmentManagers)
+          ? newDepartmentManagers
+          : ((newDepartmentManagers as any)?.results ?? []);
+        const selectedManager = managersArray.find((m: any) => m.user_id === newDepartment.manager_id);
         if (selectedManager) {
           departmentData.manager_id = selectedManager.employee_id;
         }
@@ -455,8 +444,8 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
         setUploadMessage('File validation completed successfully! No errors found.');
       } else {
         setUploadMessage('Hierarchy imported successfully!');
-        // Refresh the departments list
-        await fetchDepartments();
+        // Refresh the departments list via cached query
+        await refetchDepartments();
         
         // Close modal after a short delay
         setTimeout(() => {
@@ -546,7 +535,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <p className="text-red-600 mb-4">{error}</p>
-            <Button onClick={fetchDepartments} variant="outline">
+            <Button onClick={() => refetchDepartments()} variant="outline">
               Try Again
             </Button>
           </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -212,114 +213,99 @@ const ProfilePage: React.FC = () => {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordChangeSuccess, setPasswordChangeSuccess] = useState(false);
 
-  // Fetch evaluations data
-  useEffect(() => {
-    const fetchEvaluations = async () => {
-      if (!user?.user_id) return;
-
-      try {
-        setEvaluationsLoading(true);
-        setEvaluationsError(null);
-        console.log('Fetching evaluations for user_id:', user.user_id);
-        
-        const evaluationsData = await apiService.getEvaluations({ user_id: user.user_id });
-        console.log('Evaluations data received:', evaluationsData);
-        
-        setEvaluations(evaluationsData || []);
-      } catch (err) {
-        console.error('Error fetching evaluations:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch evaluations';
-        setEvaluationsError(errorMessage);
-      } finally {
-        setEvaluationsLoading(false);
-      }
-    };
-
-    if (user?.user_id) {
-      fetchEvaluations();
+  // React Query: Evaluations (cached)
+  const {
+    data: evaluationsData,
+    isLoading: evaluationsQueryLoading,
+    error: evaluationsQueryError,
+  } = useEvaluations(
+    user?.user_id ? { user_id: user.user_id } : undefined,
+    {
+      enabled: !!user?.user_id,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      select: (data: any) => {
+        if (Array.isArray(data)) return data;
+        if (data?.results && Array.isArray(data.results)) return data.results;
+        return [];
+      },
     }
-  }, [user?.user_id]);
+  );
 
-  // Fetch employee data on component mount
   useEffect(() => {
-    const fetchEmployeeData = async () => {
-      if (!user?.user_id) {
-        setError('User ID not available');
-        setLoading(false);
-        return;
-      }
+    setEvaluationsLoading(!!evaluationsQueryLoading);
+  }, [evaluationsQueryLoading]);
 
-      try {
-        setLoading(true);
-        setError(null);
-        console.log('Fetching my profile data');
-        
-        // Use the new my-profile API endpoint
-        const myProfileData = await apiService.getMyProfile();
-        console.log('My profile data received:', myProfileData);
-      
-        // Map API response to ProfileData
-        const mappedData: ProfileData = {
-          employee_id: myProfileData.employee_code || '', // Using employee_code as employee_id
-          employee_code: myProfileData.employee_code || '',
-          name: myProfileData.name || user.name || '',
-          username: myProfileData.username || user.username || '',
-          email: myProfileData.email || user.email || '',
-          phone: myProfileData.phone || '', // Store only the phone number without country code
-          role: myProfileData.role || '',
-          position: myProfileData.position || '',
-          managerial_level: myProfileData.managerial_level || '',
-          status: myProfileData.status || '',
-          company_name: myProfileData.company_name || '',
-          department: myProfileData.department || '',
-          direct_manager: myProfileData.direct_manager || '',
-          join_date: myProfileData.join_date || '',
-          job_type: myProfileData.job_type || '',
-          location: myProfileData.location || '',
-          branch: myProfileData.branch || '',
-          gender: '', // Not available in new API, keeping empty for backward compatibility
-          // New fields from my-profile API
-          country_code: myProfileData.country_code || '',
-          avatar: myProfileData.avatar || '',
-          is_default_password: myProfileData.is_default_password || false,
-          password_last_changed: myProfileData.password_last_changed || '',
-          org_path: myProfileData.org_path || ''
-        };
-        
-        setProfileData(mappedData);
-        setEditData(mappedData);
-        console.log('Profile data successfully updated:', mappedData);
-      } catch (err) {
-        console.error('Error fetching my profile data:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch profile data';
-        console.error('Detailed error:', errorMessage);
-        setError(errorMessage);
-        
-        // Fallback to user data if available
-        if (user) {
-          console.log('Using fallback user data:', user);
-          const fallbackData: ProfileData = {
-            employee_id: '',
-            employee_code: '',
-            name: user.name || '',
-            email: user.email || '',
-            phone: user.phone || '',
-            position: user.position || '',
-            department: '',
-            location: '',
-            join_date: ''
-          };
-          setProfileData(fallbackData);
-          setEditData(fallbackData);
-          console.log('Fallback data applied:', fallbackData);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
+  useEffect(() => {
+    setEvaluations(evaluationsData || []);
+  }, [evaluationsData]);
 
-    fetchEmployeeData();
-  }, [user]);
+  useEffect(() => {
+    setEvaluationsError(
+      evaluationsQueryError ? (evaluationsQueryError as Error).message : null
+    );
+  }, [evaluationsQueryError]);
+
+  // React Query: My Profile (cached)
+  const queryClient = useQueryClient();
+  const {
+    data: myProfileData,
+    isLoading: myProfileLoading,
+    error: myProfileError,
+  } = useQuery<ApiMyProfile>({
+    queryKey: ['my-profile'],
+    queryFn: () => apiService.getMyProfile(),
+    enabled: !!user?.user_id,
+    staleTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  useEffect(() => {
+    setLoading(!!myProfileLoading);
+  }, [myProfileLoading]);
+
+  useEffect(() => {
+    if (myProfileError) {
+      const message = myProfileError instanceof Error ? myProfileError.message : 'Failed to fetch profile data';
+      setError(message);
+    } else {
+      setError(null);
+    }
+  }, [myProfileError]);
+
+  useEffect(() => {
+    if (myProfileData) {
+      const mappedData: ProfileData = {
+        employee_id: myProfileData.employee_code || '',
+        employee_code: myProfileData.employee_code || '',
+        name: myProfileData.name || user?.name || '',
+        username: myProfileData.username || user?.username || '',
+        email: myProfileData.email || user?.email || '',
+        phone: myProfileData.phone || '',
+        role: myProfileData.role || '',
+        position: myProfileData.position || '',
+        managerial_level: myProfileData.managerial_level || '',
+        status: myProfileData.status || '',
+        company_name: myProfileData.company_name || '',
+        department: myProfileData.department || '',
+        direct_manager: myProfileData.direct_manager || '',
+        join_date: myProfileData.join_date || '',
+        job_type: myProfileData.job_type || '',
+        location: myProfileData.location || '',
+        branch: myProfileData.branch || '',
+        gender: '',
+        country_code: myProfileData.country_code || '',
+        avatar: myProfileData.avatar || '',
+        is_default_password: myProfileData.is_default_password || false,
+        password_last_changed: myProfileData.password_last_changed || '',
+        org_path: myProfileData.org_path || ''
+      };
+      setProfileData(mappedData);
+      setEditData(mappedData);
+    }
+  }, [myProfileData, user]);
 
   const handleEdit = () => {
     setEditData(profileData);
@@ -367,6 +353,12 @@ const ProfilePage: React.FC = () => {
       setProfileData(mappedData);
       setEditData(mappedData);
       setIsEditing(false);
+
+      // Sync React Query cache to prevent refetch on navigation
+      queryClient.setQueryData(['my-profile'], (prev: ApiMyProfile | undefined) => ({
+        ...(prev || {}),
+        ...updatedProfile,
+      }));
 
       // Show success message (you can add a toast notification here)
       console.log('Profile updated successfully!');

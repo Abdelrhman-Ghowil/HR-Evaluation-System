@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -17,6 +17,8 @@ import SectionsPage from '../departments/SectionsPage';
 import SubSectionsPage from '../departments/SubSectionsPage';
 import ReplacementPage from '../replacements/ReplacementPage';
 import { OrganizationalProvider } from '../../contexts/OrganizationalContext';
+import { useAuth } from '../../hooks/useAuth';
+import { toast } from '@/components/ui/use-toast';
 
 type ActiveView = 'dashboard' | 'employees' | 'evaluations' | 'companies' | 'departments' | 'admin' | 'weights-configuration' | 'user-management' | 'profile' | 'employee-profile' | 'sub-departments' | 'sections' | 'sub-sections' | 'replacements';
 
@@ -24,6 +26,7 @@ const Dashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { user } = useAuth();
 
   // Determine active view from URL
   const getActiveViewFromPath = (pathname: string): ActiveView => {
@@ -60,6 +63,41 @@ const Dashboard = () => {
   };
 
   const activeView = getActiveViewFromPath(location.pathname);
+
+  // Role-based access control per view
+  const viewAccess: Record<ActiveView, Array<'admin' | 'hr' | 'manager' | 'employee'>> = {
+    dashboard: ['admin', 'hr', 'manager', 'employee'],
+    employees: ['admin', 'hr', 'manager'],
+    evaluations: ['admin', 'hr', 'manager'],
+    companies: ['admin', 'hr'],
+    departments: ['admin', 'hr', 'manager'],
+    'sub-departments': ['admin', 'hr', 'manager'],
+    sections: ['admin', 'hr', 'manager'],
+    'sub-sections': ['admin', 'hr', 'manager'],
+    replacements: ['admin', 'hr', 'manager'],
+    admin: ['admin'],
+    'weights-configuration': ['admin'],
+    'user-management': ['admin'],
+    profile: ['admin', 'hr', 'manager', 'employee'],
+    'employee-profile': ['admin', 'hr', 'manager', 'employee']
+  };
+
+  // Redirect away from unauthorized routes when role changes or path changes
+  useEffect(() => {
+    if (!user?.role) return;
+    const allowed = viewAccess[activeView] || ['admin', 'hr', 'manager', 'employee'];
+    if (!allowed.includes(user.role)) {
+      // Send user to a safe default
+      const fallbackPath = '/';
+      if (location.pathname !== fallbackPath) {
+        toast({
+          title: 'Access denied',
+          description: 'You do not have permission to view this page.',
+        });
+        navigate(fallbackPath, { replace: true });
+      }
+    }
+  }, [activeView, user?.role, navigate, location.pathname]);
 
   const handleViewChange = (view: string) => {
     const path = view === 'dashboard' ? '/' : `/${view}`;
