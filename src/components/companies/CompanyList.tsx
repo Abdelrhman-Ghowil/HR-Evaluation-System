@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Building2, Users, MapPin, Plus, Loader2, Edit, Trash2, Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Search, Filter, Eye, Building } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { ApiCompany, CreateCompanyRequest, UpdateCompanyRequest, ApiDepartment } from '@/types/api';
-import { useUpdateCompany, useDeleteCompany, useImportCompanies } from '@/hooks/useApi';
+import { useUpdateCompany, useDeleteCompany, useImportCompanies, useCompanies } from '@/hooks/useApi';
 
 const CompanyList = () => {
   const navigate = useNavigate();
@@ -84,39 +84,34 @@ const CompanyList = () => {
     setSelectedCompanyName('all');
   };
 
-  // Fetch companies from API
-  const fetchCompanies = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('Fetching companies from API...');
-      const response = await apiService.getCompanies();
-      console.log('Companies API Response:', response);
-      
-      // Handle both paginated response and direct array response
-      if (response && Array.isArray(response.results)) {
-        // Standard paginated response
-        setCompanies(response.results);
-        console.log(`Successfully loaded ${response.results.length} companies from API`);
-      } else if (Array.isArray(response)) {
-        // Direct array response
-        setCompanies(response);
-        console.log(`Successfully loaded ${response.length} companies from API`);
-      } else {
-        console.error('Invalid companies response format:', response);
-        setError('Invalid response format from server');
-      }
-    } catch (err) {
-      console.error('Error fetching companies:', err);
-      setError('Failed to load companies. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Companies via React Query
+  const { data: companiesData, isLoading: companiesQueryLoading, error: companiesQueryError, refetch: refetchCompanies } = useCompanies();
 
   useEffect(() => {
-    fetchCompanies();
-  }, []);
+    setLoading(!!companiesQueryLoading);
+  }, [companiesQueryLoading]);
+
+  useEffect(() => {
+    if (companiesQueryError) {
+      // Map query error to local error message for UI
+      // @ts-ignore – error may be unknown type, ensure safe message
+      const msg = companiesQueryError?.message || 'Failed to load companies. Please try again.';
+      setError(msg);
+    } else {
+      setError(null);
+    }
+  }, [companiesQueryError]);
+
+  useEffect(() => {
+    if (!companiesData) return;
+    let list: ApiCompany[] = [];
+    if (Array.isArray(companiesData)) {
+      list = companiesData as ApiCompany[];
+    } else if ((companiesData as any)?.results && Array.isArray((companiesData as any).results)) {
+      list = (companiesData as any).results as ApiCompany[];
+    }
+    setCompanies(list);
+  }, [companiesData]);
 
   // Handle view departments navigation
   const handleViewDepartments = (company: ApiCompany) => {
@@ -395,7 +390,7 @@ const CompanyList = () => {
     try {
       const result = await importCompaniesMutation.mutateAsync({ file: selectedFile, dryRun: false });
       setImportResults(result);
-      fetchCompanies(); // Refresh the companies list
+      await refetchCompanies(); // Refresh the companies list using cached query
     } catch (error) {
       console.error('Import failed:', error);
     } finally {
@@ -428,7 +423,7 @@ const CompanyList = () => {
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md mx-auto">
           <h3 className="text-lg font-semibold text-red-800 mb-2">Error Loading Companies</h3>
           <p className="text-red-600 mb-4">{error}</p>
-          <Button onClick={fetchCompanies} variant="outline">
+          <Button onClick={() => refetchCompanies()} variant="outline">
             Try Again
           </Button>
         </div>

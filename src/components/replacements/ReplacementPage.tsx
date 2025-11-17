@@ -48,12 +48,8 @@ const ReplacementPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // API Hooks
-  // Force immediate freshness so invalidation/refetch always pulls latest data
-  const { data: placements = [], isLoading: loading, error } = usePlacements({
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-  });
+  // Use global React Query defaults to retain cached data across navigation
+  const { data: placements = [], isLoading: loading, error } = usePlacements();
   const { data: companiesData, isLoading: companiesLoading } = useCompanies();
   const { data: departmentsData, isLoading: departmentsLoading } = useDepartments(
     selectedCompanyId ? { company_id: selectedCompanyId } : undefined

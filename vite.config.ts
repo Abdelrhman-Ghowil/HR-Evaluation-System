@@ -29,8 +29,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === 'development' &&
-    componentTagger(),
+    // Removed: mode === 'development' && componentTagger(),
   ].filter(Boolean),
   resolve: {
     alias: {

@@ -9,7 +9,18 @@ import BackToTop from "./components/common/BackToTop";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Keep data fresh for a while and avoid automatic refetches on navigation
+      staleTime: 5 * 60 * 1000, // 5 minutes default
+      gcTime: 30 * 60 * 1000, // Keep cached data for 30 minutes when unused
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false, // do not refetch if data is in cache
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
