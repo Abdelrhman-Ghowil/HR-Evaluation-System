@@ -190,8 +190,8 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
     }
 
     try {
-      // Find the selected manager to get the user_id
-      const selectedManager = managers.find(m => m.employee_id === newSection.manager_id);
+      // Find the selected manager by user_id (Select uses user_id as value)
+      const selectedManager = managers.find(m => m.user_id === newSection.manager_id);
       
       const sectionData: CreateSectionRequest = {
         name: newSection.name,
@@ -249,12 +249,14 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
       setSelectedDepartmentId(departmentId);
     }
     
-    // Find the manager ID by matching the manager user_id
-    const manager = managers.find(m => m.user_id === section.manager_id);
-    console.log('Found manager by user_id:', manager);
-    
-    const managerId = manager ? manager.user_id : (section.manager_id === 'Unassigned' ? 'no-manager' : section.manager_id || 'no-manager');
-    console.log('Resolved manager ID:', managerId);
+    // Resolve manager to Select value (user_id). Try user_id, then employee_id, then name.
+    const byUser = managers.find(m => m.user_id === section.manager_id);
+    const byEmp = managers.find(m => m.employee_id === section.manager_id);
+    const byName = managers.find(m => m.name === section.manager);
+    const managerId = byUser?.user_id 
+      || byEmp?.user_id 
+      || (section.manager_id === 'Unassigned' ? 'no-manager' : (byName?.user_id || 'no-manager'));
+    console.log('Resolved manager ID for edit:', managerId);
     
     // Create editing section with proper sub_department_id for the form
     const sectionWithSubDeptId = {
@@ -268,6 +270,37 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
     setShowEditForm(true);
   };
 
+  // After managers load in edit form, ensure editingSection.manager_id maps to a valid user_id
+  React.useEffect(() => {
+    if (!showEditForm || !editingSection) return;
+    if (managersLoading) return;
+
+    // If already valid or explicitly no-manager, do nothing
+    const current = editingSection.manager_id;
+    if (current === 'no-manager') return;
+    const alreadyValid = managers.some(m => m.user_id === current);
+    if (alreadyValid) return;
+
+    // Try to map from employee_id
+    const byEmp = managers.find(m => m.employee_id === current);
+    if (byEmp) {
+      setEditingSection({ ...editingSection, manager_id: byEmp.user_id });
+      return;
+    }
+
+    // Try to map from name
+    if (editingSection.manager) {
+      const byName = managers.find(m => m.name === editingSection.manager);
+      if (byName) {
+        setEditingSection({ ...editingSection, manager_id: byName.user_id });
+        return;
+      }
+    }
+
+    // Fallback to no-manager
+    setEditingSection({ ...editingSection, manager_id: 'no-manager' });
+  }, [showEditForm, managersLoading, managers, editingSection?.manager_id, editingSection?.manager]);
+
   const handleUpdateSection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSection || !editingSection.sub_department) {
@@ -280,13 +313,13 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
     }
 
     try {
-      // Find the selected manager to get the user_id
-      const selectedManager = managers.find(m => m.employee_id === editingSection.manager);
+      // Find the selected manager by user_id (Select uses user_id as value)
+      const selectedManager = managers.find(m => m.user_id === editingSection.manager_id);
       
       const updateData: UpdateSectionRequest = {
         name: editingSection.name,
         sub_department_id: editingSection.sub_department_id,
-        manager_id: selectedManager ? selectedManager.user_id : (editingSection.manager_id === 'Unassigned' ? '' : editingSection.manager_id || '')
+        manager_id: selectedManager ? selectedManager.user_id : (editingSection.manager_id === 'no-manager' || editingSection.manager_id === 'Unassigned' ? '' : editingSection.manager_id || '')
       };
 
       await apiService.updateSection(editingSection.section_id, updateData);

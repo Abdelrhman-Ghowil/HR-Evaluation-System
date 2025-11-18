@@ -84,6 +84,44 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
   // Fetch managers for the add department form
   const { data: newDepartmentManagers = [], isLoading: newDepartmentManagersLoading } = useManagers(newDepartmentCompanyId);
 
+  // Prefill edit modal manager value to match Select option values (user_id)
+  // Departments provide manager_id as employee_id and sometimes manager as a name string.
+  // The Select options use user_id as value, so we map manager_id/name → user_id.
+  useEffect(() => {
+    if (!isEditModalOpen || !editingDepartment) return;
+    if (managersLoading) return;
+
+    // Normalize managers array shape
+    const managersArray: ApiEmployee[] = Array.isArray(managers)
+      ? (managers as ApiEmployee[])
+      : (((managers as unknown as { results?: ApiEmployee[] }).results) ?? []);
+
+    // If current value already matches a known user_id, keep it
+    const alreadyMatches = managersArray.some(m => m.user_id === editingDepartment.manager);
+    if (alreadyMatches) return;
+
+    // Prefer mapping via manager_id (employee_id)
+    if (editingDepartment.manager_id) {
+      const foundByEmpId = managersArray.find(m => m.user_id === editingDepartment.manager_id);
+      if (foundByEmpId) {
+        setEditingDepartment(prev => prev ? { ...prev, manager: foundByEmpId.user_id } : null);
+        return;
+      }
+    }
+
+    // Fallback: try mapping by manager name string
+    if (editingDepartment.manager && editingDepartment.manager !== 'no-manager') {
+      const foundByName = managersArray.find(m => m.name === editingDepartment.manager);
+      if (foundByName) {
+        setEditingDepartment(prev => prev ? { ...prev, manager: foundByName.user_id } : null);
+        return;
+      }
+    }
+
+    // If no match, ensure sentinel value
+    setEditingDepartment(prev => prev ? { ...prev, manager: 'no-manager' } : null);
+  }, [isEditModalOpen, managersLoading, managers, editingDepartment?.manager_id, editingDepartment?.manager]);
+
   // Departments via React Query (filter by company when provided)
   const { data: departmentsData, isLoading: departmentsQueryLoading, error: departmentsQueryError, refetch: refetchDepartments } = useDepartments(
     companyIdFromUrl ? { company_id: companyIdFromUrl } : undefined
@@ -256,9 +294,13 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       };
       
       // Only include manager_id field if it's not 'no-manager'
-      // Send the employee_id as the manager_id value
+      // Map selected manager user_id → employee_id for the API
       if (editingDepartment.manager && editingDepartment.manager !== 'no-manager') {
-        updateData.manager_id = editingDepartment.manager; // This should be the employee_id from the dropdown
+        const managersArray: ApiEmployee[] = Array.isArray(managers)
+          ? (managers as ApiEmployee[])
+          : (((managers as unknown as { results?: ApiEmployee[] }).results) ?? []);
+        const selectedManager = managersArray.find(m => m.user_id === editingDepartment.manager);
+        updateData.manager_id = selectedManager ? selectedManager.user_id : editingDepartment.manager;
       }
 
       const updatedDepartment = await apiService.updateDepartment(editingDepartment.department_id, updateData);

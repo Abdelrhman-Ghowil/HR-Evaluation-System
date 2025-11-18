@@ -137,6 +137,25 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
     }
   }, [editingSubSection?.section, sections, subDepartments, departments]);
 
+  // When managers finish loading for edit form, ensure manager is a valid user_id
+  React.useEffect(() => {
+    if (!showEditForm || !editingSubSection) return;
+    if (managersLoading) return;
+
+    const currentValue = editingSubSection.manager || '';
+    const isValidUserId = managers.some(m => m.user_id === currentValue);
+    if (isValidUserId) return;
+
+    const mappedUserId = (
+      managers.find(m => m.user_id === editingSubSection.manager_id)?.user_id ||
+      managers.find(m => (m as any).employee_id === editingSubSection.manager_id)?.user_id ||
+      managers.find(m => m.name === editingSubSection.manager)?.user_id ||
+      ''
+    );
+
+    setEditingSubSection(prev => prev ? { ...prev, manager: mappedUserId } : null);
+  }, [showEditForm, managersLoading, managers, editingSubSection?.manager_id, editingSubSection?.manager]);
+
   const loadSubSections = async () => {
     try {
       setLoading(true);
@@ -264,9 +283,17 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
   const handleEditSubSectionClick = (subSection: ApiSubSection) => {
     // Find the section ID by matching the section name
     const section = sections.find(s => s.name === subSection.section);
+    // Resolve manager to Select-friendly user_id for prefill
+    const managerUserId = (
+      managers.find(m => m.user_id === subSection.manager_id)?.user_id ||
+      managers.find(m => (m as any).employee_id === subSection.manager_id)?.user_id ||
+      managers.find(m => m.name === subSection.manager)?.user_id ||
+      ''
+    );
     const subSectionWithId = {
       ...subSection,
-      section: section?.section_id || subSection.section
+      section: section?.section_id || subSection.section,
+      manager: managerUserId
     };
     setEditingSubSection(subSectionWithId);
     setShowEditForm(true);
