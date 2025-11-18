@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Building2, Users, MapPin, Plus, Loader2, Edit, Trash2, Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Search, Filter, Eye, Building } from 'lucide-react';
 import { apiService } from '@/services/api';
-import { ApiCompany, CreateCompanyRequest, UpdateCompanyRequest, ApiDepartment } from '@/types/api';
+import { ApiCompany, CreateCompanyRequest, UpdateCompanyRequest, ApiDepartment, CompanySize } from '@/types/api';
 import { useUpdateCompany, useDeleteCompany, useImportCompanies, useCompanies } from '@/hooks/useApi';
 
 const CompanyList = () => {
@@ -25,13 +25,13 @@ const CompanyList = () => {
   const [newCompany, setNewCompany] = useState<CreateCompanyRequest>({
     name: '',
     industry: '',
-    size: 'MEDIUM',
+    size: 'Medium',
     address: ''
   });
   const [editCompany, setEditCompany] = useState<UpdateCompanyRequest>({
     name: '',
     industry: '',
-    size: 'MEDIUM',
+    size: 'Medium',
     address: ''
   });
   const [isImporting, setIsImporting] = useState(false);
@@ -40,6 +40,21 @@ const CompanyList = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Normalize company size values coming from API or user input
+  const normalizeCompanySize = (value: unknown): CompanySize => {
+    const s = String(value ?? '').trim().toLowerCase();
+    switch (s) {
+      case 'small':
+        return 'Small';
+      case 'medium':
+        return 'Medium';
+      case 'large':
+        return 'Large';
+      default:
+        return 'Medium';
+    }
+  };
 
   // View Departments modal state
   const [isViewDepartmentsModalOpen, setIsViewDepartmentsModalOpen] = useState(false);
@@ -110,7 +125,11 @@ const CompanyList = () => {
     } else if ((companiesData as any)?.results && Array.isArray((companiesData as any).results)) {
       list = (companiesData as any).results as ApiCompany[];
     }
-    setCompanies(list);
+    // Ensure sizes are normalized to title case for UI
+    setCompanies(list.map((c) => ({
+      ...c,
+      size: c.size ? normalizeCompanySize(c.size) : undefined,
+    })));
   }, [companiesData]);
 
   // Handle view departments navigation
@@ -154,7 +173,7 @@ const CompanyList = () => {
       setNewCompany({
         name: '',
         industry: '',
-        size: 'MEDIUM',
+        size: 'Medium',
         address: ''
       });
       setIsAddModalOpen(false);
@@ -179,7 +198,7 @@ const CompanyList = () => {
       setNewCompany({
         name: '',
         industry: '',
-        size: 'MEDIUM',
+        size: 'Medium',
         address: ''
       });
       setValidationErrors({});
@@ -193,7 +212,7 @@ const CompanyList = () => {
     setEditCompany({
       name: company.name,
       industry: company.industry || '',
-      size: company.size || '',
+      size: normalizeCompanySize(company.size),
       address: company.address || ''
     });
     setValidationErrors({});
@@ -277,7 +296,7 @@ const CompanyList = () => {
       setEditCompany({
         name: '',
         industry: '',
-        size: 'MEDIUM',
+        size: 'Medium',
         address: ''
       });
       setValidationErrors({});
@@ -507,7 +526,7 @@ const CompanyList = () => {
                 <Label htmlFor="company-size" className="text-sm font-medium">Company Size</Label>
                 <Select 
                   value={newCompany.size} 
-                  onValueChange={(value: 'SMALL' | 'MEDIUM' | 'LARGE') => 
+                  onValueChange={(value: CompanySize) => 
                     setNewCompany(prev => ({ ...prev, size: value }))
                   }
                 >
@@ -515,9 +534,9 @@ const CompanyList = () => {
                     <SelectValue placeholder="Select company size" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="SMALL">Small (1-50 employees)</SelectItem>
-                    <SelectItem value="MEDIUM">Medium (51-500 employees)</SelectItem>
-                    <SelectItem value="LARGE">Large (500+ employees)</SelectItem>
+                    <SelectItem value="Small">Small (1-50 employees)</SelectItem>
+                    <SelectItem value="Medium">Medium (51-500 employees)</SelectItem>
+                    <SelectItem value="Large">Large (500+ employees)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -786,7 +805,7 @@ const CompanyList = () => {
               <Label htmlFor="edit-company-size" className="text-sm font-medium">Company Size</Label>
               <Select 
                 value={editCompany.size} 
-                onValueChange={(value: 'SMALL' | 'MEDIUM' | 'LARGE') => 
+                onValueChange={(value: CompanySize) => 
                   setEditCompany(prev => ({ ...prev, size: value }))
                 }
               >
@@ -794,9 +813,9 @@ const CompanyList = () => {
                   <SelectValue placeholder="Select company size" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SMALL">Small (1-50 employees)</SelectItem>
-                  <SelectItem value="MEDIUM">Medium (51-500 employees)</SelectItem>
-                  <SelectItem value="LARGE">Large (500+ employees)</SelectItem>
+                  <SelectItem value="Small">Small (1-50 employees)</SelectItem>
+                  <SelectItem value="Medium">Medium (51-500 employees)</SelectItem>
+                  <SelectItem value="Large">Large (500+ employees)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

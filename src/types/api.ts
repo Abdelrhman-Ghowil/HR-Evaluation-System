@@ -201,7 +201,7 @@ export interface ApiCompany {
   updated_at: string;
 }
 
-export type CompanySize = 'SMALL' | 'MEDIUM' | 'LARGE';
+export type CompanySize = 'Small' | 'Medium' | 'Large';
 
 export interface CreateCompanyRequest {
   name: string;

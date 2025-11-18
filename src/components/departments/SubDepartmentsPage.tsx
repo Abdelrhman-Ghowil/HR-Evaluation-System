@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOrganizational } from '../../contexts/OrganizationalContext';
 import { apiService } from '../../services/api';
-import { ApiSubDepartment, CreateSubDepartmentRequest, UpdateSubDepartmentRequest, SubDepartmentQueryParams } from '../../types/api';
+import { ApiSubDepartment, CreateSubDepartmentRequest, UpdateSubDepartmentRequest, SubDepartmentQueryParams, ApiEmployee } from '../../types/api';
 import { useToast } from '../../hooks/use-toast';
 import { useDepartments } from '../../hooks/useApi';
 import { useManagers } from '../../hooks/usemanagers';
@@ -216,13 +216,20 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
     }
 
     try {
-      // Find the selected manager to get the user_id
-      const selectedManager = managers.find(m => m.employee_id === formData.manager);
+      // Map selected manager (user_id) to API's expected manager_id
+      const managersArray: ApiEmployee[] = Array.isArray(managers)
+        ? (managers as ApiEmployee[])
+        : (((managers as unknown as { results?: ApiEmployee[] }).results) ?? []);
+      const selectedManager = managersArray.find(m => m.user_id === formData.manager);
       
       const updateData: UpdateSubDepartmentRequest = {
         name: formData.name.trim(),
         department_id: formData.department || editingSubDepartment.department,
-        manager_id: selectedManager ? selectedManager.user_id : (formData.manager || editingSubDepartment.manager)
+        manager_id: selectedManager
+          ? selectedManager.user_id
+          : (formData.manager === 'none' 
+              ? '' 
+              : (formData.manager || editingSubDepartment.manager_id || editingSubDepartment.manager))
       };
 
       const updatedSubDepartment = await apiService.updateSubDepartment(editingSubDepartment.sub_department_id, updateData);
@@ -344,6 +351,50 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
     });
     setIsEditModalOpen(true);
   };
+
+  // Prefill manager in edit modal by mapping to Select's expected user_id
+  useEffect(() => {
+    if (!isEditModalOpen || !editingSubDepartment) return;
+    if (managersLoading) return;
+
+    const managersArray: ApiEmployee[] = Array.isArray(managers)
+      ? (managers as ApiEmployee[])
+      : (((managers as unknown as { results?: ApiEmployee[] }).results) ?? []);
+
+    // If current form value already matches a known user_id, keep it
+    const alreadyValid = managersArray.some(m => m.user_id === formData.manager);
+    if (alreadyValid) return;
+
+    // Try matching by manager_id (may be employee_id or user_id)
+    if (editingSubDepartment.manager_id) {
+      const byEmployee = managersArray.find(m => m.employee_id === editingSubDepartment.manager_id);
+      if (byEmployee) {
+        setFormData(prev => ({ ...prev, manager: byEmployee.user_id }));
+        return;
+      }
+      const byUser = managersArray.find(m => m.user_id === editingSubDepartment.manager_id);
+      if (byUser) {
+        setFormData(prev => ({ ...prev, manager: byUser.user_id }));
+        return;
+      }
+    }
+
+    // Fallback: match by manager name
+    if (editingSubDepartment.manager) {
+      if (editingSubDepartment.manager === 'Unassigned' || editingSubDepartment.manager === 'none') {
+        setFormData(prev => ({ ...prev, manager: 'none' }));
+        return;
+      }
+      const byName = managersArray.find(m => m.name === editingSubDepartment.manager);
+      if (byName) {
+        setFormData(prev => ({ ...prev, manager: byName.user_id }));
+        return;
+      }
+    }
+
+    // Default to no manager
+    setFormData(prev => ({ ...prev, manager: 'none' }));
+  }, [isEditModalOpen, managersLoading, managers, editingSubDepartment?.manager_id, editingSubDepartment?.manager, formData.manager]);
 
   // Get manager name
   const getManagerName = (managerId: string) => {

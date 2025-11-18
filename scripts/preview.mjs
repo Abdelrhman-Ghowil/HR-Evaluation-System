@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 
 // Respect Replit/hosted envs: bind to provided PORT and 0.0.0.0
-const port = process.env.PORT || process.env.VITE_PORT || 4173;
+const port = process.env.PORT || process.env.VITE_PORT || 5000;
 const isWindows = process.platform === 'win32';
 const npx = isWindows ? 'npx.cmd' : 'npx';
 
