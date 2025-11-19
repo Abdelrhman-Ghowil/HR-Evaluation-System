@@ -102,7 +102,7 @@ const EmployeeList = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResults, setImportResults] = useState<ImportResponse | null>(null);
-  const [errorView, setErrorView] = useState<'summary' | 'fields' | 'raw'>('summary');
+  const [errorView, setErrorView] = useState<'summary' | 'fields' | 'rows' | 'raw'>('summary');
   const [errorFilter, setErrorFilter] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -222,6 +222,100 @@ const EmployeeList = () => {
       }
     });
     return map;
+  }, [importResults?.errors]);
+
+  // Build user-friendly row-level messages: "Row X – Field: Message"
+  const rowErrors = React.useMemo(() => {
+    type RowMsg = { row: number; field?: string; message: string };
+    const list: RowMsg[] = [];
+    const errs = importResults?.errors || [];
+
+    const isRowKey = (key: string) => {
+      return /^(row[_\s-]?\d+|\d+)$/.test(key.trim());
+    };
+    const parseRowNumber = (key: string | number): number => {
+      if (typeof key === 'number') return key;
+      const m = String(key).match(/\d+/);
+      return m ? parseInt(m[0], 10) : 0;
+    };
+    const toMessages = (value: any): string[] => {
+      if (!value) return [];
+      if (Array.isArray(value)) return value.map((v) => String(v));
+      if (typeof value === 'object') {
+        if ('message' in value && typeof value.message === 'string') return [value.message];
+        // Flatten nested values
+        const msgs: string[] = [];
+        Object.values(value).forEach((v) => msgs.push(...toMessages(v)));
+        return msgs.length ? msgs : [JSON.stringify(value)];
+      }
+      return [String(value)];
+    };
+
+    errs.forEach((err) => {
+      const details = (err as ApiError)?.details as any;
+      if (!details || typeof details !== 'object') {
+        // Fallback: attach general message without row
+        const msg = (err as ApiError)?.message || (typeof err === 'string' ? err : 'Import error');
+        if (msg) list.push({ row: 0, message: String(msg) });
+        return;
+      }
+
+      // Shape 1: { rows: { 1: { field: [msg] }, 2: {...} } }
+      const rowBuckets = details.rows || details.by_row || details.row_errors || null;
+      if (rowBuckets && typeof rowBuckets === 'object') {
+        Object.entries(rowBuckets).forEach(([rowKey, rowVal]) => {
+          const rowNum = parseRowNumber(rowKey);
+          if (rowVal && typeof rowVal === 'object' && !Array.isArray(rowVal)) {
+            Object.entries(rowVal).forEach(([field, val]) => {
+              const msgs = toMessages(val);
+              msgs.forEach((m) => list.push({ row: rowNum, field, message: m }));
+            });
+          } else {
+            const msgs = toMessages(rowVal);
+            msgs.forEach((m) => list.push({ row: rowNum, message: m }));
+          }
+        });
+        return; // handled
+      }
+
+      // Shape 2: top-level row keys: { row_1: { field: [msg] }, row_2: {...} }
+      const topEntries = Object.entries(details);
+      const topRowLike = topEntries.filter(([k]) => isRowKey(k));
+      if (topRowLike.length > 0) {
+        topRowLike.forEach(([rowKey, rowVal]) => {
+          const rowNum = parseRowNumber(rowKey);
+          if (rowVal && typeof rowVal === 'object' && !Array.isArray(rowVal)) {
+            Object.entries(rowVal).forEach(([field, val]) => {
+              const msgs = toMessages(val);
+              msgs.forEach((m) => list.push({ row: rowNum, field, message: m }));
+            });
+          } else {
+            const msgs = toMessages(rowVal);
+            msgs.forEach((m) => list.push({ row: rowNum, message: m }));
+          }
+        });
+        return; // handled
+      }
+
+      // Shape 3: field -> row/object mapping: { department: { 1: [msg] }, email: { 2: [msg] } }
+      const fieldRowMapCandidates = topEntries.filter(([, v]) => v && typeof v === 'object');
+      if (fieldRowMapCandidates.length > 0) {
+        fieldRowMapCandidates.forEach(([field, value]) => {
+          if (value && typeof value === 'object') {
+            Object.entries(value).forEach(([maybeRow, val]) => {
+              if (isRowKey(maybeRow)) {
+                const rowNum = parseRowNumber(maybeRow);
+                const msgs = toMessages(val);
+                msgs.forEach((m) => list.push({ row: rowNum, field, message: m }));
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // Sort by row asc, then field
+    return list.sort((a, b) => (a.row - b.row) || String(a.field || '').localeCompare(String(b.field || '')));
   }, [importResults?.errors]);
 
   const copyErrors = () => {
@@ -2314,6 +2408,7 @@ const EmployeeList = () => {
                         <div className="flex items-center gap-2">
                           <Button size="sm" variant={errorView === 'summary' ? 'default' : 'outline'} onClick={() => setErrorView('summary')}>Summary</Button>
                           <Button size="sm" variant={errorView === 'fields' ? 'default' : 'outline'} onClick={() => setErrorView('fields')}>By Field</Button>
+                          <Button size="sm" variant={errorView === 'rows' ? 'default' : 'outline'} onClick={() => setErrorView('rows')}>By Row</Button>
                           <Button size="sm" variant={errorView === 'raw' ? 'default' : 'outline'} onClick={() => setErrorView('raw')}>Raw JSON</Button>
                           <div className="ml-auto flex items-center gap-2">
                             <Button size="sm" variant="outline" onClick={copyErrors}><Copy className="h-4 w-4 mr-1" />Copy</Button>
@@ -2368,6 +2463,44 @@ const EmployeeList = () => {
                                     </ul>
                                   </div>
                                 ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {errorView === 'rows' && (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={errorFilter}
+                                onChange={(e) => setErrorFilter(e.target.value)}
+                                placeholder="Filter by row number or field name"
+                                className="h-8"
+                              />
+                            </div>
+                            <div className="space-y-2 max-h-72 overflow-auto pr-1">
+                              {rowErrors
+                                .filter((e) => {
+                                  const q = errorFilter.toLowerCase();
+                                  if (!q) return true;
+                                  return (
+                                    String(e.row).includes(q) ||
+                                    String(e.field || '').toLowerCase().includes(q) ||
+                                    e.message.toLowerCase().includes(q)
+                                  );
+                                })
+                                .map((e, i) => (
+                                  <div key={`${e.row}-${e.field}-${i}`} className="border rounded p-2 bg-white">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-semibold text-gray-800">{e.row ? `Row ${e.row}` : 'General'}{e.field ? ` – ${e.field}` : ''}</span>
+                                    </div>
+                                    <p className="mt-2 text-xs text-red-700">
+                                      {e.message}
+                                    </p>
+                                  </div>
+                                ))}
+                              {rowErrors.length === 0 && (
+                                <div className="text-xs text-gray-600">No row-level errors detected.</div>
+                              )}
                             </div>
                           </div>
                         )}

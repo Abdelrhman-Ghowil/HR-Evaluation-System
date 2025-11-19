@@ -16,20 +16,20 @@ This project uses environment-specific configuration files:
 ### For Vercel Deployment
 
 1. **Automatic Configuration**: The `vercel.json` file automatically sets the correct environment variables for production:
-   ```json
-   {
-     "env": {
-       "VITE_API_BASE_URL": "https://hr-eval-sys-git-feature-schema-v2-bd5633-mohs-projects-85795635.vercel.app/",
-       "VITE_APP_ENV": "production"
-     }
-   }
-   ```
+  ```json
+  {
+    "env": {
+      "VITE_API_BASE_URL": "https://hr-eval-sys-dev.replit.app/",
+      "VITE_APP_ENV": "production"
+    }
+  }
+  ```
 
 2. **Manual Configuration** (if needed):
    - Go to your Vercel project dashboard
    - Navigate to Settings → Environment Variables
    - Add the following variables:
-     - `VITE_API_BASE_URL` = `https://hr-eval-sys-git-feature-schema-v2-bd5633-mohs-projects-85795635.vercel.app/`
+    - `VITE_API_BASE_URL` = `https://hr-eval-sys-dev.replit.app/`
      - `VITE_APP_ENV` = `production`
      - `VITE_API_TIMEOUT` = `10000`
 
@@ -50,14 +50,14 @@ This project uses environment-specific configuration files:
 
 If you still encounter CORS errors:
 
-1. **Check Environment Variables**: Ensure `VITE_API_BASE_URL` is set to `https://hr-eval-sys.vercel.app` in production
+1. **Check Environment Variables**: Ensure `VITE_API_BASE_URL` is set to `https://hr-eval-sys-dev.replit.app/` in production
 2. **Use Explicit Build**: Try using `npm run build:prod` which explicitly sets environment variables
-3. **Verify Backend**: Check that the backend API at `https://hr-eval-sys.vercel.app` has proper CORS headers
+3. **Verify Backend**: Check that the backend API at `https://hr-eval-sys-dev.replit.app/` has proper CORS headers
 4. **Clear Cache**: Clear browser cache and try again
 5. **Check Build Logs**: Review Vercel deployment logs for any build errors
 6. **Environment File Issues**: If `.env.production` is not in the repository, the environment variables in `vercel.json` and the build script should handle this
 7. **Manual Vercel Config**: Go to Vercel dashboard → Settings → Environment Variables and manually add:
-   - `VITE_API_BASE_URL` = `https://hr-eval-sys.vercel.app`
+   - `VITE_API_BASE_URL` = `https://hr-eval-sys-dev.replit.app/`
    - `VITE_APP_ENV` = `production`
    - `VITE_API_TIMEOUT` = `10000`
 
