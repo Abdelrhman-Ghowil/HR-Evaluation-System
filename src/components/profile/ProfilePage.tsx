@@ -51,6 +51,7 @@ import {
 import { EvaluationInput } from '../../types/shared';
 
 interface ProfileData {
+  company_id: string;
   employee_id: string;
   employee_code: string;
   name: string;
@@ -138,9 +139,9 @@ const ProfilePage: React.FC = () => {
         return '';
       case 'email':
         if (!value.trim()) return 'Email is required';
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(value)) return 'Please enter a valid email address';
-        return '';
+          return '';
       case 'phone':
         if (value && !/^[\+]?[1-9][\d]{0,15}$/.test(value.replace(/[\s\-\(\)]/g, ''))) {
           return 'Please enter a valid phone number';
@@ -295,7 +296,7 @@ const ProfilePage: React.FC = () => {
         job_type: myProfileData.job_type || '',
         location: myProfileData.location || '',
         branch: myProfileData.branch || '',
-        gender: '',
+        gender: myProfileData.gender || '',
         country_code: myProfileData.country_code || '',
         avatar: myProfileData.avatar || '',
         is_default_password: myProfileData.is_default_password || false,
@@ -419,7 +420,7 @@ const ProfilePage: React.FC = () => {
       // Fetch objectives
       setIsLoadingObjectives(true);
       try {
-        const objectivesData = await apiService.getObjectives(evaluation.evaluation_id || evaluation.id);
+        const objectivesData = await apiService.getObjectives(evaluation.evaluation_id );
         setObjectives(objectivesData || []);
       } catch (err) {
         console.error('Error fetching objectives:', err);

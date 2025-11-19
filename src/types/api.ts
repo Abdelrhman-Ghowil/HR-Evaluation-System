@@ -42,6 +42,7 @@ export interface ApiMyProfile {
   country_code: string;
   phone: string;
   avatar?: string;
+  gender: string;
   
   // Employment details
   role: UserRole;

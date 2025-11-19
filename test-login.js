@@ -1,7 +1,7 @@
 // Test script to check login API directly
 import axios from 'axios';
 
-const API_BASE_URL = 'https://hr-eval-sys-git-feature-schema-v2-bd5633-mohs-projects-85795635.vercel.app/';
+const API_BASE_URL = 'https://hr-eval-sys-dev.replit.app/';
 
 const testLogin = async () => {
   try {
