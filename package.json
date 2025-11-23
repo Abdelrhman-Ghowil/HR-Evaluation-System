@@ -9,7 +9,7 @@
     "build:prod": "cross-env VITE_API_BASE_URL=https://hr-eval-sys-dev.replit.app/ VITE_APP_ENV=production VITE_API_TIMEOUT=10000 vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "node scripts/preview.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
