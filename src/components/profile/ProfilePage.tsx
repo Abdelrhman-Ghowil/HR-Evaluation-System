@@ -41,7 +41,8 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/api';
 import { ApiEmployee, ApiEvaluation, ApiObjective, ApiCompetency, ApiMyProfile } from '../../types/api';
-import { useEvaluations } from '../../hooks/useApi';
+import { useEvaluations, useUpdateObjective, useUpdateCompetency, useUpdateEvaluation } from '../../hooks/useApi';
+import { toast } from 'sonner';
 import EvaluationDetails from '../employees/EvaluationDetails';
 import { 
   transformEmployeeForEvaluation, 
@@ -198,6 +199,15 @@ const ProfilePage: React.FC = () => {
   const [competencies, setCompetencies] = useState<ApiCompetency[]>([]);
   const [isLoadingObjectives, setIsLoadingObjectives] = useState(false);
   const [isLoadingCompetencies, setIsLoadingCompetencies] = useState(false);
+  const [isSelfEvalMode, setIsSelfEvalMode] = useState(false);
+  const [objectiveEdits, setObjectiveEdits] = useState<Record<string, number>>({});
+  const [competencyEdits, setCompetencyEdits] = useState<Record<string, number>>({});
+  const [isSubmittingSelfEval, setIsSubmittingSelfEval] = useState(false);
+  const [selectedSelfEvaluation, setSelectedSelfEvaluation] = useState<ApiEvaluation | null>(null);
+  const [selfObjectives, setSelfObjectives] = useState<ApiObjective[]>([]);
+  const [selfCompetencies, setSelfCompetencies] = useState<ApiCompetency[]>([]);
+  const [selfLoadingObjectives, setSelfLoadingObjectives] = useState(false);
+  const [selfLoadingCompetencies, setSelfLoadingCompetencies] = useState(false);
 
   // Password change state
   const [passwordData, setPasswordData] = useState({
@@ -453,17 +463,19 @@ const ProfilePage: React.FC = () => {
 
   // Score calculation functions
   const getObjectiveScore = (objective: ApiObjective): number => {
-    if (!objective.target || !objective.achieved) return 0;
+    const achievedValue = objectiveEdits[objective.objective_id] ?? objective.achieved;
+    if (!objective.target || !achievedValue) return 0;
     const target = parseFloat(objective.target.toString());
-    const achieved = parseFloat(objective.achieved.toString());
+    const achieved = parseFloat(achievedValue.toString());
     if (target === 0) return 0;
     return Math.min((achieved / target) * 100, 100);
   };
 
   const getCompetencyScore = (competency: ApiCompetency): number => {
-    if (!competency.required_level || !competency.actual_level) return 0;
+    const actualLevel = competencyEdits[competency.competence_id] ?? competency.actual_level;
+    if (!competency.required_level || !actualLevel) return 0;
     const required = parseFloat(competency.required_level.toString());
-    const actual = parseFloat(competency.actual_level.toString());
+    const actual = parseFloat(actualLevel.toString());
     if (required === 0) return 0;
     return Math.min((actual / required) * 100, 100);
   };
@@ -495,6 +507,101 @@ const ProfilePage: React.FC = () => {
     
     return weightedScore;
   };
+
+  const getOverallObjectiveScoreForList = (list: ApiObjective[]): number => {
+    if (list.length === 0) return 0;
+    const totalWeight = list.reduce((sum, obj) => sum + (obj.weight || 0), 0);
+    if (totalWeight === 0) return 0;
+    const weightedScore = list.reduce((sum, obj) => {
+      const score = getObjectiveScore(obj);
+      const weight = obj.weight || 0;
+      return sum + (score * weight / 100);
+    }, 0);
+    return weightedScore;
+  };
+
+  const getOverallCompetencyScoreForList = (list: ApiCompetency[]): number => {
+    if (list.length === 0) return 0;
+    const totalWeight = list.reduce((sum, comp) => sum + (comp.weight || 0), 0);
+    if (totalWeight === 0) return 0;
+    const weightedScore = list.reduce((sum, comp) => {
+      const score = getCompetencyScore(comp);
+      const weight = comp.weight || 0;
+      return sum + (score * weight / 100);
+    }, 0);
+    return weightedScore;
+  };
+
+  const updateObjectiveMutation = useUpdateObjective();
+  const updateCompetencyMutation = useUpdateCompetency();
+  const updateEvaluationMutation = useUpdateEvaluation();
+
+  const handleSubmitSelfEvaluation = async () => {
+    const evalToSubmit = selectedSelfEvaluation || selectedEvaluationForPanel;
+    if (!evalToSubmit) return;
+    setIsSubmittingSelfEval(true);
+    try {
+      const objectivesList = selectedSelfEvaluation ? selfObjectives : objectives;
+      const competenciesList = selectedSelfEvaluation ? selfCompetencies : competencies;
+      for (const obj of objectivesList) {
+        const newAchieved = objectiveEdits[obj.objective_id];
+        if (newAchieved !== undefined && newAchieved !== obj.achieved) {
+          await updateObjectiveMutation.mutateAsync({ objectiveId: obj.objective_id, evaluationId: evalToSubmit.evaluation_id, objectiveData: { achieved: newAchieved } });
+        }
+      }
+      for (const comp of competenciesList) {
+        const newActual = competencyEdits[comp.competence_id];
+        if (newActual !== undefined && newActual !== comp.actual_level) {
+          await updateCompetencyMutation.mutateAsync({ competencyId: comp.competence_id, competencyData: { actual_level: newActual } });
+        }
+      }
+      const objScore = getOverallObjectiveScoreForList(objectivesList);
+      const compScore = getOverallCompetencyScoreForList(competenciesList);
+      const newScore = Math.round((objScore + compScore) / 2);
+      if (!Number.isNaN(newScore) && evalToSubmit.evaluation_id) {
+        await updateEvaluationMutation.mutateAsync({ evaluationId: evalToSubmit.evaluation_id, evaluationData: { score: newScore } });
+      }
+      if (selectedSelfEvaluation) {
+        setSelfObjectives(prev => prev.map(o => ({ ...o, achieved: objectiveEdits[o.objective_id] ?? o.achieved })));
+        setSelfCompetencies(prev => prev.map(c => ({ ...c, actual_level: competencyEdits[c.competence_id] ?? c.actual_level })));
+      } else {
+        setObjectives(prev => prev.map(o => ({ ...o, achieved: objectiveEdits[o.objective_id] ?? o.achieved })));
+        setCompetencies(prev => prev.map(c => ({ ...c, actual_level: competencyEdits[c.competence_id] ?? c.actual_level })));
+      }
+      setObjectiveEdits({});
+      setCompetencyEdits({});
+      setIsSelfEvalMode(false);
+      toast.success('Self evaluation submitted');
+    } catch (e) {
+      toast.error('Failed to submit self evaluation');
+    } finally {
+      setIsSubmittingSelfEval(false);
+    }
+  };
+
+  useEffect(() => {
+    const pending = evaluations.filter(e => e.status === 'Employee Review');
+    setSelectedSelfEvaluation(pending.length > 0 ? pending[0] : null);
+  }, [evaluations]);
+
+  useEffect(() => {
+    const eid = selectedSelfEvaluation?.evaluation_id;
+    if (!eid) {
+      setSelfObjectives([]);
+      setSelfCompetencies([]);
+      return;
+    }
+    setSelfLoadingObjectives(true);
+    setSelfLoadingCompetencies(true);
+    apiService.getObjectives(eid)
+      .then(data => setSelfObjectives(data || []))
+      .catch(() => setSelfObjectives([]))
+      .finally(() => setSelfLoadingObjectives(false));
+    apiService.getCompetencies(eid)
+      .then(data => setSelfCompetencies(data || []))
+      .catch(() => setSelfCompetencies([]))
+      .finally(() => setSelfLoadingCompetencies(false));
+  }, [selectedSelfEvaluation?.evaluation_id]);
 
   const getStatusColor = (status: string): string => {
     switch (status) {
@@ -779,7 +886,7 @@ const ProfilePage: React.FC = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="personal" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-white border shadow-sm">
+          <TabsList className="grid w-full grid-cols-5 bg-white border shadow-sm">
             <TabsTrigger value="personal" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               Personal
@@ -791,6 +898,10 @@ const ProfilePage: React.FC = () => {
             <TabsTrigger value="performance" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Performance
+            </TabsTrigger>
+            <TabsTrigger value="self-review" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Self Review
             </TabsTrigger>
             <TabsTrigger value="security" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
@@ -1080,6 +1191,241 @@ const ProfilePage: React.FC = () => {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="self-review" className="space-y-6">
+            <Card className="shadow-lg border-0">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                  Self Evaluation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {evaluations.filter(e => e.status === 'Employee Review').length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">No evaluations pending employee review</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Select Evaluation</Label>
+                        <Select
+                          value={selectedSelfEvaluation?.evaluation_id || ''}
+                          onValueChange={(value) => {
+                            const ev = evaluations.find(e => e.evaluation_id === value) || null;
+                            setSelectedSelfEvaluation(ev);
+                            setObjectiveEdits({});
+                            setCompetencyEdits({});
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Choose evaluation" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {evaluations.filter(e => e.status === 'Employee Review').map(e => (
+                              <SelectItem key={e.evaluation_id} value={e.evaluation_id}>
+                                {e.type} • {e.period}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {selectedSelfEvaluation && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="text-center p-4 bg-gray-50 rounded">
+                            <div className="text-2xl font-bold text-blue-600">{getOverallObjectiveScoreForList(selfObjectives).toFixed(1)}%</div>
+                            <div className="text-sm text-gray-600">Objectives</div>
+                          </div>
+                          <div className="text-center p-4 bg-gray-50 rounded">
+                            <div className="text-2xl font-bold text-green-600">{getOverallCompetencyScoreForList(selfCompetencies).toFixed(1)}%</div>
+                            <div className="text-sm text-gray-600">Competencies</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedSelfEvaluation && (
+                      <Tabs defaultValue="objectives" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="objectives" className="flex items-center space-x-2">
+                            <Target className="h-4 w-4" />
+                            <span>Objectives ({selfObjectives.length})</span>
+                          </TabsTrigger>
+                          <TabsTrigger value="competencies" className="flex items-center space-x-2">
+                            <Award className="h-4 w-4" />
+                            <span>Competencies ({selfCompetencies.length})</span>
+                          </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="objectives" className="space-y-4">
+                          {selfLoadingObjectives ? (
+                            <div className="flex items-center justify-center py-8">
+                              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                              <span className="ml-2 text-gray-600">Loading objectives...</span>
+                            </div>
+                          ) : selfObjectives.length === 0 ? (
+                            <div className="text-center py-8">
+                              <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                              <p className="text-gray-600">No objectives found</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {selfObjectives.map((objective) => {
+                                const score = getObjectiveScore(objective);
+                                const achievedValue = objectiveEdits[objective.objective_id] ?? objective.achieved;
+                                return (
+                                  <Card key={objective.objective_id} className="border-l-4 border-l-blue-500">
+                                    <CardContent className="p-4">
+                                      <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                          <h4 className="font-semibold text-gray-900">{objective.title}</h4>
+                                          <p className="text-sm text-gray-600 mt-1">{objective.description}</p>
+                                          <div className="flex items-center space-x-4 mt-2">
+                                            <div className="text-sm">
+                                              <span className="text-gray-500">Target:</span>
+                                              <span className="font-medium ml-1">{objective.target}</span>
+                                            </div>
+                                            <div className="text-sm">
+                                              <span className="text-gray-500">Achieved:</span>
+                                              <Input
+                                                type="number"
+                                                min={0}
+                                                value={achievedValue?.toString() ?? ''}
+                                                onChange={(e) => {
+                                                  const v = parseFloat(e.target.value);
+                                                  setObjectiveEdits(prev => ({ ...prev, [objective.objective_id]: Number.isNaN(v) ? 0 : v }));
+                                                }}
+                                                className="ml-2 w-24"
+                                              />
+                                            </div>
+                                            <div className="text-sm">
+                                              <span className="text-gray-500">Weight:</span>
+                                              <span className="font-medium ml-1">{objective.weight}%</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="text-right space-y-2">
+                                          <div className="text-lg font-bold text-blue-600">{score.toFixed(1)}%</div>
+                                          <Badge 
+                                            variant={objective.status === 'Completed' ? 'default' : 'secondary'}
+                                            className={
+                                              objective.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                              objective.status === 'In-progress' ? 'bg-yellow-100 text-yellow-800' :
+                                              'bg-gray-100 text-gray-800'
+                                            }
+                                          >
+                                            {objective.status}
+                                          </Badge>
+                                        </div>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </TabsContent>
+
+                        <TabsContent value="competencies" className="space-y-4">
+                          {selfLoadingCompetencies ? (
+                            <div className="flex items-center justify-center py-8">
+                              <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+                              <span className="ml-2 text-gray-600">Loading competencies...</span>
+                            </div>
+                          ) : selfCompetencies.length === 0 ? (
+                            <div className="text-center py-8">
+                              <Award className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                              <p className="text-gray-600">No competencies found</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {selfCompetencies.map((competency) => {
+                                const score = getCompetencyScore(competency);
+                                const actualValue = competencyEdits[competency.competence_id] ?? competency.actual_level;
+                                return (
+                                  <Card key={competency.competence_id} className="border-l-4 border-l-green-500">
+                                    <CardContent className="p-4">
+                                      <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                          <div className="flex items-center space-x-2">
+                                            <h4 className="font-semibold text-gray-900">{competency.name}</h4>
+                                            <Badge 
+                                              variant="outline"
+                                              className={
+                                                competency.category === 'Core' ? 'border-blue-200 text-blue-700' :
+                                                competency.category === 'Leadership' ? 'border-purple-200 text-purple-700' :
+                                                'border-orange-200 text-orange-700'
+                                              }
+                                            >
+                                              {competency.category}
+                                            </Badge>
+                                          </div>
+                                          <p className="text-sm text-gray-600 mt-1">{competency.description}</p>
+                                          <div className="flex items-center space-x-4 mt-2">
+                                            <div className="text-sm">
+                                              <span className="text-gray-500">Required:</span>
+                                              <span className="font-medium ml-1">{competency.required_level}/10</span>
+                                            </div>
+                                            <div className="text-sm">
+                                              <span className="text-gray-500">Actual:</span>
+                                              <Input
+                                                type="number"
+                                                min={0}
+                                                max={10}
+                                                value={actualValue?.toString() ?? ''}
+                                                onChange={(e) => {
+                                                  const v = parseFloat(e.target.value);
+                                                  setCompetencyEdits(prev => ({ ...prev, [competency.competence_id]: Number.isNaN(v) ? 0 : v }));
+                                                }}
+                                                className="ml-2 w-24"
+                                              />
+                                            </div>
+                                            <div className="text-sm">
+                                              <span className="text-gray-500">Weight:</span>
+                                              <span className="font-medium ml-1">{competency.weight}%</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-lg font-bold text-green-600">{score.toFixed(1)}%</div>
+                                          <div className="text-xs text-gray-500 mt-1">
+                                            {actualValue >= competency.required_level ? 'Meets Requirement' : 'Below Requirement'}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </TabsContent>
+                      </Tabs>
+                    )}
+
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={handleSubmitSelfEvaluation}
+                        className="bg-blue-600 hover:bg-blue-700"
+                        disabled={isSubmittingSelfEval || !selectedSelfEvaluation}
+                      >
+                        {isSubmittingSelfEval ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          'Submit Self Evaluation'
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Professional Tab */}
@@ -1714,6 +2060,8 @@ const ProfilePage: React.FC = () => {
                   </div>
                 </div>
 
+                
+
                 <Tabs defaultValue="objectives" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="objectives" className="flex items-center space-x-2">
@@ -1741,6 +2089,7 @@ const ProfilePage: React.FC = () => {
                       <div className="space-y-3">
                         {objectives.map((objective) => {
                           const score = getObjectiveScore(objective);
+                          const achievedValue = objectiveEdits[objective.objective_id] ?? objective.achieved;
                           return (
                             <Card key={objective.objective_id} className="border-l-4 border-l-blue-500">
                               <CardContent className="p-4">
@@ -1755,7 +2104,20 @@ const ProfilePage: React.FC = () => {
                                       </div>
                                       <div className="text-sm">
                                         <span className="text-gray-500">Achieved:</span>
-                                        <span className="font-medium ml-1">{objective.achieved}</span>
+                                        {isSelfEvalMode ? (
+                                          <Input
+                                            type="number"
+                                            min={0}
+                                            value={achievedValue?.toString() ?? ''}
+                                            onChange={(e) => {
+                                              const v = parseFloat(e.target.value);
+                                              setObjectiveEdits(prev => ({ ...prev, [objective.objective_id]: Number.isNaN(v) ? 0 : v }));
+                                            }}
+                                            className="ml-2 w-24"
+                                          />
+                                        ) : (
+                                          <span className="font-medium ml-1">{objective.achieved}</span>
+                                        )}
                                       </div>
                                       <div className="text-sm">
                                         <span className="text-gray-500">Weight:</span>
@@ -1859,6 +2221,7 @@ const ProfilePage: React.FC = () => {
               >
                 Close
               </Button>
+              
             </DialogFooter>
           </DialogContent>
         </Dialog>
