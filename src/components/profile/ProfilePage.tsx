@@ -8,8 +8,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { 
   User, 
   Mail, 
@@ -38,10 +40,12 @@ import {
   Clock,
   MapIcon
 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/api';
 import { ApiEmployee, ApiEvaluation, ApiObjective, ApiCompetency, ApiMyProfile } from '../../types/api';
-import { useEvaluations } from '../../hooks/useApi';
+import { useEvaluations, useUpdateObjective, useUpdateCompetency, useUpdateEvaluation, useCreateObjective, useDeleteObjective, useCreateCompetency, useDeleteCompetency } from '../../hooks/useApi';
+import { toast } from 'sonner';
 import EvaluationDetails from '../employees/EvaluationDetails';
 import { 
   transformEmployeeForEvaluation, 
@@ -198,6 +202,29 @@ const ProfilePage: React.FC = () => {
   const [competencies, setCompetencies] = useState<ApiCompetency[]>([]);
   const [isLoadingObjectives, setIsLoadingObjectives] = useState(false);
   const [isLoadingCompetencies, setIsLoadingCompetencies] = useState(false);
+  const [isSelfEvalMode, setIsSelfEvalMode] = useState(false);
+  const [objectiveEdits, setObjectiveEdits] = useState<Record<string, number>>({});
+  const [competencyEdits, setCompetencyEdits] = useState<Record<string, number>>({});
+  const [isSubmittingSelfEval, setIsSubmittingSelfEval] = useState(false);
+  const [selectedSelfEvaluation, setSelectedSelfEvaluation] = useState<ApiEvaluation | null>(null);
+  const [selfObjectives, setSelfObjectives] = useState<ApiObjective[]>([]);
+  const [selfCompetencies, setSelfCompetencies] = useState<ApiCompetency[]>([]);
+  const [selfLoadingObjectives, setSelfLoadingObjectives] = useState(false);
+  const [selfLoadingCompetencies, setSelfLoadingCompetencies] = useState(false);
+  const [selfEvaluations, setSelfEvaluations] = useState<ApiEvaluation[]>([]);
+  const [selfEvaluationsLoading, setSelfEvaluationsLoading] = useState(false);
+  const [selfEvaluationsError, setSelfEvaluationsError] = useState<string | null>(null);
+  const [creatingSelfEval, setCreatingSelfEval] = useState(false);
+  const [newSelfType, setNewSelfType] = useState<'Quarterly' | 'Annual' | 'Optional'>('Quarterly');
+  const getCurrentQuarterString = () => {
+    const d = new Date();
+    const q = Math.floor(d.getMonth() / 3) + 1;
+    return `${d.getFullYear()}-Q${q}`;
+  };
+  const [newSelfPeriod, setNewSelfPeriod] = useState<string>(getCurrentQuarterString());
+  const [isDeletingSelfId, setIsDeletingSelfId] = useState<string | null>(null);
+  const [confirmSelfDeleteOpen, setConfirmSelfDeleteOpen] = useState(false);
+  const [selfEvalToDelete, setSelfEvalToDelete] = useState<ApiEvaluation | null>(null);
 
   // Password change state
   const [passwordData, setPasswordData] = useState({
@@ -246,6 +273,25 @@ const ProfilePage: React.FC = () => {
       evaluationsQueryError ? (evaluationsQueryError as Error).message : null
     );
   }, [evaluationsQueryError]);
+
+  useEffect(() => {
+    const fetchSelfEvals = async () => {
+      if (!user?.user_id) return;
+      setSelfEvaluationsLoading(true);
+      setSelfEvaluationsError(null);
+      try {
+        const data = await apiService.getSelfEvaluations();
+        setSelfEvaluations(Array.isArray(data) ? data : []);
+      } catch (err: any) {
+        const msg = err?.message || 'Error fetching self evaluations';
+        setSelfEvaluationsError(msg);
+        setSelfEvaluations([]);
+      } finally {
+        setSelfEvaluationsLoading(false);
+      }
+    };
+    fetchSelfEvals();
+  }, [user?.user_id]);
 
   // React Query: My Profile (cached)
   const queryClient = useQueryClient();
@@ -453,17 +499,19 @@ const ProfilePage: React.FC = () => {
 
   // Score calculation functions
   const getObjectiveScore = (objective: ApiObjective): number => {
-    if (!objective.target || !objective.achieved) return 0;
+    const achievedValue = objectiveEdits[objective.objective_id] ?? objective.achieved;
+    if (!objective.target || !achievedValue) return 0;
     const target = parseFloat(objective.target.toString());
-    const achieved = parseFloat(objective.achieved.toString());
+    const achieved = parseFloat(achievedValue.toString());
     if (target === 0) return 0;
     return Math.min((achieved / target) * 100, 100);
   };
 
   const getCompetencyScore = (competency: ApiCompetency): number => {
-    if (!competency.required_level || !competency.actual_level) return 0;
+    const actualLevel = competencyEdits[competency.competence_id] ?? competency.actual_level;
+    if (!competency.required_level || !actualLevel) return 0;
     const required = parseFloat(competency.required_level.toString());
-    const actual = parseFloat(competency.actual_level.toString());
+    const actual = parseFloat(actualLevel.toString());
     if (required === 0) return 0;
     return Math.min((actual / required) * 100, 100);
   };
@@ -495,6 +543,115 @@ const ProfilePage: React.FC = () => {
     
     return weightedScore;
   };
+
+  const getOverallObjectiveScoreForList = (list: ApiObjective[]): number => {
+    if (list.length === 0) return 0;
+    const totalWeight = list.reduce((sum, obj) => sum + (obj.weight || 0), 0);
+    if (totalWeight === 0) return 0;
+    const weightedScore = list.reduce((sum, obj) => {
+      const score = getObjectiveScore(obj);
+      const weight = obj.weight || 0;
+      return sum + (score * weight / 100);
+    }, 0);
+    return weightedScore;
+  };
+
+  const getOverallCompetencyScoreForList = (list: ApiCompetency[]): number => {
+    if (list.length === 0) return 0;
+    const totalWeight = list.reduce((sum, comp) => sum + (comp.weight || 0), 0);
+    if (totalWeight === 0) return 0;
+    const weightedScore = list.reduce((sum, comp) => {
+      const score = getCompetencyScore(comp);
+      const weight = comp.weight || 0;
+      return sum + (score * weight / 100);
+    }, 0);
+    return weightedScore;
+  };
+
+  const updateObjectiveMutation = useUpdateObjective();
+  const updateCompetencyMutation = useUpdateCompetency();
+  const updateEvaluationMutation = useUpdateEvaluation();
+  const createObjectiveMutation = useCreateObjective();
+  const deleteObjectiveMutation = useDeleteObjective();
+  const createCompetencyMutation = useCreateCompetency();
+  const deleteCompetencyMutation = useDeleteCompetency();
+  const isEmployee = (user?.role || '').toLowerCase() === 'employee';
+  const canSelfCrud = isSelfEvalMode && isEmployee;
+
+  const [editingObjectiveId, setEditingObjectiveId] = useState<string | null>(null);
+  const [objectiveFieldEdits, setObjectiveFieldEdits] = useState<Record<string, Partial<UpdateObjectiveRequest>>>({});
+  const [editingCompetencyId, setEditingCompetencyId] = useState<string | null>(null);
+  const [competencyFieldEdits, setCompetencyFieldEdits] = useState<Record<string, Partial<UpdateCompetencyRequest>>>({});
+
+  const [newObjective, setNewObjective] = useState<{ title: string; description: string; target: number; achieved: number; status: 'Not started' | 'In-progress' | 'Completed' } | null>({ title: '', description: '', target: 0, achieved: 0, status: 'Not started' });
+  const [newCompetency, setNewCompetency] = useState<{ name: string; category: 'Core' | 'Leadership' | 'Functional'; required_level: number; actual_level: number; description: string } | null>({ name: '', category: 'Core', required_level: 5, actual_level: 0, description: '' });
+
+  const handleSubmitSelfEvaluation = async () => {
+    const evalToSubmit = selectedSelfEvaluation || selectedEvaluationForPanel;
+    if (!evalToSubmit) return;
+    setIsSubmittingSelfEval(true);
+    try {
+      const objectivesList = selectedSelfEvaluation ? selfObjectives : objectives;
+      const competenciesList = selectedSelfEvaluation ? selfCompetencies : competencies;
+      for (const obj of objectivesList) {
+        const newAchieved = objectiveEdits[obj.objective_id];
+        if (newAchieved !== undefined && newAchieved !== obj.achieved) {
+          await updateObjectiveMutation.mutateAsync({ objectiveId: obj.objective_id, evaluationId: evalToSubmit.evaluation_id, objectiveData: { achieved: newAchieved } });
+        }
+      }
+      for (const comp of competenciesList) {
+        const newActual = competencyEdits[comp.competence_id];
+        if (newActual !== undefined && newActual !== comp.actual_level) {
+          await updateCompetencyMutation.mutateAsync({ competencyId: comp.competence_id, competencyData: { actual_level: newActual } });
+        }
+      }
+      const objScore = getOverallObjectiveScoreForList(objectivesList);
+      const compScore = getOverallCompetencyScoreForList(competenciesList);
+      const newScore = Math.round((objScore + compScore) / 2);
+      if (!Number.isNaN(newScore) && evalToSubmit.evaluation_id) {
+        await updateEvaluationMutation.mutateAsync({ evaluationId: evalToSubmit.evaluation_id, evaluationData: { score: newScore } });
+      }
+      if (selectedSelfEvaluation) {
+        setSelfObjectives(prev => prev.map(o => ({ ...o, achieved: objectiveEdits[o.objective_id] ?? o.achieved })));
+        setSelfCompetencies(prev => prev.map(c => ({ ...c, actual_level: competencyEdits[c.competence_id] ?? c.actual_level })));
+      } else {
+        setObjectives(prev => prev.map(o => ({ ...o, achieved: objectiveEdits[o.objective_id] ?? o.achieved })));
+        setCompetencies(prev => prev.map(c => ({ ...c, actual_level: competencyEdits[c.competence_id] ?? c.actual_level })));
+      }
+      setObjectiveEdits({});
+      setCompetencyEdits({});
+      setIsSelfEvalMode(false);
+      toast.success('Self evaluation submitted');
+    } catch (e) {
+      toast.error('Failed to submit self evaluation');
+    } finally {
+      setIsSubmittingSelfEval(false);
+    }
+  };
+
+  useEffect(() => {
+    const pending = evaluations.filter(e => e.status === 'Employee Review');
+    setSelectedSelfEvaluation(pending.length > 0 ? pending[0] : null);
+  }, [evaluations]);
+
+  useEffect(() => {
+    const eid = selectedSelfEvaluation?.evaluation_id;
+    if (!eid) {
+      setSelfObjectives([]);
+      setSelfCompetencies([]);
+      return;
+    }
+    setSelfLoadingObjectives(true);
+    setSelfLoadingCompetencies(true);
+    apiService.getObjectives(eid)
+      .then(data => setSelfObjectives(data || []))
+      .catch(() => setSelfObjectives([]))
+      .finally(() => setSelfLoadingObjectives(false));
+    apiService.getCompetencies(eid)
+      .then(data => setSelfCompetencies(data || []))
+      .catch(() => setSelfCompetencies([]))
+      .finally(() => setSelfLoadingCompetencies(false));
+  }, [selectedSelfEvaluation?.evaluation_id]);
 
   const getStatusColor = (status: string): string => {
     switch (status) {
@@ -779,7 +936,7 @@ const ProfilePage: React.FC = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="personal" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-white border shadow-sm">
+          <TabsList className="grid w-full grid-cols-5 bg-white border shadow-sm">
             <TabsTrigger value="personal" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               Personal
@@ -791,6 +948,10 @@ const ProfilePage: React.FC = () => {
             <TabsTrigger value="performance" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Performance
+            </TabsTrigger>
+            <TabsTrigger value="self-review" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Self Review
             </TabsTrigger>
             <TabsTrigger value="security" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
@@ -1081,6 +1242,185 @@ const ProfilePage: React.FC = () => {
               </Card>
             </div>
           </TabsContent>
+
+          <TabsContent value="self-review" className="space-y-6">
+            <Card className="shadow-lg border-0">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                  Self Evaluation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex flex-wrap items-end gap-4 p-4 bg-gray-50 rounded-lg border">
+                  <div className="space-y-2">
+                    <Label>Period</Label>
+                    <Input value={newSelfPeriod} disabled placeholder="2025-Q1" className="w-40" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Input value={newSelfType} disabled className="w-40" />
+                  </div>
+                  <div className="ml-auto">
+                    <Button
+                      onClick={async () => {
+                        if (!newSelfPeriod || !newSelfType) return;
+                        setCreatingSelfEval(true);
+                        try {
+                          const created = await apiService.createSelfEvaluation({ period: newSelfPeriod, type: newSelfType });
+                          toast.success('Self evaluation created');
+                          const refreshed = await apiService.getSelfEvaluations();
+                          setSelfEvaluations(Array.isArray(refreshed) ? refreshed : []);
+                          setIsSelfEvalMode(true);
+                          setSelectedSelfEvaluation(created);
+                        } catch (err: any) {
+                          toast.error(err?.message || 'Failed to create self evaluation');
+                        } finally {
+                          setCreatingSelfEval(false);
+                        }
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700"
+                      disabled={creatingSelfEval}
+                    >
+                      {creatingSelfEval ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Self Evaluation'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                {selfEvaluationsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                    <span className="ml-2 text-gray-600">Loading self evaluations...</span>
+                  </div>
+                ) : selfEvaluationsError ? (
+                  <div className="text-center py-8">
+                    <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+                    <p className="text-red-600 font-medium">Error loading self evaluations</p>
+                    <p className="text-red-500 text-sm mt-2">{selfEvaluationsError}</p>
+                  </div>
+                ) : selfEvaluations.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">No self evaluations found</p>
+                    <p className="text-gray-500 text-sm mt-2">Your self evaluations will appear here when available.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {selfEvaluations.map((evaluation) => (
+                      <Card 
+                        key={evaluation.evaluation_id} 
+                        className="hover:shadow-md transition-all duration-200 border-l-4 border-l-blue-500 cursor-pointer"
+                        onClick={() => { setIsSelfEvalMode(true); handleEvaluationClick(evaluation); }}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4 flex-1">
+                              <div className="bg-blue-100 p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-blue-600" />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-gray-900">{evaluation.type}</h3>
+                                <p className="text-sm text-gray-600">{evaluation.period}</p>
+                                {evaluation.reviewer && (
+                                  <p className="text-xs text-gray-500">Reviewer: {evaluation.reviewer}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <Badge className={getStatusBadgeClass(evaluation.status)}>
+                                {evaluation.status}
+                              </Badge>
+                              {evaluation.score && (
+                                <div className="text-right">
+                                  <p className="text-lg font-bold text-gray-900">{evaluation.score}</p>
+                                  <p className="text-xs text-gray-500">Score</p>
+                                </div>
+                              )}
+                              <Button variant="outline" size="sm" className="flex items-center gap-2">
+                                <Eye className="h-4 w-4" />
+                                View
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => { e.stopPropagation(); setSelfEvalToDelete(evaluation); setConfirmSelfDeleteOpen(true); }}
+                                className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                disabled={isDeletingSelfId === evaluation.evaluation_id}
+                              >
+                                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="3 6 5 6 21 6" />
+                                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                  <path d="M10 11v6" />
+                                  <path d="M14 11v6" />
+                                  <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                                </svg>
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                          {evaluation.created_at && (
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                {formatDate(evaluation.created_at)}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <AlertDialog open={confirmSelfDeleteOpen} onOpenChange={setConfirmSelfDeleteOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Self Evaluation</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {selfEvalToDelete ? (
+                    <span>
+                      This action will permanently delete the self evaluation for {selfEvalToDelete.period} ({selfEvalToDelete.type}).
+                    </span>
+                  ) : (
+                    <span>Are you sure you want to delete this self evaluation?</span>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => { setSelfEvalToDelete(null); }}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    if (!selfEvalToDelete) return;
+                    try {
+                      setIsDeletingSelfId(selfEvalToDelete.evaluation_id);
+                      await apiService.deleteEvaluation(selfEvalToDelete.evaluation_id);
+                      toast.success('Self evaluation deleted');
+                      const refreshed = await apiService.getSelfEvaluations();
+                      setSelfEvaluations(Array.isArray(refreshed) ? refreshed : []);
+                    } catch (err: any) {
+                      toast.error(err?.message || 'Failed to delete self evaluation');
+                    } finally {
+                      setIsDeletingSelfId(null);
+                      setConfirmSelfDeleteOpen(false);
+                      setSelfEvalToDelete(null);
+                    }
+                  }}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Professional Tab */}
           <TabsContent value="professional" className="space-y-8">
@@ -1432,7 +1772,7 @@ const ProfilePage: React.FC = () => {
                       <Card 
                         key={evaluation.evaluation_id } 
                         className="hover:shadow-md transition-all duration-200 border-l-4 border-l-blue-500 cursor-pointer"
-                        onClick={() => handleEvaluationClick(evaluation)}
+                        onClick={() => { setIsSelfEvalMode(false); handleEvaluationClick(evaluation); }}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
@@ -1714,6 +2054,8 @@ const ProfilePage: React.FC = () => {
                   </div>
                 </div>
 
+                
+
                 <Tabs defaultValue="objectives" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="objectives" className="flex items-center space-x-2">
@@ -1727,6 +2069,122 @@ const ProfilePage: React.FC = () => {
                   </TabsList>
 
                   <TabsContent value="objectives" className="space-y-4">
+                    {canSelfCrud && selectedEvaluationForPanel && (
+                      <Card className="border-0 shadow-xl bg-gradient-to-br from-blue-50 to-indigo-50">
+                        <CardContent className="p-3">
+                          <Accordion type="single" collapsible>
+                            <AccordionItem value="add-objective">
+                              <AccordionTrigger>
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg">
+                                      <Target className="h-4 w-4 text-white" />
+                                    </div>
+                                    <div className="font-semibold text-gray-900">Add Objective</div>
+                                  </div>
+                                  <Badge>{selectedEvaluationForPanel.period}</Badge>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="space-y-3">
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => setNewObjective({ title: 'Increase KPI', description: 'Improve quarterly KPI performance', target: 10, achieved: 0, status: 'Not started' })} className="rounded-full">Increase KPI</Button>
+                                    <Button variant="outline" size="sm" onClick={() => setNewObjective({ title: 'Reduce Incidents', description: 'Lower monthly incident rate', target: 10, achieved: 0, status: 'Not started' })} className="rounded-full">Reduce Incidents</Button>
+                                    <Button variant="outline" size="sm" onClick={() => setNewObjective({ title: 'Improve Quality', description: 'Enhance deliverable quality benchmarks', target: 10, achieved: 0, status: 'Not started' })} className="rounded-full">Improve Quality</Button>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                      <Label>Title</Label>
+                                      <Input value={newObjective?.title ?? ''} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, status: 'Not started' }), title: e.target.value }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Target</Label>
+                                      <Input type="number" min={0} max={10} value={newObjective?.target ?? 0} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, status: 'Not started' }), target: Math.min(parseFloat(e.target.value) || 0, 10) }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Achieved</Label>
+                                      <Input type="number" min={0} max={10} value={newObjective?.achieved ?? 0} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, status: 'Not started' }), achieved: Math.min(parseFloat(e.target.value) || 0, 10) }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Status</Label>
+                                      <Select value={newObjective?.status ?? 'Not started'} onValueChange={(v) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, status: 'Not started' }), status: v as any }))}>
+                                        <SelectTrigger className="w-40">
+                                          <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="Not started">Not started</SelectItem>
+                                          <SelectItem value="In-progress">In-progress</SelectItem>
+                                          <SelectItem value="Completed">Completed</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-1 md:col-span-2">
+                                      <Label>Description</Label>
+                                      <Textarea rows={2} value={newObjective?.description ?? ''} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, status: 'Not started' }), description: e.target.value }))} />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="rounded-lg border bg-white p-3">
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-sm text-gray-600">Preview</div>
+                                        <Badge variant="outline" className="text-blue-700 border-blue-200">{newObjective?.status}</Badge>
+                                      </div>
+                                      <div className="mt-2 flex items-center gap-6">
+                                        <div>
+                                          <div className="text-xs text-gray-500">Target</div>
+                                          <div className="text-lg font-semibold text-gray-900">{newObjective?.target ?? 0}</div>
+                                        </div>
+                                        <div>
+                                          <div className="text-xs text-gray-500">Achieved</div>
+                                          <div className="text-lg font-semibold text-gray-900">{newObjective?.achieved ?? 0}</div>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="text-xs text-gray-500 mb-1">Progress</div>
+                                          <div className="w-full h-2 bg-gray-200 rounded">
+                                            <div
+                                              className="h-2 rounded bg-gradient-to-r from-blue-600 to-indigo-600"
+                                              style={{ width: `${Math.min(((newObjective?.achieved ?? 0) / Math.max(newObjective?.target ?? 1, 1)) * 100, 100)}%` }}
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-end">
+                                    <Button
+                                      onClick={async () => {
+                                        if (!selectedEvaluationForPanel || !newObjective || !newObjective.title) { toast.error('Provide title'); return; }
+                                        try {
+                                          const payload = {
+                                            evaluation_id: selectedEvaluationForPanel.evaluation_id,
+                                            title: newObjective.title,
+                                            description: newObjective.description,
+                                            target: newObjective.target,
+                                            achieved: newObjective.achieved,
+                                            weight: 0,
+                                            status: newObjective.status,
+                                          };
+                                          const created = await createObjectiveMutation.mutateAsync(payload as any);
+                                          setObjectives(prev => [created, ...prev]);
+                                          setNewObjective({ title: '', description: '', target: 0, achieved: 0, status: 'Not started' });
+                                          toast.success('Objective added');
+                                        } catch (err: any) {
+                                          toast.error(err?.message || 'Failed to add objective');
+                                        }
+                                      }}
+                                      className="bg-blue-600 hover:bg-blue-700"
+                                    >
+                                      <Plus className="h-4 w-4 mr-2" />
+                                      Add Objective
+                                    </Button>
+                                  </div>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        </CardContent>
+                      </Card>
+                    )}
                     {isLoadingObjectives ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -1741,6 +2199,7 @@ const ProfilePage: React.FC = () => {
                       <div className="space-y-3">
                         {objectives.map((objective) => {
                           const score = getObjectiveScore(objective);
+                          const achievedValue = objectiveEdits[objective.objective_id] ?? objective.achieved;
                           return (
                             <Card key={objective.objective_id} className="border-l-4 border-l-blue-500">
                               <CardContent className="p-4">
@@ -1757,10 +2216,12 @@ const ProfilePage: React.FC = () => {
                                         <span className="text-gray-500">Achieved:</span>
                                         <span className="font-medium ml-1">{objective.achieved}</span>
                                       </div>
-                                      <div className="text-sm">
-                                        <span className="text-gray-500">Weight:</span>
-                                        <span className="font-medium ml-1">{objective.weight}%</span>
-                                      </div>
+                                      {!isSelfEvalMode && (
+                                        <div className="text-sm">
+                                          <span className="text-gray-500">Weight:</span>
+                                          <span className="font-medium ml-1">{objective.weight}%</span>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="text-right space-y-2">
@@ -1775,8 +2236,87 @@ const ProfilePage: React.FC = () => {
                                     >
                                       {objective.status}
                                     </Badge>
+                                    {canSelfCrud && (
+                                      <div className="flex items-center gap-2 justify-end mt-2">
+                                        {editingObjectiveId === objective.objective_id ? (
+                                          <Button
+                                            onClick={async () => {
+                                              try {
+                                                const data = objectiveFieldEdits[objective.objective_id] || {};
+                                                const achievedChanged = objectiveEdits[objective.objective_id];
+                                                const updateData: any = { ...data };
+                                                if (achievedChanged !== undefined) updateData.achieved = achievedChanged;
+                                                if (Object.keys(updateData).length === 0) { setEditingObjectiveId(null); return; }
+                                                const updated = await updateObjectiveMutation.mutateAsync({ objectiveId: objective.objective_id, evaluationId: objective.evaluation_id, objectiveData: updateData });
+                                                setObjectives(prev => prev.map(o => o.objective_id === objective.objective_id ? { ...o, ...updated } : o));
+                                                setEditingObjectiveId(null);
+                                                setObjectiveFieldEdits(prev => ({ ...prev, [objective.objective_id]: {} }));
+                                                toast.success('Objective updated');
+                                              } catch (err: any) {
+                                                toast.error(err?.message || 'Failed to update objective');
+                                              }
+                                            }}
+                                            className="bg-green-600 hover:bg-green-700"
+                                          >
+                                            <Save className="h-4 w-4 mr-2" />
+                                            Save
+                                          </Button>
+                                        ) : (
+                                          <Button onClick={() => setEditingObjectiveId(objective.objective_id)} variant="outline">
+                                            <Edit3 className="h-4 w-4 mr-2" />
+                                            Edit
+                                          </Button>
+                                        )}
+                                        <Button
+                                          variant="outline"
+                                          onClick={async () => {
+                                            try {
+                                              await deleteObjectiveMutation.mutateAsync({ objectiveId: objective.objective_id, evaluationId: objective.evaluation_id });
+                                              setObjectives(prev => prev.filter(o => o.objective_id !== objective.objective_id));
+                                              toast.success('Objective deleted');
+                                            } catch (err: any) {
+                                              toast.error(err?.message || 'Failed to delete objective');
+                                            }
+                                          }}
+                                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Delete
+                                        </Button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
+                                {canSelfCrud && editingObjectiveId === objective.objective_id && (
+                                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="space-y-1">
+                                      <Label>Title</Label>
+                                      <Input defaultValue={objective.title} onChange={(e) => setObjectiveFieldEdits(prev => ({ ...prev, [objective.objective_id]: { ...prev[objective.objective_id], title: e.target.value } }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Target</Label>
+                                      <Input type="number" min={0} max={10} defaultValue={objective.target} onChange={(e) => setObjectiveFieldEdits(prev => ({ ...prev, [objective.objective_id]: { ...prev[objective.objective_id], target: Math.min(parseFloat(e.target.value) || 0, 10) } }))} />
+                                    </div>
+                                    
+                                    <div className="md:col-span-3 space-y-1">
+                                      <Label>Description</Label>
+                                      <Textarea rows={2} defaultValue={objective.description} onChange={(e) => setObjectiveFieldEdits(prev => ({ ...prev, [objective.objective_id]: { ...prev[objective.objective_id], description: e.target.value } }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Status</Label>
+                                      <Select value={(objective.status as any) ?? 'Not started'} onValueChange={(v) => setObjectiveFieldEdits(prev => ({ ...prev, [objective.objective_id]: { ...prev[objective.objective_id], status: v } }))}>
+                                        <SelectTrigger className="w-40">
+                                          <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="Not started">Not started</SelectItem>
+                                          <SelectItem value="In-progress">In-progress</SelectItem>
+                                          <SelectItem value="Completed">Completed</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+                                )}
                               </CardContent>
                             </Card>
                           );
@@ -1786,6 +2326,134 @@ const ProfilePage: React.FC = () => {
                   </TabsContent>
 
                   <TabsContent value="competencies" className="space-y-4">
+                    {canSelfCrud && selectedEvaluationForPanel && (
+                      <Card className="border-0 shadow-xl bg-gradient-to-br from-green-50 to-emerald-50">
+                        <CardContent className="p-3">
+                          <Accordion type="single" collapsible>
+                            <AccordionItem value="add-competency">
+                              <AccordionTrigger>
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-gradient-to-br from-green-600 to-emerald-600 rounded-lg">
+                                      <Award className="h-4 w-4 text-white" />
+                                    </div>
+                                    <div className="font-semibold text-gray-900">Add Competency</div>
+                                  </div>
+                                  <Badge>{selectedEvaluationForPanel.period}</Badge>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="space-y-3">
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => setNewCompetency({ name: 'Communication', category: 'Core', required_level: 5, actual_level: 0, description: 'Improve communication effectiveness' })} className="rounded-full">Communication</Button>
+                                    <Button variant="outline" size="sm" onClick={() => setNewCompetency({ name: 'Leadership', category: 'Leadership', required_level: 6, actual_level: 0, description: 'Develop leadership capabilities' })} className="rounded-full">Leadership</Button>
+                                    <Button variant="outline" size="sm" onClick={() => setNewCompetency({ name: 'Functional Expertise', category: 'Functional', required_level: 7, actual_level: 0, description: 'Strengthen functional knowledge' })} className="rounded-full">Functional Expertise</Button>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                      <Label>Name</Label>
+                                      <Input value={newCompetency?.name ?? ''} onChange={(e) => setNewCompetency(prev => ({ ...(prev || { name: '', category: 'Core', required_level: 5, actual_level: 0, weight: 10, description: '' }), name: e.target.value }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Category</Label>
+                                      <Select value={newCompetency?.category ?? 'Core'} onValueChange={(v) => setNewCompetency(prev => ({ ...(prev || { name: '', category: 'Core', required_level: 5, actual_level: 0, weight: 10, description: '' }), category: v as any }))}>
+                                        <SelectTrigger className="w-40">
+                                          <SelectValue placeholder="Select category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="Core">Core</SelectItem>
+                                          <SelectItem value="Leadership">Leadership</SelectItem>
+                                          <SelectItem value="Functional">Functional</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Required Level</Label>
+                                      <Input type="range" min={0} max={10} value={newCompetency?.required_level ?? 5} onChange={(e) => setNewCompetency(prev => ({ ...(prev || { name: '', category: 'Core', required_level: 5, actual_level: 0, weight: 10, description: '' }), required_level: parseFloat(e.target.value) || 0 }))} />
+                                      <div className="text-xs text-gray-600">{newCompetency?.required_level ?? 5}/10</div>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Actual Level</Label>
+                                      <Input type="range" min={0} max={10} value={newCompetency?.actual_level ?? 0} onChange={(e) => setNewCompetency(prev => ({ ...(prev || { name: '', category: 'Core', required_level: 5, actual_level: 0, weight: 10, description: '' }), actual_level: parseFloat(e.target.value) || 0 }))} />
+                                      <div className="text-xs text-gray-600">{newCompetency?.actual_level ?? 0}/10</div>
+                                    </div>
+                                    <div className="space-y-1 md:col-span-2">
+                                      <Label>Description</Label>
+                                      <Textarea rows={2} value={newCompetency?.description ?? ''} onChange={(e) => setNewCompetency(prev => ({ ...(prev || { name: '', category: 'Core', required_level: 5, actual_level: 0, description: '' }), description: e.target.value }))} />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="rounded-lg border bg-white p-3">
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-sm text-gray-600">Preview</div>
+                                        <Badge 
+                                          variant="outline" 
+                                          className={
+                                            (newCompetency?.category === 'Core') ? 'text-blue-700 border-blue-200' :
+                                            (newCompetency?.category === 'Leadership') ? 'text-purple-700 border-purple-200' :
+                                            'text-orange-700 border-orange-200'
+                                          }
+                                        >
+                                          {newCompetency?.category}
+                                        </Badge>
+                                      </div>
+                                      <div className="mt-2 flex items-center gap-6">
+                                        <div>
+                                          <div className="text-xs text-gray-500">Required</div>
+                                          <div className="text-lg font-semibold text-gray-900">{newCompetency?.required_level ?? 0}/10</div>
+                                        </div>
+                                        <div>
+                                          <div className="text-xs text-gray-500">Actual</div>
+                                          <div className="text-lg font-semibold text-gray-900">{newCompetency?.actual_level ?? 0}/10</div>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="text-xs text-gray-500 mb-1">Progress</div>
+                                          <div className="w-full h-2 bg-gray-200 rounded">
+                                            <div
+                                              className="h-2 rounded bg-gradient-to-r from-green-600 to-emerald-600"
+                                              style={{ width: `${Math.min(((newCompetency?.actual_level ?? 0) / Math.max(newCompetency?.required_level ?? 1, 1)) * 100, 100)}%` }}
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-end">
+                                    <Button
+                                      onClick={async () => {
+                                        if (!selectedEvaluationForPanel || !newCompetency || !newCompetency.name) { toast.error('Provide name'); return; }
+                                        try {
+                                          const payload = {
+                                            evaluation_id: selectedEvaluationForPanel.evaluation_id,
+                                            employee_id: profileData.employee_id,
+                                            name: newCompetency.name,
+                                            category: newCompetency.category,
+                                            required_level: newCompetency.required_level,
+                                            actual_level: newCompetency.actual_level,
+                                            weight: 0,
+                                            description: newCompetency.description,
+                                          };
+                                          const created = await createCompetencyMutation.mutateAsync(payload as any);
+                                          setCompetencies(prev => [created, ...prev]);
+                                          setNewCompetency({ name: '', category: 'Core', required_level: 5, actual_level: 0, description: '' });
+                                          toast.success('Competency added');
+                                        } catch (err: any) {
+                                          toast.error(err?.message || 'Failed to add competency');
+                                        }
+                                      }}
+                                      className="bg-green-600 hover:bg-green-700"
+                                    >
+                                      <Plus className="h-4 w-4 mr-2" />
+                                      Add Competency
+                                    </Button>
+                                  </div>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        </CardContent>
+                      </Card>
+                    )}
                     {isLoadingCompetencies ? (
                       <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin text-green-600" />
@@ -1828,10 +2496,12 @@ const ProfilePage: React.FC = () => {
                                         <span className="text-gray-500">Actual:</span>
                                         <span className="font-medium ml-1">{competency.actual_level}/10</span>
                                       </div>
-                                      <div className="text-sm">
-                                        <span className="text-gray-500">Weight:</span>
-                                        <span className="font-medium ml-1">{competency.weight}%</span>
-                                      </div>
+                                      {!isSelfEvalMode && (
+                                        <div className="text-sm">
+                                          <span className="text-gray-500">Weight:</span>
+                                          <span className="font-medium ml-1">{competency.weight}%</span>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="text-right">
@@ -1839,8 +2509,87 @@ const ProfilePage: React.FC = () => {
                                     <div className="text-xs text-gray-500 mt-1">
                                       {competency.actual_level >= competency.required_level ? 'Meets Requirement' : 'Below Requirement'}
                                     </div>
+                                    {canSelfCrud && (
+                                      <div className="flex items-center gap-2 justify-end mt-2">
+                                        {editingCompetencyId === competency.competence_id ? (
+                                          <Button
+                                            onClick={async () => {
+                                              try {
+                                                const data = competencyFieldEdits[competency.competence_id] || {};
+                                                const updated = await updateCompetencyMutation.mutateAsync({ competencyId: competency.competence_id, competencyData: data });
+                                                setCompetencies(prev => prev.map(c => c.competence_id === competency.competence_id ? { ...c, ...updated } : c));
+                                                setEditingCompetencyId(null);
+                                                setCompetencyFieldEdits(prev => ({ ...prev, [competency.competence_id]: {} }));
+                                                toast.success('Competency updated');
+                                              } catch (err: any) {
+                                                toast.error(err?.message || 'Failed to update competency');
+                                              }
+                                            }}
+                                            className="bg-green-600 hover:bg-green-700"
+                                          >
+                                            <Save className="h-4 w-4 mr-2" />
+                                            Save
+                                          </Button>
+                                        ) : (
+                                          <Button onClick={() => setEditingCompetencyId(competency.competence_id)} variant="outline">
+                                            <Edit3 className="h-4 w-4 mr-2" />
+                                            Edit
+                                          </Button>
+                                        )}
+                                        <Button
+                                          variant="outline"
+                                          onClick={async () => {
+                                            try {
+                                              await deleteCompetencyMutation.mutateAsync({ competencyId: competency.competence_id, evaluationId: selectedEvaluationForPanel?.evaluation_id || '' });
+                                              setCompetencies(prev => prev.filter(c => c.competence_id !== competency.competence_id));
+                                              toast.success('Competency deleted');
+                                            } catch (err: any) {
+                                              toast.error(err?.message || 'Failed to delete competency');
+                                            }
+                                          }}
+                                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Delete
+                                        </Button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
+                                {canSelfCrud && editingCompetencyId === competency.competence_id && (
+                                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="space-y-1">
+                                      <Label>Name</Label>
+                                      <Input defaultValue={competency.name} onChange={(e) => setCompetencyFieldEdits(prev => ({ ...prev, [competency.competence_id]: { ...prev[competency.competence_id], name: e.target.value } }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Category</Label>
+                                      <Select value={(competency.category as any) ?? 'Core'} onValueChange={(v) => setCompetencyFieldEdits(prev => ({ ...prev, [competency.competence_id]: { ...prev[competency.competence_id], category: v } }))}>
+                                        <SelectTrigger className="w-40">
+                                          <SelectValue placeholder="Select category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="Core">Core</SelectItem>
+                                          <SelectItem value="Leadership">Leadership</SelectItem>
+                                          <SelectItem value="Functional">Functional</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Required</Label>
+                                      <Input type="number" min={0} max={10} defaultValue={competency.required_level} onChange={(e) => setCompetencyFieldEdits(prev => ({ ...prev, [competency.competence_id]: { ...prev[competency.competence_id], required_level: Math.min(parseFloat(e.target.value) || 0, 10) } }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Actual</Label>
+                                      <Input type="number" min={0} max={10} defaultValue={competency.actual_level} onChange={(e) => setCompetencyFieldEdits(prev => ({ ...prev, [competency.competence_id]: { ...prev[competency.competence_id], actual_level: Math.min(parseFloat(e.target.value) || 0, 10) } }))} />
+                                    </div>
+                                    
+                                    <div className="md:col-span-3 space-y-1">
+                                      <Label>Description</Label>
+                                      <Textarea rows={2} defaultValue={competency.description} onChange={(e) => setCompetencyFieldEdits(prev => ({ ...prev, [competency.competence_id]: { ...prev[competency.competence_id], description: e.target.value } }))} />
+                                    </div>
+                                  </div>
+                                )}
                               </CardContent>
                             </Card>
                           );
@@ -1859,6 +2608,7 @@ const ProfilePage: React.FC = () => {
               >
                 Close
               </Button>
+              
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Calendar, User, BarChart3, FileText, Target, Plus, Edit, Trash2, Loader2, Mail, Phone, MapPin, Building2, Users, Briefcase, Hash, Clock } from 'lucide-react';
 import EvaluationDetails from './EvaluationDetails';
 import { EmployeeInput, EvaluationInput } from '../../types/shared';
-import { useEvaluations, useCreateEvaluation, useUpdateEvaluation, useDeleteEvaluation, useUsers } from '../../hooks/useApi';
+import { useEvaluations, useCreateEvaluation, useUpdateEvaluation, useDeleteEvaluation, useUsers, useSelfEvaluations } from '../../hooks/useApi';
 import { useManagers } from '../../hooks/usemanagers';
 import { ApiEvaluation } from '../../types/api';
 import { 
@@ -64,6 +65,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const { data: evaluationsData, isLoading: evaluationsLoading, error: evaluationsError } = useEvaluations({
     employee_id: employee.id
   });
+  const { data: selfEvaluationsData, isLoading: selfEvaluationsLoading, error: selfEvaluationsError } = useSelfEvaluations(employee.id);
   
   // Create evaluation mutation
   const createEvaluationMutation = useCreateEvaluation();
@@ -143,6 +145,27 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
       return [];
     }
   }, [evaluationsData]);
+
+  const selfEvaluationList = useMemo(() => {
+    let dataToTransform: any[] = [];
+    if (selfEvaluationsData && Array.isArray(selfEvaluationsData)) {
+      dataToTransform = selfEvaluationsData;
+    } else if (selfEvaluationsData && typeof selfEvaluationsData === 'object') {
+      if ((selfEvaluationsData as any).results && Array.isArray((selfEvaluationsData as any).results)) {
+        dataToTransform = (selfEvaluationsData as any).results;
+      } else if ((selfEvaluationsData as any).data && Array.isArray((selfEvaluationsData as any).data)) {
+        dataToTransform = (selfEvaluationsData as any).data;
+      }
+    }
+    if (!dataToTransform || dataToTransform.length === 0) {
+      return [];
+    }
+    try {
+      return dataToTransform.map(transformApiEvaluation);
+    } catch {
+      return [];
+    }
+  }, [selfEvaluationsData]);
 
   // Transform users data to reviewers format
   const reviewers: Reviewer[] = useMemo(() => {
@@ -968,89 +991,153 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                 <p className="text-sm text-gray-500 mt-1">Add an evaluation to get started</p>
               </div>
             ) : (
-              evaluationList.map((evaluation) => (
-              <Card 
-                key={evaluation.id} 
-                className="hover:shadow-md transition-all duration-200 border-l-4 border-l-blue-500"
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div 
-                      className="flex items-center space-x-4 cursor-pointer flex-1"
-                      onClick={() => setSelectedEvaluation(evaluation)}
-                    >
-                      <div className="bg-blue-100 p-3 rounded-lg">
-                        <BarChart3 className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{evaluation.type}</h3>
-                        <p className="text-sm text-gray-600">{evaluation.period}</p>
-                      </div>
+              <Tabs defaultValue="selfEval" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="selfEval" className="flex items-center gap-2">
+                    Self Evaluation
+                    <Badge variant="secondary" className="ml-1">
+                      {selfEvaluationList.length}
+                    </Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="managerEval" className="flex items-center gap-2">
+                    Manager Evaluation
+                    <Badge variant="secondary" className="ml-1">
+                      {evaluationList.filter(e => e.status !== 'Self Evaluation').length}
+                    </Badge>
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="selfEval" className="space-y-4">
+                  {selfEvaluationsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                      <span className="ml-2 text-gray-600">Loading self evaluations...</span>
                     </div>
-                    
-                    <div className="flex items-center space-x-4">
-                      <Badge 
-                        variant={
-                          evaluation.status === 'Completed' ? 'default' : 
-                          evaluation.status === 'Employee Review' ? 'secondary' : 'outline'
-                        }
-                        className={
-                          evaluation.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                          evaluation.status === 'Employee Review' ? 'bg-yellow-100 text-yellow-800' :
-                          evaluation.status === 'Pending HoD Approval' ? 'bg-orange-100 text-orange-800' :
-                          evaluation.status === 'Pending HR Approval' ? 'bg-purple-100 text-purple-800' :
-                          evaluation.status === 'Approved' ? 'bg-blue-100 text-blue-800' :
-                          evaluation.status === 'Draft' ? 'bg-gray-100 text-gray-800' :
-                          evaluation.status === 'Rejected' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }
-                      >
-                        {evaluation.status}
-                      </Badge>
-                      
-                      {evaluation.score && (
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-gray-900">{evaluation.score}</div>
-                          <div className="text-xs text-gray-500">Score</div>
-                        </div>
-                      )}
-                      
-                      <div className="text-right space-y-1">
-                        <div className="flex items-center text-sm text-gray-600">
-                          <User className="h-4 w-4 mr-1" />
-                          {evaluation.reviewer}
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditEvaluation(evaluation);
-                          }}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteEvaluation(evaluation.id);
-                          }}
-                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                  ) : selfEvaluationsError ? (
+                    <div className="text-center py-8">
+                      <p className="text-red-600">Failed to load self evaluations</p>
+                      <p className="text-sm text-gray-500 mt-1">{(selfEvaluationsError as any)?.message || 'Error'}</p>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  ) : selfEvaluationList.length === 0 ? (
+                    <div className="text-center py-8">
+                      <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600">No self evaluations</p>
+                    </div>
+                  ) : (
+                    selfEvaluationList.map((evaluation) => (
+                      <Card key={evaluation.id} className="hover:shadow-md transition-all duration-200 border-l-4 border-l-blue-500">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4 cursor-pointer flex-1" onClick={() => setSelectedEvaluation(evaluation)}>
+                              <div className="bg-blue-100 p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-blue-600" />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-gray-900">{evaluation.type}</h3>
+                                <p className="text-sm text-gray-600">{evaluation.period}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <Badge 
+                                variant={evaluation.status === 'Completed' ? 'default' : 'outline'}
+                                className={
+                                  evaluation.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }
+                              >
+                                {evaluation.status}
+                              </Badge>
+                              {evaluation.score && (
+                                <div className="text-center">
+                                  <div className="text-lg font-bold text-gray-900">{evaluation.score}</div>
+                                  <div className="text-xs text-gray-500">Score</div>
+                                </div>
+                              )}
+                              <div className="text-right space-y-1">
+                                <div className="flex items-center text-sm text-gray-600">
+                                  <User className="h-4 w-4 mr-1" />
+                                  {evaluation.reviewer}
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleEditEvaluation(evaluation); }} className="h-8 w-8 p-0">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleDeleteEvaluation(evaluation.id); }} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </TabsContent>
+
+                <TabsContent value="managerEval" className="space-y-4">
+                  {evaluationList.filter(e => e.status !== 'Self Evaluation').length === 0 ? (
+                    <div className="text-center py-8">
+                      <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600">No manager evaluations</p>
+                    </div>
+                  ) : (
+                    evaluationList.filter(e => e.status !== 'Self Evaluation').map((evaluation) => (
+                      <Card key={evaluation.id} className="hover:shadow-md transition-all duration-200 border-l-4 border-l-blue-500">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4 cursor-pointer flex-1" onClick={() => setSelectedEvaluation(evaluation)}>
+                              <div className="bg-blue-100 p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-blue-600" />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-gray-900">{evaluation.type}</h3>
+                                <p className="text-sm text-gray-600">{evaluation.period}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <Badge 
+                                variant={evaluation.status === 'Completed' ? 'default' : 'outline'}
+                                className={
+                                  evaluation.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                  evaluation.status === 'Pending HoD Approval' ? 'bg-orange-100 text-orange-800' :
+                                  evaluation.status === 'Pending HR Approval' ? 'bg-purple-100 text-purple-800' :
+                                  evaluation.status === 'Approved' ? 'bg-blue-100 text-blue-800' :
+                                  evaluation.status === 'Draft' ? 'bg-gray-100 text-gray-800' :
+                                  evaluation.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }
+                              >
+                                {evaluation.status}
+                              </Badge>
+                              {evaluation.score && (
+                                <div className="text-center">
+                                  <div className="text-lg font-bold text-gray-900">{evaluation.score}</div>
+                                  <div className="text-xs text-gray-500">Score</div>
+                                </div>
+                              )}
+                              <div className="text-right space-y-1">
+                                <div className="flex items-center text-sm text-gray-600">
+                                  <User className="h-4 w-4 mr-1" />
+                                  {evaluation.reviewer}
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleEditEvaluation(evaluation); }} className="h-8 w-8 p-0">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleDeleteEvaluation(evaluation.id); }} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </TabsContent>
+              </Tabs>
             )}
           </div>
         </CardContent>

@@ -54,6 +54,7 @@ export const queryKeys = {
   evaluation: (id: string) => ['evaluations', id] as const,
   objectives: (evaluationId: string) => ['objectives', evaluationId] as const,
   competencies: (evaluationId: string) => ['competencies', evaluationId] as const,
+  selfEvaluations: (employeeId: string) => ['selfEvaluations', employeeId] as const,
   placements: ['placements'] as const,
   placement: (id: string) => ['placements', id] as const,
 };
@@ -450,6 +451,19 @@ export const useEvaluations = (
   });
 };
 
+export const useSelfEvaluations = (
+  employeeId: string,
+  options?: UseQueryOptions<ApiEvaluation[], ApiError>
+) => {
+  return useQuery({
+    queryKey: queryKeys.selfEvaluations(employeeId),
+    queryFn: () => apiService.getSelfEvaluationByEmployeeId(employeeId),
+    enabled: !!employeeId,
+    staleTime: 2 * 60 * 1000,
+    ...options,
+  });
+};
+
 export const useEvaluation = (
   evaluationId: string,
   options?: UseQueryOptions<ApiEvaluation, ApiError>
@@ -471,6 +485,7 @@ export const useCreateEvaluation = (options?: UseMutationOptions<ApiEvaluation, 
     onSuccess: () => {
       toast.success('Evaluation created successfully!');
       queryClient.invalidateQueries({ queryKey: queryKeys.evaluations });
+      queryClient.invalidateQueries({ queryKey: ['selfEvaluations'] });
     },
     onError: (error: ApiError) => {
       toast.error(error.message || 'Failed to create evaluation');
@@ -488,6 +503,7 @@ export const useUpdateEvaluation = (options?: UseMutationOptions<ApiEvaluation, 
       toast.success('Evaluation updated successfully!');
       queryClient.invalidateQueries({ queryKey: queryKeys.evaluation(variables.evaluationId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.evaluations });
+      queryClient.invalidateQueries({ queryKey: ['selfEvaluations'] });
     },
     onError: (error: ApiError) => {
       toast.error(error.message || 'Failed to update evaluation');
@@ -504,6 +520,7 @@ export const useDeleteEvaluation = (options?: UseMutationOptions<void, ApiError,
     onSuccess: () => {
       toast.success('Evaluation deleted successfully!');
       queryClient.invalidateQueries({ queryKey: queryKeys.evaluations });
+      queryClient.invalidateQueries({ queryKey: ['selfEvaluations'] });
     },
     onError: (error: ApiError) => {
       toast.error(error.message || 'Failed to delete evaluation');
