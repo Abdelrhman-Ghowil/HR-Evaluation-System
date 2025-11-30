@@ -58,7 +58,7 @@ export interface EvaluationInput {
   id: string;
   evaluation_id: string;
   type: string;
-  status: 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed';
+  status: 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed' | 'Self Evaluation' ;
   score?: number;
   date: string;
   reviewer: string;

@@ -219,16 +219,16 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   };
 
   const handleDeleteObjective = async (id: string) => {
-     try {
-       await deleteObjectiveMutation.mutateAsync({
+    try {
+      await deleteObjectiveMutation.mutateAsync({
         objectiveId: id,
         evaluationId: evaluation.id
-       });
-     } catch (err) {
-       console.error('Error deleting objective:', err);
+      });
+    } catch (err) {
+      console.error('Error deleting objective:', err);
        // Error handling is managed by the React Query hook
-     }
-   };
+    }
+  };
 
   // Handlers for competencies
   const handleAddCompetency = () => {

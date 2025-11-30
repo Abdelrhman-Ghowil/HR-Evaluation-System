@@ -29,6 +29,7 @@ import {
   EmployeeQueryParams,
   DepartmentQueryParams,
   EvaluationQueryParams,
+  EvaluationType,
   WeightsConfiguration,
   WeightsConfigurationLevel,
   UpdateWeightsConfigurationRequest,
@@ -643,6 +644,30 @@ class ApiService {
       params,
     });
     return response.data;
+  }
+
+  async getSelfEvaluations(): Promise<ApiEvaluation[]> {
+    const response: AxiosResponse<ApiEvaluation[] | PaginatedResponse<ApiEvaluation> | ApiResponse<ApiEvaluation[]>> = await this.api.get('/api/evaluations/self-evaluate/');
+    const data = response.data as any;
+    if (Array.isArray(data)) return data;
+    if (data?.results && Array.isArray(data.results)) return data.results;
+    if (data?.data && Array.isArray(data.data)) return data.data;
+    return [];
+  }
+
+  async getSelfEvaluationByEmployeeId(employeeId: string): Promise<ApiEvaluation[]> {
+    const response: AxiosResponse<ApiEvaluation[] | PaginatedResponse<ApiEvaluation> | ApiResponse<ApiEvaluation[]>> = await this.api.get(`/api/evaluations/self-evaluate/?employee_id=${employeeId}`);
+    const data = response.data as any;
+    if (Array.isArray(data)) return data;
+    if (data?.results && Array.isArray(data.results)) return data.results;
+    if (data?.data && Array.isArray(data.data)) return data.data;
+    return [];
+  }
+
+  async createSelfEvaluation(payload: { period: string; type: EvaluationType }): Promise<ApiEvaluation> {
+    const response: AxiosResponse<ApiEvaluation | ApiResponse<ApiEvaluation>> = await this.api.post('/api/evaluations/self-evaluate/', payload);
+    const data = response.data as any;
+    return (data?.data ?? data) as ApiEvaluation;
   }
 
   async getEvaluation(evaluationId: string): Promise<ApiEvaluation> {
