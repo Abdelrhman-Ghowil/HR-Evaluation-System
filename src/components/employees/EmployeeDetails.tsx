@@ -200,6 +200,20 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   // Generate quarter options for Optional type
   const quarterOptions = Array.from({ length: 6 }, (_, i) => i + 1);
 
+  const [ratingYear, setRatingYear] = useState<number>(currentYear);
+
+  const getYearFromPeriod = (period: string) => {
+    const m = period?.match(/^(\d{4})/);
+    return m ? parseInt(m[1], 10) : null;
+  };
+
+  const yearEvaluations = useMemo(() => {
+    return evaluationList.filter(e => {
+      const y = getYearFromPeriod(e.period);
+      return y === ratingYear;
+    });
+  }, [evaluationList, ratingYear]);
+
   // Helper function to generate evaluation records
   const generateEvaluationRecords = () => {
     const records: Partial<EvaluationInput>[] = [];
@@ -363,8 +377,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     if (!editingEvaluation) return false;
     
     // Basic field validation
-    const hasRequiredFields = editingEvaluation.type && 
-                             editingEvaluation.period;
+    const hasRequiredFields = editingEvaluation.type && editingEvaluation.period;
     
     if (!hasRequiredFields) return false;
     
@@ -923,17 +936,37 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
               <CardContent className="p-6 text-center">
-                <div className="flex items-center justify-center mb-4">
-                  <div className="bg-blue-600 p-3 rounded-full">
-                    <BarChart3 className="h-6 w-6 text-white" />
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center">
+                    <div className="bg-blue-600 p-3 rounded-full">
+                      <BarChart3 className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm text-blue-700">Year</Label>
+                    <Select
+                      value={ratingYear.toString()}
+                      onValueChange={(value) => setRatingYear(parseInt(value))}
+                    >
+                      <SelectTrigger className="h-8 w-24">
+                        <SelectValue placeholder="Year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {yearOptions.map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <h3 className="text-2xl font-bold text-blue-900">
-                  {evaluationList.length > 0
+                  {yearEvaluations.length > 0
                     ? (
                         (
-                          evaluationList.reduce((sum, evaluation) => sum + (evaluation.score || 0), 0) /
-                          evaluationList.length
+                          yearEvaluations.reduce((sum, evaluation) => sum + (evaluation.score || 0), 0) /
+                          yearEvaluations.length
                         ).toFixed(1)
                       )
                     : 'N/A'}
