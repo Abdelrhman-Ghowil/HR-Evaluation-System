@@ -991,7 +991,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                 <p className="text-sm text-gray-500 mt-1">Add an evaluation to get started</p>
               </div>
             ) : (
-              <Tabs defaultValue="selfEval" className="w-full">
+              <Tabs defaultValue="managerEval" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="selfEval" className="flex items-center gap-2">
                     Self Evaluation

@@ -48,7 +48,10 @@ import {
   ApiPlacement,
   CreatePlacementRequest,
   ImportResponse,
-  ApiMyProfile
+  ApiMyProfile,
+  ApiActivityLog,
+  CreateActivityLogRequest,
+  PaginatedResponse as _PaginatedResponse
 } from '../types/api';
 
 // Base API configuration
@@ -742,6 +745,22 @@ class ApiService {
 
   async deleteCompetency(competencyId: string): Promise<void> {
     await this.api.delete(`/api/competencies/${competencyId}/`);
+  }
+
+  async getActivityLogByEvaluationId(evaluationId: string): Promise<ApiActivityLog[]> {
+    const response: AxiosResponse<ApiActivityLog[] | _PaginatedResponse<ApiActivityLog> | ApiResponse<ApiActivityLog[]>> = await this.api.get(`/api/activity-log/?evaluation_id=${evaluationId}`);
+    const data = response.data as any;
+    if (Array.isArray(data)) return data;
+    if (data?.results && Array.isArray(data.results)) return data.results;
+    if (data?.data && Array.isArray(data.data)) return data.data;
+    return [];
+  }
+
+  async createActivityLog(payload: CreateActivityLogRequest): Promise<ApiActivityLog> {
+    const response: AxiosResponse<ApiActivityLog | ApiResponse<ApiActivityLog>> = await this.api.post('/api/activity-log/', payload);
+    const data = response.data as any;
+    if (data?.data) return data.data as ApiActivityLog;
+    return data as ApiActivityLog;
   }
 
   // Utility methods

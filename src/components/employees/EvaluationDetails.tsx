@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,11 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SmartEvaluationButton } from '@/components/ui/SmartEvaluationButton';
 import { SmartEvaluationModal } from '@/components/ui/SmartEvaluationModal';
-import { ArrowLeft, Award, Target, Users, Plus, Edit, Trash2, Save, X, BarChart3, TrendingUp, CheckCircle2, Circle, ChevronRight, Check, XCircle, Info } from 'lucide-react';
+import { ArrowLeft, Award, Target, Users, Plus, Edit, Trash2, Save, X, BarChart3, TrendingUp, CheckCircle2, Circle, ChevronRight, Check, XCircle, Info, Clock, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { ApiObjective, ApiCompetency } from '../../types/api';
 import { apiService } from '../../services/api';
-import { useObjectives, useCreateObjective, useUpdateObjective, useDeleteObjective, useCompetencies, useCreateCompetency, useUpdateCompetency, useDeleteCompetency } from '../../hooks/useApi';
+import { useObjectives, useCreateObjective, useUpdateObjective, useDeleteObjective, useCompetencies, useCreateCompetency, useUpdateCompetency, useDeleteCompetency, useActivityLog, useCreateActivityLog, useUpdateEvaluation } from '../../hooks/useApi';
 
 interface Employee {
   id: string;
@@ -359,6 +359,11 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const initialStatus: WorkflowStatus = (evaluation.status === 'Rejected' ? 'Draft' : (statusOrder.includes(evaluation.status as WorkflowStatus) ? evaluation.status as WorkflowStatus : 'Draft'));
   const [currentStatus, setCurrentStatus] = useState<WorkflowStatus>(initialStatus);
   const [commentText, setCommentText] = useState('');
+  const [panelAction, setPanelAction] = useState<'approve' | 'reject' | null>(null);
+  const [panelComment, setPanelComment] = useState('');
+  const [panelError, setPanelError] = useState('');
+  const [panelSubmitted, setPanelSubmitted] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [actionError, setActionError] = useState('');
   const [activityLog, setActivityLog] = useState<ActivityEntry[]>(() => {
     const existing = (evaluation as any).activity_log as ActivityEntry[] | undefined;
@@ -375,6 +380,116 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       },
     ];
   });
+
+  const { data: activityLogData, isLoading: activityLogLoading, error: activityLogError } = useActivityLog(evaluation.id);
+
+  const statusMap: Record<string, WorkflowStatus> = {
+    DRAFT: 'Draft',
+    PENDING_HOD: 'Pending HoD Approval',
+    PENDING_HR: 'Pending HR Approval',
+    EMP_REVIEW: 'Employee Review',
+    APPROVED: 'Approved',
+    REJECTED: 'Rejected',
+    COMPLETED: 'Completed',
+  };
+
+  const actionMap: Record<string, ActivityEntry['action']> = {
+    CREATED: 'Created',
+    SUBMIT_HOD: 'Submitted to HoD',
+    HOD_APPROVE: 'Approved',
+    HOD_REJECT: 'Rejected',
+    SUBMIT_HR: 'Submitted',
+    HR_APPROVE: 'Approved',
+    HR_REJECT: 'Rejected',
+    COMMENT: 'Comment',
+    SELF_EVAL_CREATE: 'Self Evaluation Created',
+  };
+
+  const roleMap: Record<string, string> = {
+    EMP: 'Employee',
+    LM: 'Line Manager',
+    HOD: 'HoD',
+    HR: 'HR',
+    ADMIN: 'Admin',
+  };
+
+  const embeddedActivityRaw = ((evaluation as any).activity_log as any[]) || [];
+  const embeddedActivityFiltered = Array.isArray(embeddedActivityRaw)
+    ? embeddedActivityRaw.filter((a: any) => {
+        const evalId = (a.evaluation_id || a.evaluationId || '').toString();
+        return !evalId || evalId === evaluation.id;
+      })
+    : [];
+
+  const embeddedActivityMapped: ActivityEntry[] = embeddedActivityFiltered.map((a: any, i: number) => ({
+    id: i + 1,
+    activitystatus: statusMap[(a.activitystatus || a.status || '').toUpperCase()] || 'Draft',
+    action: actionMap[(a.action || '').toUpperCase()] || 'Created',
+    actor: `${roleMap[(a.actor_role || a.role || '')] || (a.actor_role || a.role || '')} - ${a.actor_name || a.actor || ''}`,
+    timestamp: a.created_at || a.timestamp || new Date().toISOString(),
+    comment: a.comment,
+    is_rejection: !!(a.is_rejection ?? a.isRejected),
+  }));
+
+  const apiActivityMapped: ActivityEntry[] = activityLogData && Array.isArray(activityLogData)
+    ? activityLogData.map((a: any, i: number) => ({
+        id: i + 1,
+        activitystatus: statusMap[(a.activitystatus || '').toUpperCase()] || 'Draft',
+        action: actionMap[(a.action || '').toUpperCase()] || 'Created',
+        actor: `${roleMap[(a.actor_role || '')] || a.actor_role} - ${a.actor_name}`,
+        timestamp: a.created_at,
+        comment: a.comment,
+        is_rejection: !!a.is_rejection,
+      }))
+    : [];
+
+  const displayActivityLog: ActivityEntry[] = apiActivityMapped.length > 0
+    ? apiActivityMapped
+    : (embeddedActivityMapped.length > 0 ? embeddedActivityMapped : activityLog);
+
+  const initialLogAttempted = useRef(false);
+  useEffect(() => {
+    if (!evaluation?.id) return;
+    if (initialLogAttempted.current) return;
+    if (activityLogLoading) return;
+    const embeddedCount = Array.isArray(embeddedActivityRaw) ? embeddedActivityRaw.length : 0;
+    const apiCount = Array.isArray(activityLogData) ? activityLogData.length : 0;
+    if (embeddedCount === 0 && apiCount === 0) {
+      initialLogAttempted.current = true;
+      const isSelf = evaluation.type === 'Self Evaluation';
+      const payload = {
+        evaluation_id: evaluation.id,
+        activitystatus: 'DRAFT',
+        action: isSelf ? 'SELF_EVAL_CREATE' : 'CREATED',
+        comment: isSelf ? 'Self evaluation created' : 'Initial evaluation created',
+        is_rejection: false,
+      };
+      createActivityLogMutation.mutate(payload, {
+        onSuccess: async () => {
+          const newUiStatus = statusMap[payload.activitystatus] || 'Draft';
+          setCurrentStatus(newUiStatus);
+          try {
+            await updateEvaluationMutation.mutateAsync({ evaluationId: evaluation.id, evaluationData: { status: newUiStatus } });
+          } catch {}
+        }
+      });
+    }
+  }, [evaluation?.id, evaluation?.type, activityLogLoading, activityLogData, embeddedActivityRaw]);
+
+  const sortedActivity = useMemo(() => {
+    return [...displayActivityLog].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [displayActivityLog]);
+
+  const groupedActivity = useMemo(() => {
+    const groups: Record<string, ActivityEntry[]> = {};
+    for (const entry of sortedActivity) {
+      const d = new Date(entry.timestamp);
+      const key = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(entry);
+    }
+    return Object.entries(groups).sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime());
+  }, [sortedActivity]);
 
   const statusIndex = statusOrder.indexOf(currentStatus);
   const isPending = (s: WorkflowStatus) => statusOrder.indexOf(s) > statusIndex;
@@ -475,6 +590,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
     }
   };
 
+  const createActivityLogMutation = useCreateActivityLog();
+  const isSubmittingAction = createActivityLogMutation.isPending;
+  const updateEvaluationMutation = useUpdateEvaluation();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
@@ -573,51 +692,41 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 <div className="text-xs lg:text-sm text-gray-600 font-medium mt-2">Status</div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
 
         <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
-                  <TrendingUp className="h-5 w-5 text-white" />
+          <CardHeader className="pb-2">
+            <CardTitle className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
+                    <TrendingUp className="h-5 w-5 text-white" />
+                  </div>
+                  <span>Evaluation Status</span>
                 </div>
-                <span>Evaluation Status Tracker</span>
-                <Badge className="ml-2">
+                <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow">
                   {statusLabelAr[currentStatus]} / {currentStatus}
-                </Badge>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Label className="text-sm text-gray-600">Role</Label>
-                <Select value={currentRole} onValueChange={(v) => setCurrentRole(v as DemoRole)}>
-                  <SelectTrigger className="w-52">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="line_manager">Line Manager (مدير مباشر)</SelectItem>
-                    <SelectItem value="hod">HoD (رئيس القسم)</SelectItem>
-                    <SelectItem value="hr">HR (الموارد البشرية)</SelectItem>
-                    <SelectItem value="employee">Employee (الموظف)</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600" style={{ width: `${(statusIndex / (statusOrder.length - 1)) * 100}%` }} />
               </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                <div className="relative">
-                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
-                  <div className="space-y-5">
-                    {statusOrder.map((s, i) => {
-                      const state = isCompleted(s) ? 'completed' : i === statusIndex ? 'current' : 'pending';
-                      const iconClass = state === 'completed' ? 'text-green-600' : state === 'current' ? 'text-blue-600' : 'text-gray-400';
-                      const dotBg = state === 'completed' ? 'bg-green-100 border-green-300' : state === 'current' ? 'bg-blue-100 border-blue-300 ring-2 ring-blue-500' : 'bg-gray-100 border-gray-300';
-                      const lineColor = i < statusIndex ? 'bg-green-300' : 'bg-gray-200';
-                      return (
-                        <div key={s} className="relative pl-12">
-                          <div className={`absolute left-0 top-0 flex items-center justify-center h-8 w-8 rounded-full border ${dotBg}`}>
+                <div className="flex items-start justify-between gap-4">
+                  {statusOrder.map((s, i) => {
+                    const state = isCompleted(s) ? 'completed' : i === statusIndex ? 'current' : 'pending';
+                    const iconClass = state === 'completed' ? 'text-green-600' : state === 'current' ? 'text-blue-600' : 'text-gray-400';
+                    const dotBg = state === 'completed' ? 'bg-green-100 border-green-300' : state === 'current' ? 'bg-blue-100 border-blue-300 ring-2 ring-blue-500' : 'bg-gray-100 border-gray-300';
+                    const lineColor = i < statusIndex ? 'bg-green-300' : 'bg-gray-200';
+                    return (
+                      <div key={s} className="flex-1 flex flex-col items-center">
+                        <div className="flex items-center w-full">
+                          <div className={`h-8 w-8 rounded-full border ${dotBg} flex items-center justify-center`}>
                             {state === 'completed' ? (
                               <CheckCircle2 className={`h-5 w-5 ${iconClass}`} />
                             ) : (
@@ -625,66 +734,25 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                             )}
                           </div>
                           {i < statusOrder.length - 1 && (
-                            <div className={`absolute left-4 top-8 w-0.5 ${lineColor}`} style={{ height: 'calc(100% - 8px)' }} />
+                            <div className={`flex-1 h-0.5 ${lineColor} ml-2`} />
                           )}
-                          <div className="p-4 rounded-lg border bg-white">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="font-semibold text-gray-900">
-                                  {s}
-                                </div>
-                                <div className="text-sm text-gray-600">
-                                  {statusLabelAr[s]}
-                                </div>
-                              </div>
-                              <div>
-                                {state === 'completed' && (
-                                  <Badge className="bg-green-100 text-green-800 border-green-200">
-                                    Completed
-                                  </Badge>
-                                )}
-                                {state === 'current' && (
-                                  <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                                    In Progress
-                                  </Badge>
-                                )}
-                                {state === 'pending' && (
-                                  <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200">
-                                    Pending
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div className="mt-2 text-center">
+                          <div className="text-xs font-semibold text-gray-900">{s}</div>
+                          <div className="text-[10px] text-gray-600">{statusLabelAr[s]}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
               <div className="space-y-3">
-                <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
-                  <div className="flex items-center gap-2 text-blue-900 font-medium">
-                    <Info className="h-4 w-4" />
-                    <span>Workflow Rules</span>
-                  </div>
-                  <div className="mt-2 text-sm text-blue-800 space-y-2">
-                    <div className="flex items-start gap-2">
-                      <ChevronRight className="h-4 w-4 mt-0.5" />
-                      <span>Linear: Draft → HoD → HR → Employee Review → Approved → Completed</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <ChevronRight className="h-4 w-4 mt-0.5" />
-                      <span>HoD rejection → back to Draft</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <ChevronRight className="h-4 w-4 mt-0.5" />
-                      <span>HR rejection → back to Pending HoD Approval</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <ChevronRight className="h-4 w-4 mt-0.5" />
-                      <span>Employee can comment in Employee Review stage only</span>
-                    </div>
+                <div className="p-4 rounded-lg border bg-white">
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 border border-blue-200">Draft → HoD → HR → Employee Review → Approved → Completed</span>
+                    <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 border border-yellow-200">HoD rejection → back to Draft</span>
+                    <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800 border border-orange-200">HR rejection → back to Pending HoD Approval</span>
+                    <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800 border border-gray-200">Employee Review stage only</span>
                   </div>
                 </div>
               </div>
@@ -961,123 +1029,218 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 space-y-4">
-                <Label className="text-sm">Comment / التعليق</Label>
-                <Textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Add a comment (Arabic/English)" />
-                {actionError && (
-                  <div className="text-red-600 text-sm flex items-center gap-2">
-                    <XCircle className="h-4 w-4" />
-                    <span>{actionError}</span>
-                  </div>
-                )}
-                <div className="flex flex-wrap items-center gap-3">
-                  {currentRole === 'line_manager' && currentStatus === 'Draft' && (
-                    <Button onClick={submitToHoD} className="bg-blue-600 hover:bg-blue-700">
-                      <ChevronRight className="h-4 w-4 mr-2" />
-                      Submit to HoD
-                    </Button>
-                  )}
-                  {currentRole === 'hod' && currentStatus === 'Pending HoD Approval' && (
-                    <>
-                      <Button onClick={approve} className="bg-green-600 hover:bg-green-700">
-                        <Check className="h-4 w-4 mr-2" />
-                        Approve
-                      </Button>
-                      <Button variant="destructive" onClick={reject} className="bg-red-600 hover:bg-red-700">
-                        <X className="h-4 w-4 mr-2" />
-                        Reject
-                      </Button>
-                    </>
-                  )}
-                  {currentRole === 'hr' && currentStatus === 'Pending HR Approval' && (
-                    <>
-                      <Button onClick={approve} className="bg-green-600 hover:bg-green-700">
-                        <Check className="h-4 w-4 mr-2" />
-                        Approve
-                      </Button>
-                      <Button variant="destructive" onClick={reject} className="bg-red-600 hover:bg-red-700">
-                        <X className="h-4 w-4 mr-2" />
-                        Reject
-                      </Button>
-                    </>
-                  )}
-                  {currentRole === 'hr' && currentStatus === 'Approved' && (
-                    <Button onClick={approve} className="bg-purple-600 hover:bg-purple-700">
-                      <Check className="h-4 w-4 mr-2" />
-                      Mark Completed
-                    </Button>
-                  )}
-                  {currentRole === 'employee' && currentStatus === 'Employee Review' && (
-                    <Button onClick={() => { if (commentText.trim()) { setCurrentStatus('Approved'); addLog({ activitystatus: 'Approved', action: 'Submitted', actor: `Employee - ${auth.user?.name || 'User'}`, comment: commentText.trim(), is_rejection: false }); setCommentText(''); } }} className="bg-blue-600 hover:bg-blue-700">
-                      <ChevronRight className="h-4 w-4 mr-2" />
-                      Add Comment
-                    </Button>
-                  )}
-                </div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Button onClick={() => { if (panelSubmitted) return; setPanelError(''); setPanelAction('approve'); setPanelComment('HoD approved and forwarded to HR.'); }} className="bg-green-600 hover:bg-green-700" disabled={isSubmittingAction || panelSubmitted}>
+                  <Check className="h-4 w-4 mr-2" />
+                  Approve
+                </Button>
+                <Button variant="destructive" onClick={() => { if (panelSubmitted) return; setPanelError(''); setPanelAction('reject'); setPanelComment(''); }} className="bg-red-600 hover:bg-red-700" disabled={isSubmittingAction || panelSubmitted}>
+                  <X className="h-4 w-4 mr-2" />
+                  Reject
+                </Button>
               </div>
-              <div>
-                <div className="rounded-lg border bg-gray-50 p-4">
-                  <div className="text-sm text-gray-700 font-medium mb-2">Current Status</div>
-                  <div className="flex items-center gap-3">
-                    <Badge className={
-                      currentStatus === 'Completed' ? 'bg-green-100 text-green-800 border-green-200' :
-                      currentStatus === 'Approved' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                      currentStatus === 'Draft' ? 'bg-gray-100 text-gray-800 border-gray-200' :
-                      currentStatus === 'Pending HoD Approval' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-                      currentStatus === 'Pending HR Approval' ? 'bg-orange-100 text-orange-800 border-orange-200' :
-                      'bg-blue-100 text-blue-800 border-blue-200'
-                    }>
-                      {currentStatus}
-                    </Badge>
-                    <span className="text-sm text-gray-600">{statusLabelAr[currentStatus]}</span>
+              {panelAction && (
+                <div className="space-y-2">
+                  <Label className="text-sm">Comment</Label>
+                  <Textarea value={panelComment} onChange={(e) => { const v = e.target.value.slice(0, 500); setPanelComment(v); if (panelAction === 'reject' && !v.trim()) setPanelError('Comment is required'); else setPanelError(''); }} placeholder={panelAction === 'reject' ? 'Enter rejection reason' : 'Optional approval note'} />
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">{panelComment.length}/500</div>
+                    {panelError && (
+                      <div className="text-red-600 text-xs flex items-center gap-2">
+                        <XCircle className="h-4 w-4" />
+                        <span>{panelError}</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-3 text-xs text-gray-600">Actor: {auth.user?.name || 'User'} • Role: {currentRole}</div>
+                  <div className="flex items-center gap-2">
+                    <Button onClick={() => { if (panelAction === 'reject' && !panelComment.trim()) { setPanelError('Comment is required'); return; } setIsConfirmOpen(true); }} className="bg-blue-600 hover:bg-blue-700" disabled={isSubmittingAction}>
+                      Submit
+                    </Button>
+                    <Button variant="outline" onClick={() => { setPanelAction(null); setPanelComment(''); setPanelError(''); }} disabled={isSubmittingAction}>
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
+              )}
+              <div className="rounded-lg border bg-gray-50 p-4">
+                <div className="text-sm text-gray-700 font-medium mb-2">Current Status</div>
+                <div className="flex items-center gap-3">
+                  <Badge className={
+                    currentStatus === 'Completed' ? 'bg-green-100 text-green-800 border-green-200' :
+                    currentStatus === 'Approved' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                    currentStatus === 'Draft' ? 'bg-gray-100 text-gray-800 border-gray-200' :
+                    currentStatus === 'Pending HoD Approval' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                    currentStatus === 'Pending HR Approval' ? 'bg-orange-100 text-orange-800 border-orange-200' :
+                    'bg-blue-100 text-blue-800 border-blue-200'
+                  }>
+                    {currentStatus}
+                  </Badge>
+                  <span className="text-sm text-gray-600">{statusLabelAr[currentStatus]}</span>
+                </div>
+                <div className="mt-3 text-xs text-gray-600">Actor: {auth.user?.name || 'User'} • Role: {currentRole}</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
+        <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle>{panelAction === 'approve' ? 'Confirm Approve' : 'Confirm Reject'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="text-sm text-gray-700">{panelAction === 'approve' ? 'This will forward to HR.' : 'This will mark as rejected.'}</div>
+              <div className="rounded border p-3 text-sm text-gray-700">{panelComment || 'No comment'}</div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={isSubmittingAction}>Cancel</Button>
+              <Button onClick={async () => {
+                if (!panelAction) return;
+                const nextUiStatus = panelAction === 'approve' ? getNextWorkflowStatus(currentStatus) : getPrevWorkflowStatus(currentStatus);
+                const nextActivityKey = statusKeyMap[nextUiStatus] || 'DRAFT';
+                const payload = {
+                  evaluation_id: evaluation.id,
+                  activitystatus: nextActivityKey,
+                  action: panelAction === 'approve' ? 'HOD_APPROVE' : 'HOD_REJECT',
+                  comment: panelComment || undefined,
+                  is_rejection: panelAction === 'reject',
+                };
+                try {
+                  await createActivityLogMutation.mutateAsync(payload);
+                  setPanelSubmitted(true);
+                  setIsConfirmOpen(false);
+                  setCurrentStatus(nextUiStatus);
+                  await updateEvaluationMutation.mutateAsync({ evaluationId: evaluation.id, evaluationData: { status: nextUiStatus as any } });
+                } catch {}
+              }} disabled={isSubmittingAction} className="bg-green-600 hover:bg-green-700">
+                {isSubmittingAction ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Confirm
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2 bg-gradient-to-br from-slate-500 to-gray-600 rounded-lg">
-                <BarChart3 className="h-5 w-5 text-white" />
+              <div className="p-2 bg-gradient-to-br from-slate-500 to-gray-700 rounded-lg">
+                <Clock className="h-5 w-5 text-white" />
               </div>
               <span>Activity Log</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {activityLog.length === 0 && (
-                <div className="text-center text-gray-600">No activity yet</div>
-              )}
-              {activityLog.map((log) => (
-                <div key={log.id} className={
-                  log.is_rejection
-                    ? 'border-l-4 border-red-500 bg-red-50 rounded p-4'
-                    : 'border-l-4 border-blue-500 bg-blue-50 rounded p-4'
-                }>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {log.is_rejection ? (
-                        <X className="h-4 w-4 text-red-600" />
-                      ) : (
-                        <Check className="h-4 w-4 text-blue-600" />
-                      )}
-                      <div className="font-medium text-gray-900">{log.action}</div>
-                      <div className="text-sm text-gray-600">→ {log.activitystatus}</div>
+            {activityLogLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600 mx-auto mb-4"></div>
+                <p className="text-gray-500">Loading activity...</p>
+              </div>
+            ) : activityLogError ? (
+              <div className="text-center py-8 text-red-500">
+                <p>Error loading activity log</p>
+                <p className="text-sm text-gray-500 mt-1">{(activityLogError as any)?.message || 'An error occurred'}</p>
+              </div>
+            ) : displayActivityLog.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No activity recorded</p>
+              </div>
+            ) : (
+              <div className="relative">
+                <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
+                <div className="space-y-6">
+                  {groupedActivity.map(([dateKey, entries]) => (
+                    <div key={dateKey} className="relative">
+                      <div className="sticky top-0 bg-white z-10 pl-12 py-1">
+                        <Badge variant="outline" className="bg-slate-100 text-slate-800 border-slate-200">
+                          {new Date(dateKey).toLocaleDateString()}
+                        </Badge>
+                      </div>
+                      <div className="space-y-4">
+                        {entries.map((entry) => {
+                          const isPositive = entry.action === 'Approved' || entry.action === 'Completed';
+                          const isNegative = entry.is_rejection || entry.action === 'Rejected';
+                          const dotBg = isPositive ? 'bg-green-100 border-green-300' : isNegative ? 'bg-red-100 border-red-300' : 'bg-yellow-100 border-yellow-300';
+                          const iconClass = isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-yellow-600';
+                          const badgeClass = isPositive
+                            ? 'bg-green-100 text-green-800 border-green-200'
+                            : isNegative
+                            ? 'bg-red-100 text-red-800 border-red-200'
+                            : 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                          return (
+                            <div key={entry.id} className="relative pl-12">
+                              <div className={`absolute left-0 top-0 flex items-center justify-center h-8 w-8 rounded-full border ${dotBg}`}>
+                                {isPositive ? (
+                                  <CheckCircle2 className={`h-5 w-5 ${iconClass}`} />
+                                ) : isNegative ? (
+                                  <XCircle className={`h-5 w-5 ${iconClass}`} />
+                                ) : (
+                                  <Circle className={`h-5 w-5 ${iconClass}`} />
+                                )}
+                              </div>
+                              <div className="p-4 rounded-lg border bg-white">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <Badge className={`${badgeClass} flex items-center gap-2`}>
+                                      {entry.action === 'Approved' || entry.action === 'Completed' ? (
+                                        <Check className="h-4 w-4" />
+                                      ) : entry.is_rejection || entry.action === 'Rejected' ? (
+                                        <X className="h-4 w-4" />
+                                      ) : entry.action === 'Submitted' || entry.action === 'Submitted to HoD' ? (
+                                        <ChevronRight className="h-4 w-4" />
+                                      ) : entry.action === 'Created' ? (
+                                        <Plus className="h-4 w-4" />
+                                      ) : (
+                                        <Circle className="h-4 w-4" />
+                                      )}
+                                      <span className="font-medium">Action:</span>
+                                      <span>{entry.action}</span>
+                                    </Badge>
+                                    <Badge variant="outline" className={
+                                      entry.activitystatus === 'Draft' ? 'bg-gray-100 text-gray-800 border-gray-200' :
+                                      entry.activitystatus === 'Pending HoD Approval' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                                      entry.activitystatus === 'Pending HR Approval' ? 'bg-orange-100 text-orange-800 border-orange-200' :
+                                      entry.activitystatus === 'Employee Review' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                                      entry.activitystatus === 'Approved' ? 'bg-green-100 text-green-800 border-green-200' :
+                                      entry.activitystatus === 'Completed' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+                                      'bg-gray-100 text-gray-800 border-gray-200'
+                                    }>
+                                      <span className={
+                                        entry.activitystatus === 'Draft' ? 'w-1.5 h-1.5 rounded-full bg-gray-500' :
+                                        entry.activitystatus === 'Pending HoD Approval' ? 'w-1.5 h-1.5 rounded-full bg-yellow-500' :
+                                        entry.activitystatus === 'Pending HR Approval' ? 'w-1.5 h-1.5 rounded-full bg-orange-500' :
+                                        entry.activitystatus === 'Employee Review' ? 'w-1.5 h-1.5 rounded-full bg-blue-500' :
+                                        entry.activitystatus === 'Approved' ? 'w-1.5 h-1.5 rounded-full bg-green-500' :
+                                        entry.activitystatus === 'Completed' ? 'w-1.5 h-1.5 rounded-full bg-purple-500' :
+                                        'w-1.5 h-1.5 rounded-full bg-gray-500'
+                                      }></span>
+                                      <span className="ml-2 font-medium">Status:</span>
+                                      <span className="ml-1">{entry.activitystatus}</span>
+                                    </Badge>
+                                    <Badge className={entry.is_rejection ? 'bg-red-100 text-red-800 border-red-200' : 'bg-green-100 text-green-800 border-green-200'}>
+                                      {entry.is_rejection ? 'Rejected' : 'Accepted'}
+                                    </Badge>
+                                  </div>
+                                  <div className="text-sm text-gray-600">{new Date(entry.timestamp).toLocaleString()}</div>
+                                </div>
+                                <div className="mt-2 text-sm text-gray-700">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{entry.actor}</span>
+                                  </div>
+                                  {entry.comment && (
+                                    <p className="mt-1 text-gray-600">{entry.comment}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-600">{new Date(log.timestamp).toLocaleString()}</div>
-                  </div>
-                  {log.comment && (
-                    <div className="mt-2 text-sm text-gray-700">{log.comment}</div>
-                  )}
-                  <div className="mt-1 text-xs text-gray-600">{log.actor}</div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1379,12 +1542,12 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
 };
 
 export default EvaluationDetails;
-type WorkflowStatus = 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Completed';
+type WorkflowStatus = 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed' | 'Self Evaluation';
 
 type ActivityEntry = {
   id: number;
   activitystatus: WorkflowStatus;
-  action: 'Created' | 'Submitted' | 'Submitted to HoD' | 'Approved' | 'Rejected' | 'Completed';
+  action: 'Created' | 'Submitted' | 'Submitted to HoD' | 'Approved' | 'Rejected' | 'Completed' | 'Comment' | 'Self Evaluation Created';
   actor: string;
   timestamp: string;
   comment?: string;
@@ -1402,11 +1565,36 @@ const statusOrder: WorkflowStatus[] = [
   'Completed',
 ];
 
+const statusKeyMap: Record<WorkflowStatus, string> = {
+  'Draft': 'DRAFT',
+  'Pending HoD Approval': 'PENDING_HOD',
+  'Pending HR Approval': 'PENDING_HR',
+  'Employee Review': 'EMP_REVIEW',
+  'Approved': 'APPROVED',
+  'Rejected': 'REJECTED',
+  'Completed': 'COMPLETED',
+  'Self Evaluation': 'DRAFT',
+};
+
+const getNextWorkflowStatus = (current: WorkflowStatus): WorkflowStatus => {
+  const i = statusOrder.indexOf(current);
+  if (i === -1) return current;
+  return i < statusOrder.length - 1 ? statusOrder[i + 1] : statusOrder[i];
+};
+
+const getPrevWorkflowStatus = (current: WorkflowStatus): WorkflowStatus => {
+  const i = statusOrder.indexOf(current);
+  if (i <= 0) return statusOrder[0];
+  return statusOrder[i - 1];
+};
+
 const statusLabelAr: Record<WorkflowStatus, string> = {
   Draft: 'مسودة',
   'Pending HoD Approval': 'بانتظار موافقة رئيس القسم',
   'Pending HR Approval': 'بانتظار موافقة الموارد البشرية',
   'Employee Review': 'مراجعة الموظف',
   Approved: 'معتمد',
+  Rejected: 'مرفوض',
   Completed: 'مكتمل',
+  'Self Evaluation': 'التقييم الذاتي',
 };

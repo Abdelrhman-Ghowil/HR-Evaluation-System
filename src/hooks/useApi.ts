@@ -35,7 +35,9 @@ import {
   DepartmentQueryParams,
   EvaluationQueryParams,
   ApiError,
-  ImportResponse
+  ImportResponse,
+  ApiActivityLog,
+  CreateActivityLogRequest
 } from '../types/api';
 
 // Query Keys
@@ -55,6 +57,7 @@ export const queryKeys = {
   objectives: (evaluationId: string) => ['objectives', evaluationId] as const,
   competencies: (evaluationId: string) => ['competencies', evaluationId] as const,
   selfEvaluations: (employeeId: string) => ['selfEvaluations', employeeId] as const,
+  activityLog: (evaluationId: string) => ['activityLog', evaluationId] as const,
   placements: ['placements'] as const,
   placement: (id: string) => ['placements', id] as const,
 };
@@ -460,6 +463,37 @@ export const useSelfEvaluations = (
     queryFn: () => apiService.getSelfEvaluationByEmployeeId(employeeId),
     enabled: !!employeeId,
     staleTime: 2 * 60 * 1000,
+    ...options,
+  });
+};
+
+export const useActivityLog = (
+  evaluationId: string,
+  options?: UseQueryOptions<ApiActivityLog[], ApiError>
+) => {
+  return useQuery({
+    queryKey: queryKeys.activityLog(evaluationId),
+    queryFn: () => apiService.getActivityLogByEvaluationId(evaluationId),
+    enabled: !!evaluationId,
+    staleTime: 2 * 60 * 1000,
+    ...options,
+  });
+};
+
+export const useCreateActivityLog = (
+  options?: UseMutationOptions<ApiActivityLog, ApiError, CreateActivityLogRequest>
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateActivityLogRequest) => apiService.createActivityLog(payload),
+    retry: 2,
+    onSuccess: (data, variables) => {
+      toast.success('Action recorded');
+      queryClient.invalidateQueries({ queryKey: queryKeys.activityLog(variables.evaluation_id) });
+    },
+    onError: (error: ApiError) => {
+      toast.error(error.message || 'Failed to record action');
+    },
     ...options,
   });
 };
