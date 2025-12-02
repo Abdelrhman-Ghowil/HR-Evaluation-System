@@ -167,6 +167,15 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     }
   }, [selfEvaluationsData]);
 
+  const isEditingSelfEvaluation = useMemo(() => {
+    if (!editingEvaluation) return false;
+    return (
+      selfEvaluationList.some(e => e.id === editingEvaluation.id) ||
+      editingEvaluation.type === 'Self Evaluation' ||
+      editingEvaluation.status === 'Self Evaluation'
+    );
+  }, [editingEvaluation, selfEvaluationList]);
+
   // Transform users data to reviewers format
   const reviewers: Reviewer[] = useMemo(() => {
     if (!usersData) {
@@ -850,42 +859,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                   )}
 
                   {/* Reviewer Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="reviewer">Reviewer</Label>
-                    <Select
-                      value={newEvaluation.reviewer_id || ''}
-                      onValueChange={(value) => setNewEvaluation({
-                        ...newEvaluation,
-                        reviewer_id: value
-                      })}
-                      disabled={managersLoading || managers.length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={
-                          managersLoading ? "Loading managers..." :
-                          managers.length === 0 ? "No managers available" :
-                          "Select a reviewer"
-                        } />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {managersError ? (
-                          <SelectItem value="error" disabled>
-                            Error loading managers
-                          </SelectItem>
-                        ) : managers.length === 0 ? (
-                          <SelectItem value="no-managers" disabled>
-                            No managers found for this company
-                          </SelectItem>
-                        ) : (
-                      (Array.isArray(managers) ? managers : managers.results || []).map((manager) => (
-                            <SelectItem key={manager.employee_id} value={manager.user_id}>
-                              {manager.name} ({manager.role})
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  
 
 
 
@@ -1080,18 +1054,6 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                               >
                                 {evaluation.status}
                               </Badge>
-                              {evaluation.score && (
-                                <div className="text-center">
-                                  <div className="text-lg font-bold text-gray-900">{evaluation.score}</div>
-                                  <div className="text-xs text-gray-500">Score</div>
-                                </div>
-                              )}
-                              <div className="text-right space-y-1">
-                                <div className="flex items-center text-sm text-gray-600">
-                                  <User className="h-4 w-4 mr-1" />
-                                  {evaluation.reviewer}
-                                </div>
-                              </div>
                               <div className="flex items-center space-x-2">
                                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleEditEvaluation(evaluation); }} className="h-8 w-8 p-0">
                                   <Edit className="h-4 w-4" />
@@ -1149,12 +1111,6 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                                   <div className="text-xs text-gray-500">Score</div>
                                 </div>
                               )}
-                              <div className="text-right space-y-1">
-                                <div className="flex items-center text-sm text-gray-600">
-                                  <User className="h-4 w-4 mr-1" />
-                                  {evaluation.reviewer}
-                                </div>
-                              </div>
                               <div className="flex items-center space-x-2">
                                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleEditEvaluation(evaluation); }} className="h-8 w-8 p-0">
                                   <Edit className="h-4 w-4" />
@@ -1225,114 +1181,25 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                 />
               </div>
               
-              <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="edit-status" className="text-right">
-                    Status
-                  </Label>
-                  <div className="col-span-3 space-y-2">
-                    <Select
+              {!isEditingSelfEvaluation && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit-status" className="text-right">
+                      Status
+                    </Label>
+                    <Input
+                      id="edit-status"
                       value={editingEvaluation.status}
-                      onValueChange={(value) => setEditingEvaluation({
-                        ...editingEvaluation,
-                        status: value as 'Draft' | 'Pending HoD Approval' | 'Pending HR Approval' | 'Employee Review' | 'Approved' | 'Rejected' | 'Completed'
-                      })}>
-                      <SelectTrigger id="edit-status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(() => {
-                          const originalEvaluation = evaluationList.find(e => e.id === editingEvaluation.id);
-                          const currentStatus = originalEvaluation?.status || editingEvaluation.status;
-                          const validTransitions = [currentStatus, ...getValidStatusTransitions(currentStatus)];
-                        
-                          return [
-                             { value: 'Draft', label: 'Draft' },
-                             { value: 'Pending HoD Approval', label: 'Pending HoD Approval' },
-                             { value: 'Pending HR Approval', label: 'Pending HR Approval' },
-                             { value: 'Employee Review', label: 'Employee Review' },
-                             { value: 'Approved', label: 'Approved' },
-                             { value: 'Rejected', label: 'Rejected' },
-                             { value: 'Completed', label: 'Completed' }
-                           ].map(status => (
-                             <SelectItem 
-                               key={status.value} 
-                               value={status.value}
-                               disabled={!validTransitions.includes(status.value)}
-                             >
-                               {status.label}
-                             </SelectItem>
-                           ));
-                         })()} 
-                       </SelectContent>
-                     </Select>
-                     {(() => {
-                       const originalEvaluation = evaluationList.find(e => e.id === editingEvaluation.id);
-                       if (originalEvaluation && !isValidStatusTransition(originalEvaluation.status, editingEvaluation.status)) {
-                         return (
-                           <p className="text-sm text-red-600">
-                             Invalid status transition from {originalEvaluation.status} to {editingEvaluation.status}
-                           </p>
-                         );
-                      }
-                      return null;
-                    })()}
+                      disabled
+                      className="col-span-3"
+                    />
                   </div>
-                </div>
+              )}
               
               <div className="grid grid-cols-4 items-center gap-4">
-                 <Label htmlFor="edit-reviewer" className="text-right">
-                   Reviewer
-                 </Label>
-                 <Select
-                   value={editingEvaluation.reviewer_id || ''}
-                   onValueChange={(value) => setEditingEvaluation({
-                     ...editingEvaluation,
-                     reviewer_id: value
-                   })}
-                   disabled={managersLoading || managers.length === 0}
-                 >
-                   <SelectTrigger className="col-span-3">
-                     <SelectValue placeholder={
-                      managersLoading ? "Loading managers..." :
-                      managers.length === 0 ? "No managers available" :
-                      "Select a reviewer"
-                    } />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {managersError ? (
-                      <SelectItem value="error" disabled>
-                        Error loading managers
-                      </SelectItem>
-                    ) : managers.length === 0 ? (
-                      <SelectItem value="no-managers" disabled>
-                        No managers found for this company
-                      </SelectItem>
-                    ) : (
-                      Array.isArray(managers) && managers.map((manager) => (
-                        <SelectItem key={manager.user_id} value={manager.user_id}>
-                          {manager.name} ({manager.role})
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                 
               </div>
               
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-date" className="text-right">
-                  Date
-                </Label>
-                <Input
-                  id="edit-date"
-                  type="date"
-                  value={editingEvaluation.date}
-                  onChange={(e) => setEditingEvaluation({
-                    ...editingEvaluation,
-                    date: e.target.value
-                  })}
-                  className="col-span-3"
-                />
-              </div>
+              
               
               {/* Score field removed - made non-editable as requested */}
             </div>
