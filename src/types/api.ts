@@ -326,6 +326,32 @@ export interface UpdateEvaluationRequest {
   reviewer_id?: string;
 }
 
+export interface ApiActivityLog {
+  activitylog_id: string;
+  evaluation_id: string;
+  activitystatus: string;
+  action: string;
+  actor_id: string;
+  actor_name: string;
+  actor_role: UserRole;
+  comment?: string;
+  is_rejection: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ActivityLogQueryParams {
+  evaluation_id?: string;
+}
+
+export interface CreateActivityLogRequest {
+  evaluation_id: string;
+  activitystatus: string;
+  action: string;
+  comment?: string;
+  is_rejection: boolean;
+}
+
 // Objective Types
 export interface ApiObjective {
   objective_id: string;
