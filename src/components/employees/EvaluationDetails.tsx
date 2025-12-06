@@ -593,6 +593,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const createActivityLogMutation = useCreateActivityLog();
   const isSubmittingAction = createActivityLogMutation.isPending;
   const updateEvaluationMutation = useUpdateEvaluation();
+  const isSelfEvaluation = evaluation.type === 'Self Evaluation' || evaluation.status === 'Self Evaluation';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 sm:p-6 lg:p-8">
@@ -695,70 +696,72 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
         </CardContent>
       </Card>
 
-        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
-                    <TrendingUp className="h-5 w-5 text-white" />
+        {!isSelfEvaluation && (
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-white" />
+                    </div>
+                    <span>Evaluation Status</span>
                   </div>
-                  <span>Evaluation Status</span>
+                  <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow">
+                    {statusLabelAr[currentStatus]} / {currentStatus}
+                  </div>
                 </div>
-                <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow">
-                  {statusLabelAr[currentStatus]} / {currentStatus}
+                <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600" style={{ width: `${(statusIndex / (statusOrder.length - 1)) * 100}%` }} />
                 </div>
-              </div>
-              <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600" style={{ width: `${(statusIndex / (statusOrder.length - 1)) * 100}%` }} />
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <div className="flex items-start justify-between gap-4">
-                  {statusOrder.map((s, i) => {
-                    const state = isCompleted(s) ? 'completed' : i === statusIndex ? 'current' : 'pending';
-                    const iconClass = state === 'completed' ? 'text-green-600' : state === 'current' ? 'text-blue-600' : 'text-gray-400';
-                    const dotBg = state === 'completed' ? 'bg-green-100 border-green-300' : state === 'current' ? 'bg-blue-100 border-blue-300 ring-2 ring-blue-500' : 'bg-gray-100 border-gray-300';
-                    const lineColor = i < statusIndex ? 'bg-green-300' : 'bg-gray-200';
-                    return (
-                      <div key={s} className="flex-1 flex flex-col items-center">
-                        <div className="flex items-center w-full">
-                          <div className={`h-8 w-8 rounded-full border ${dotBg} flex items-center justify-center`}>
-                            {state === 'completed' ? (
-                              <CheckCircle2 className={`h-5 w-5 ${iconClass}`} />
-                            ) : (
-                              <Circle className={`h-5 w-5 ${iconClass}`} />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <div className="flex items-start justify-between gap-4">
+                    {statusOrder.map((s, i) => {
+                      const state = isCompleted(s) ? 'completed' : i === statusIndex ? 'current' : 'pending';
+                      const iconClass = state === 'completed' ? 'text-green-600' : state === 'current' ? 'text-blue-600' : 'text-gray-400';
+                      const dotBg = state === 'completed' ? 'bg-green-100 border-green-300' : state === 'current' ? 'bg-blue-100 border-blue-300 ring-2 ring-blue-500' : 'bg-gray-100 border-gray-300';
+                      const lineColor = i < statusIndex ? 'bg-green-300' : 'bg-gray-200';
+                      return (
+                        <div key={s} className="flex-1 flex flex-col items-center">
+                          <div className="flex items-center w-full">
+                            <div className={`h-8 w-8 rounded-full border ${dotBg} flex items-center justify-center`}>
+                              {state === 'completed' ? (
+                                <CheckCircle2 className={`h-5 w-5 ${iconClass}`} />
+                              ) : (
+                                <Circle className={`h-5 w-5 ${iconClass}`} />
+                              )}
+                            </div>
+                            {i < statusOrder.length - 1 && (
+                              <div className={`flex-1 h-0.5 ${lineColor} ml-2`} />
                             )}
                           </div>
-                          {i < statusOrder.length - 1 && (
-                            <div className={`flex-1 h-0.5 ${lineColor} ml-2`} />
-                          )}
+                          <div className="mt-2 text-center">
+                            <div className="text-xs font-semibold text-gray-900">{s}</div>
+                            <div className="text-[10px] text-gray-600">{statusLabelAr[s]}</div>
+                          </div>
                         </div>
-                        <div className="mt-2 text-center">
-                          <div className="text-xs font-semibold text-gray-900">{s}</div>
-                          <div className="text-[10px] text-gray-600">{statusLabelAr[s]}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-3">
-                <div className="p-4 rounded-lg border bg-white">
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 border border-blue-200">Draft → HoD → HR → Employee Review → Approved → Completed</span>
-                    <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 border border-yellow-200">HoD rejection → back to Draft</span>
-                    <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800 border border-orange-200">HR rejection → back to Pending HoD Approval</span>
-                    <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800 border border-gray-200">Employee Review stage only</span>
+                <div className="space-y-3">
+                  <div className="p-4 rounded-lg border bg-white">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 border border-blue-200">Draft → HoD → HR → Employee Review → Approved → Completed</span>
+                      <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 border border-yellow-200">HoD rejection → back to Draft</span>
+                      <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800 border border-orange-200">HR rejection → back to Pending HoD Approval</span>
+                      <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800 border border-gray-200">Employee Review stage only</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Tabs for Objectives and Competencies */}
         <Tabs defaultValue="objectives" className="w-full">
@@ -1016,6 +1019,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           </TabsContent>
         </Tabs>
 
+        {!isSelfEvaluation && (
         <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-3 text-xl">
@@ -1083,44 +1087,48 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
             </div>
           </CardContent>
         </Card>
+        )}
 
-        <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-          <DialogContent className="sm:max-w-[480px]">
-            <DialogHeader>
-              <DialogTitle>{panelAction === 'approve' ? 'Confirm Approve' : 'Confirm Reject'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="text-sm text-gray-700">{panelAction === 'approve' ? 'This will forward to HR.' : 'This will mark as rejected.'}</div>
-              <div className="rounded border p-3 text-sm text-gray-700">{panelComment || 'No comment'}</div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={isSubmittingAction}>Cancel</Button>
-              <Button onClick={async () => {
-                if (!panelAction) return;
-                const nextUiStatus = panelAction === 'approve' ? getNextWorkflowStatus(currentStatus) : getPrevWorkflowStatus(currentStatus);
-                const nextActivityKey = statusKeyMap[nextUiStatus] || 'DRAFT';
-                const payload = {
-                  evaluation_id: evaluation.id,
-                  activitystatus: nextActivityKey,
-                  action: panelAction === 'approve' ? 'HOD_APPROVE' : 'HOD_REJECT',
-                  comment: panelComment || undefined,
-                  is_rejection: panelAction === 'reject',
-                };
-                try {
-                  await createActivityLogMutation.mutateAsync(payload);
-                  setPanelSubmitted(true);
-                  setIsConfirmOpen(false);
-                  setCurrentStatus(nextUiStatus);
-                  await updateEvaluationMutation.mutateAsync({ evaluationId: evaluation.id, evaluationData: { status: nextUiStatus as any } });
-                } catch {}
-              }} disabled={isSubmittingAction} className="bg-green-600 hover:bg-green-700">
-                {isSubmittingAction ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                Confirm
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {!isSelfEvaluation && (
+          <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+            <DialogContent className="sm:max-w-[480px]">
+              <DialogHeader>
+                <DialogTitle>{panelAction === 'approve' ? 'Confirm Approve' : 'Confirm Reject'}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="text-sm text-gray-700">{panelAction === 'approve' ? 'This will forward to HR.' : 'This will mark as rejected.'}</div>
+                <div className="rounded border p-3 text-sm text-gray-700">{panelComment || 'No comment'}</div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={isSubmittingAction}>Cancel</Button>
+                <Button onClick={async () => {
+                  if (!panelAction) return;
+                  const nextUiStatus = panelAction === 'approve' ? getNextWorkflowStatus(currentStatus) : getPrevWorkflowStatus(currentStatus);
+                  const nextActivityKey = statusKeyMap[nextUiStatus] || 'DRAFT';
+                  const payload = {
+                    evaluation_id: evaluation.id,
+                    activitystatus: nextActivityKey,
+                    action: panelAction === 'approve' ? 'HOD_APPROVE' : 'HOD_REJECT',
+                    comment: panelComment || undefined,
+                    is_rejection: panelAction === 'reject',
+                  };
+                  try {
+                    await createActivityLogMutation.mutateAsync(payload);
+                    setPanelSubmitted(true);
+                    setIsConfirmOpen(false);
+                    setCurrentStatus(nextUiStatus);
+                    await updateEvaluationMutation.mutateAsync({ evaluationId: evaluation.id, evaluationData: { status: nextUiStatus as any } });
+                  } catch {}
+                }} disabled={isSubmittingAction} className="bg-green-600 hover:bg-green-700">
+                  {isSubmittingAction ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Confirm
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
 
+        {!isSelfEvaluation && (
         <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-3 text-xl">
@@ -1243,6 +1251,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Objective Modal */}
         <Dialog open={isObjectiveModalOpen} onOpenChange={setIsObjectiveModalOpen}>
