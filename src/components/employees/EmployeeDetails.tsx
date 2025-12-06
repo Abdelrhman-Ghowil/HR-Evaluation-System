@@ -104,6 +104,18 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     // Parse reviewer_id safely
     const reviewer_id = apiEval.reviewer_id;
     
+    // Parse objectives and competencies scores safely
+    let objectives_score: number | undefined;
+    let competencies_score: number | undefined;
+    const objScoreRaw = (apiEval as any).objectives_score;
+    const compScoreRaw = (apiEval as any).competencies_score;
+    if (objScoreRaw !== undefined) {
+      objectives_score = typeof objScoreRaw === 'string' ? parseFloat(objScoreRaw) : objScoreRaw;
+    }
+    if (compScoreRaw !== undefined) {
+      competencies_score = typeof compScoreRaw === 'string' ? parseFloat(compScoreRaw) : compScoreRaw;
+    }
+
     return {
       id: evaluationId,
       evaluation_id: evaluationId,
@@ -111,6 +123,8 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
       period: apiEval.period,
       status: apiEval.status,
       score: score,
+      objectives_score,
+      competencies_score,
       reviewer: apiEval.reviewer || 'Unknown',
       reviewer_id: reviewer_id?.toString(),
       date: new Date(apiEval.created_at).toISOString().split('T')[0]

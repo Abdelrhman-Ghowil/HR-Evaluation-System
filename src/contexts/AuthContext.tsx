@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import apiService from '../services/api';
+import { useQueryClient } from '@tanstack/react-query';
 import { ApiUser, UserRole } from '../types/api';
 import { toast } from 'sonner';
 
@@ -68,6 +69,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const queryClient = useQueryClient();
 
   const login = async (credentials: { email?: string; username?: string; password: string }): Promise<boolean> => {
     setIsLoading(true);
@@ -88,6 +90,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(localUser);
         setIsAuthenticated(true);
         localStorage.setItem('user', JSON.stringify(localUser));
+        queryClient.clear();
         toast.success(`Welcome back, ${localUser.name}!`);
         setIsLoading(false);
         return true;
@@ -119,6 +122,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
       localStorage.removeItem('user');
+      localStorage.removeItem('refresh_token');
+      queryClient.clear();
       toast.success('Logged out successfully');
     }
   };

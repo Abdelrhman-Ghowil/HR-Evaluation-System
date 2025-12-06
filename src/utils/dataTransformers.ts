@@ -65,7 +65,9 @@ export const transformEvaluationForDetails = (evaluationInput: EvaluationInput, 
       reviewer_id: evaluationInput.reviewer_id,
       reviewer: evaluationInput.reviewer,
       date: evaluationInput.date,
-      score: evaluationInput.score  
+      score: evaluationInput.score,
+      objectives_score: evaluationInput.objectives_score,
+      competencies_score: evaluationInput.competencies_score
     };
   } catch (error) {
     console.error('Error transforming evaluation data:', error);
@@ -208,6 +210,6 @@ export const parsePhoneNumber = (fullPhone: string): { countryCode: string; phon
  */
 export const generateWhatsAppUrl = (phone: string, countryCode?: string): string => {
   const cleanPhone = phone?.replace(/[^0-9]/g, '') || '';
-  const code = (countryCode || '+1').replace('+', '');
+  const code = (countryCode || '+20').replace('+', '');
   return `https://wa.me/${code}${cleanPhone}`;
 };

@@ -1148,11 +1148,9 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
               <div className="col-span-3">
                 <Select
                   value={editingDepartment?.company || ''}
-                  onValueChange={(value) => setEditingDepartment(prev => 
-                    prev ? { ...prev, company: value } : null
-                  )}
+                  disabled
                 >
-                  <SelectTrigger className={validationErrors.company ? 'border-red-500' : ''}>
+                  <SelectTrigger disabled className={validationErrors.company ? 'border-red-500' : ''}>
                     <SelectValue placeholder="Select a company" />
                   </SelectTrigger>
                   <SelectContent>
