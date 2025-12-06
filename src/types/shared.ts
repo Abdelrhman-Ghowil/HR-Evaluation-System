@@ -52,6 +52,8 @@ export interface Evaluation {
   reviewer?: string;
   date: string;
   score?: number;
+  objectives_score?: number;
+  competencies_score?: number;
 }
 
 export interface EvaluationInput {
@@ -64,6 +66,8 @@ export interface EvaluationInput {
   reviewer: string;
   reviewer_id?: string;
   period: string;
+  objectives_score?: number;
+  competencies_score?: number;
 }
 
 export interface Objective {

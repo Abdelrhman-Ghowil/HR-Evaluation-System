@@ -37,6 +37,8 @@ interface Evaluation {
   reviewer_id?: string;
   date: string;
   score?: number;
+  objectives_score?: number;
+  competencies_score?: number;
   activity_log?: ActivityEntry[];
 }
 
@@ -131,7 +133,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const validateObjective = (obj: Partial<Objective>): Record<string, string> => {
     const errors: Record<string, string> = {};
     if (!obj.title?.trim()) errors.title = 'Title is required';
-    if (!obj.description?.trim()) errors.description = 'Description is required';
     if (!obj.target || obj.target < 1 || obj.target > 10) errors.target = 'Target must be between 1-10';
     if (!obj.achieved || obj.achieved < 1 || obj.achieved > 10) errors.achieved = 'Achieved must be between 1-10';
     return errors;
@@ -181,10 +182,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
          // Update existing objective using evaluation_id endpoint
          const updateData = {
            title: objectiveForm.title!,
-           description: objectiveForm.description!,
            target: objectiveForm.target!,
            achieved: objectiveForm.achieved!,
-           status: objectiveForm.status!
+           status: objectiveForm.status!,
+           ...(objectiveForm.description !== undefined ? { description: objectiveForm.description } : {})
          };
          await updateObjectiveMutation.mutateAsync({
            objectiveId: editingObjective.id,
@@ -198,7 +199,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
          const createData = {
            evaluation_id: evaluation.id,
            title: objectiveForm.title!,
-           description: objectiveForm.description!,
+           description: objectiveForm.description ?? '',
            target: objectiveForm.target!,
            achieved: objectiveForm.achieved!,
            status: objectiveForm.status!,
@@ -656,7 +657,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   <Target className="h-5 w-5 text-green-600 mr-2" />
                 </div>
                 <div className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                  {getOverallObjectiveScore()}
+                  {typeof evaluation.objectives_score === 'number' ? evaluation.objectives_score.toFixed(1) : getOverallObjectiveScore()}
                 </div>
                 <div className="text-xs lg:text-sm text-gray-600 font-medium">Objectives</div>
               </div>
@@ -667,7 +668,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   <Users className="h-5 w-5 text-purple-600 mr-2" />
                 </div>
                 <div className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
-                  {getOverallCompetencyScore()}
+                  {typeof evaluation.competencies_score === 'number' ? evaluation.competencies_score.toFixed(1) : getOverallCompetencyScore()}
                 </div>
                 <div className="text-xs lg:text-sm text-gray-600 font-medium">Competencies</div>
               </div>
@@ -1289,22 +1290,15 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
               <div className="space-y-2">
                 <Label htmlFor="description" className="text-sm font-medium text-gray-700 flex items-center gap-1">
                   Description
-                  <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   id="description"
                   value={objectiveForm.description || ''}
                   onChange={(e) => setObjectiveForm(prev => ({ ...prev, description: e.target.value }))}
-                  className={`transition-all duration-200 resize-none ${objectiveErrors.description ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
+                  className={`transition-all duration-200 resize-none focus:ring-green-500 focus:border-green-500`}
                   rows={3}
                   placeholder="Describe the objective in detail"
                 />
-                {objectiveErrors.description && (
-                  <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
-                    <span className="w-1 h-1 bg-red-500 rounded-full"></span>
-                    {objectiveErrors.description}
-                  </p>
-                )}
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -1033,14 +1033,23 @@ const CompanyList = () => {
 
             {/* Results Display */}
             {importResults && (
-              <div className={`rounded-lg p-4 ${
-                importResults.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-              }`}>
-                <div className="flex items-start gap-3">
-                  <div className={`p-1 rounded-full ${
-                    importResults.success ? 'bg-green-100' : 'bg-red-100'
+              (() => {
+                const derivedSuccess = Boolean(
+                  (importResults as any).success === true ||
+                  String((importResults as any).message || '').toLowerCase().includes('success') ||
+                  String((importResults as any).message || '').toLowerCase().includes('imported') ||
+                  String((importResults as any).data?.status || '').toLowerCase() === 'imported' ||
+                  !((importResults as any).errors && (importResults as any).errors.length > 0)
+                );
+                return (
+                  <div className={`rounded-lg p-4 ${
+                    derivedSuccess ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
                   }`}>
-                    {importResults.success ? (
+                  <div className="flex items-start gap-3">
+                  <div className={`p-1 rounded-full ${
+                    derivedSuccess ? 'bg-green-100' : 'bg-red-100'
+                  }`}>
+                    {derivedSuccess ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     ) : (
                       <AlertCircle className="h-5 w-5 text-red-600" />
@@ -1048,12 +1057,12 @@ const CompanyList = () => {
                   </div>
                   <div className="flex-1">
                     <h4 className={`font-medium ${
-                      importResults.success ? 'text-green-800' : 'text-red-800'
+                      derivedSuccess ? 'text-green-800' : 'text-red-800'
                     }`}>
-                      {importResults.success ? 'Success!' : 'Error'}
+                      {derivedSuccess ? 'Success!' : 'Error'}
                     </h4>
                     <p className={`text-sm mt-1 ${
-                      importResults.success ? 'text-green-700' : 'text-red-700'
+                      derivedSuccess ? 'text-green-700' : 'text-red-700'
                     }`}>
                       {importResults.message}
                     </p>
@@ -1107,6 +1116,8 @@ const CompanyList = () => {
                   </div>
                 </div>
               </div>
+                );
+              })()
             )}
 
             {/* Help Text */}
