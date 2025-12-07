@@ -8,13 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { Building, Users, Plus, Eye, Edit, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle, ArrowLeft, Home, Search } from 'lucide-react';
+import { Building, Users, Plus, Eye, Edit, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle, ArrowLeft, Home, Search, Download } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { ApiDepartment, ApiCompany, CreateDepartmentRequest, UpdateDepartmentRequest, ApiEmployee } from '@/types/api';
 import { useOrganizational } from '@/contexts/OrganizationalContext';
 import { useDepartments, useCompanies } from '@/hooks/useApi';
 import { useManagers } from '@/hooks/usemanagers';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '../../hooks/useAuth';
 
 interface DepartmentListProps {
   onViewChange?: (view: string) => void;
@@ -46,6 +47,8 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [departmentToDelete, setDepartmentToDelete] = useState<ApiDepartment | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const { user } = useAuth();
+  const canImport = user?.role === 'admin' || user?.role === 'hr';
 
   // Import Excel state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -110,7 +113,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
     }
 
     // Fallback: try mapping by manager name string
-    if (editingDepartment.manager && editingDepartment.manager !== 'no-manager') {
+    if (editingDepartment.manager && editingDepartment.manager !== 'no-HoD') {
       const foundByName = managersArray.find(m => m.name === editingDepartment.manager);
       if (foundByName) {
         setEditingDepartment(prev => prev ? { ...prev, manager: foundByName.user_id } : null);
@@ -119,7 +122,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
     }
 
     // If no match, ensure sentinel value
-    setEditingDepartment(prev => prev ? { ...prev, manager: 'no-manager' } : null);
+    setEditingDepartment(prev => prev ? { ...prev, manager: 'no-HoD' } : null);
   }, [isEditModalOpen, managersLoading, managers, editingDepartment?.manager_id, editingDepartment?.manager]);
 
   // Departments via React Query (filter by company when provided)
@@ -222,7 +225,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
           : ((newDepartmentManagers as any)?.results ?? []);
         const selectedManager = managersArray.find((m: any) => m.user_id === newDepartment.manager_id);
         if (selectedManager) {
-          departmentData.manager_id = selectedManager.employee_id;
+          departmentData.manager_id = selectedManager.user_id;
         }
       }
       
@@ -275,7 +278,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
     // Convert empty manager to "no-manager" for the dropdown
     const departmentForEdit = {
       ...department,
-      manager: department.manager || 'no-manager'
+      manager: department.manager || 'no-HoD'
     };
     setEditingDepartment(departmentForEdit);
     setIsEditModalOpen(true);
@@ -295,7 +298,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       
       // Only include manager_id field if it's not 'no-manager'
       // Map selected manager user_id → employee_id for the API
-      if (editingDepartment.manager && editingDepartment.manager !== 'no-manager') {
+      if (editingDepartment.manager && editingDepartment.manager !== 'no-HoD') {
         const managersArray: ApiEmployee[] = Array.isArray(managers)
           ? (managers as ApiEmployee[])
           : (((managers as unknown as { results?: ApiEmployee[] }).results) ?? []);
@@ -644,14 +647,16 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
           </p>
         </div>
         <div className="flex gap-3">
-          <Button 
-            variant="outline" 
-            onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-2"
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            Import Hierarchy
-          </Button>
+          {canImport && (
+            <Button 
+              variant="outline" 
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Import Hierarchy
+            </Button>
+          )}
           <Dialog open={isAddModalOpen} onOpenChange={handleModalClose}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
@@ -709,23 +714,23 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="manager" className="text-sm font-medium">Manager (Optional)</Label>
+                    <Label htmlFor="manager" className="text-sm font-medium">HoD (Optional)</Label>
                     <Select
-                      value={newDepartment.manager_id || 'no-manager'}
+                      value={newDepartment.manager_id || 'no-HoD'}
                       onValueChange={(value) => setNewDepartment(prev => ({ 
                         ...prev, 
                         manager_id: value === 'no-manager' ? '' : value 
                       }))}
                     >
                       <SelectTrigger className={validationErrors.manager ? 'border-red-500' : ''}>
-                        <SelectValue placeholder="Select a manager (optional)" />
+                        <SelectValue placeholder="Select a HoD (optional)" />
                       </SelectTrigger>
                       <SelectContent>
                         {newDepartmentManagersLoading ? (
-                          <SelectItem value="loading" disabled>Loading managers...</SelectItem>
+                          <SelectItem value="loading" disabled>Loading HoDs...</SelectItem>
                         ) : (
                           <>
-                            <SelectItem value="no-manager">No Manager</SelectItem>
+                            <SelectItem value="no-manager">No HoD</SelectItem>
                             {Array.isArray(newDepartmentManagers) && newDepartmentManagers.map((manager) => (
                             <SelectItem key={manager.employee_id} value={manager.user_id}>
                               {manager.name} ({manager.role})
@@ -747,7 +752,14 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
                   Cancel
                 </Button>
                 <Button onClick={handleCreateDepartment} disabled={isCreating}>
-                  {isCreating ? 'Creating...' : 'Create Department'}
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Department'
+                  )}
                 </Button>
               </div>
             </DialogContent>
@@ -756,13 +768,14 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       </div>
 
       {/* Import Excel Modal */}
-      <Dialog open={isImportModalOpen} onOpenChange={(open) => {
-        setIsImportModalOpen(open);
-        if (!open) resetImportModal();
-      }}>
-        <DialogContent className="max-w-2xl">
+      {canImport && (
+        <Dialog open={isImportModalOpen} onOpenChange={(open) => {
+          setIsImportModalOpen(open);
+          if (!open) resetImportModal();
+        }}>
+          <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+            <DialogTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <FileSpreadsheet className="h-6 w-6 text-blue-600" />
               Import Hierarchy File
             </DialogTitle>
@@ -770,14 +783,14 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
               Upload an Excel (.xlsx, .xls) or CSV file to import organizational hierarchy. You can validate your file first before importing.
             </p>
           </DialogHeader>
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* File Upload Area */}
             <div
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer ${
+              className={`border border-dashed rounded-md p-4 text-center transition-all duration-200 cursor-pointer ${
                 isDragOver
-                  ? 'border-blue-500 bg-blue-50 scale-[1.02] shadow-lg'
+                  ? 'border-blue-500 bg-blue-50'
                   : selectedFile
-                  ? 'border-green-500 bg-green-50 shadow-md'
+                  ? 'border-green-500 bg-green-50'
                   : uploadStatus === 'error'
                   ? 'border-red-300 bg-red-50'
                   : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
@@ -796,140 +809,114 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
               />
               
               {selectedFile ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-center">
-                    <div className="bg-green-100 p-4 rounded-full animate-pulse">
-                      <CheckCircle className="h-10 w-10 text-green-600" />
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-lg p-4 border border-green-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <FileSpreadsheet className="h-8 w-8 text-green-600" />
-                        <div>
-                          <p className="text-lg font-medium text-gray-900 truncate max-w-xs">
-                            {selectedFile.name}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • {selectedFile.type.includes('sheet') ? 'Excel' : 'CSV'} File
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedFile(null);
-                          setUploadStatus('idle');
-                          setUploadMessage('');
-                        }}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 truncate max-w-[220px]">{selectedFile.name}</p>
+                      <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB • {selectedFile.type.includes('sheet') ? 'Excel' : 'CSV'}</p>
                     </div>
                   </div>
                   <Button
-                    variant="outline"
+                    variant="ghost"
+                    size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleFileSelect();
+                      setSelectedFile(null);
+                      setUploadStatus('idle');
+                      setUploadMessage('');
                     }}
-                    className="bg-white hover:bg-gray-50 border-dashed"
+                    className="h-8 px-2 text-red-600 hover:text-red-700"
                   >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Choose Different File
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-2">
                   <div className="flex items-center justify-center">
-                    <div className={`p-4 rounded-full transition-colors ${
-                      isDragOver ? 'bg-blue-100' : 'bg-gray-100'
-                    }`}>
-                      <Upload className={`h-12 w-12 transition-colors ${
-                        isDragOver ? 'text-blue-600' : 'text-gray-400'
-                      }`} />
+                    <div className={`p-2 rounded-full ${isDragOver ? 'bg-blue-100' : 'bg-gray-100'}`}> 
+                      <Upload className={`h-6 w-6 ${isDragOver ? 'text-blue-600' : 'text-gray-400'}`} />
                     </div>
                   </div>
                   <div>
-                    <p className="text-xl font-medium text-gray-900">
-                      {isDragOver ? 'Drop your file here' : 'Drag and drop your file here'}
+                    <p className="text-sm font-medium text-gray-900">
+                      {isDragOver ? 'Drop your file here' : 'Drag and drop Excel/CSV here'}
                     </p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      or click to browse files from your computer
-                    </p>
+                    <p className="text-xs text-gray-500">or click to browse</p>
                   </div>
-                  <div className="flex flex-col items-center gap-3">
-                    <Button
-                      onClick={handleFileSelect}
-                      className="bg-blue-600 hover:bg-blue-700 px-6 py-2"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Browse Files
-                    </Button>
-                    <p className="text-xs text-gray-400">
-                      Supported formats: .xlsx, .xls, .csv (Max 50MB)
-                    </p>
-                  </div>
+                  <p className="text-xs text-gray-400">.xlsx, .xls, .csv • max 50MB</p>
                 </div>
               )}
             </div>
 
-            {/* File Requirements */}
-            <div className="bg-gray-50 rounded-lg p-4 border">
-              <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-blue-600" />
-                File Requirements
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-gray-600">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
-                  Excel (.xlsx, .xls) or CSV files
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
-                  Maximum file size: 50MB
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
-                  Required columns: Company, Department, Manager
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
-                  UTF-8 encoding recommended
-                </div>
-              </div>
-            </div>
+        <div className="flex items-center justify-between rounded-md border p-2">
+          <div className="flex items-center gap-2 text-xs">
+            <FileSpreadsheet className="h-4 w-4 text-indigo-600" />
+            <span className="text-gray-700">Download Excel template</span>
+          </div>
+          <Button asChild variant="link" size="sm" className="text-indigo-700">
+            <a
+              href="https://docs.google.com/spreadsheets/d/1qv6M6dlaggBvkVkEJJWV0IjhOcSqOcSa/edit?usp=drive_web&ouid=102577459244863862882&rtpof=true"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Download className="h-3 w-3 mr-1" />
+              Template
+            </a>
+          </Button>
+        </div>
 
-            {/* Upload Status */}
+        <div className="bg-gray-50 rounded-md p-2 border">
+          <h4 className="text-sm font-medium text-gray-900 mb-1 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            File Requirements
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-3 w-3 text-green-500" />
+              Excel (.xlsx, .xls) or CSV files
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-3 w-3 text-green-500" />
+              Maximum file size: 50MB
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-3 w-3 text-green-500" />
+              Required columns: Company, Department, Manager
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-3 w-3 text-green-500" />
+              UTF-8 encoding recommended
+            </div>
+          </div>
+        </div>
+
             {uploadMessage && (
-              <div className={`p-4 rounded-lg border-l-4 ${
+              <div className={`p-3 rounded-md border-l-4 ${
                 uploadStatus === 'success' 
                   ? 'bg-green-50 border-green-400 border border-green-200' 
                   : uploadStatus === 'error'
                   ? 'bg-red-50 border-red-400 border border-red-200'
                   : 'bg-blue-50 border-blue-400 border border-blue-200'
               }`}>
-                <div className="flex items-start space-x-3">
+                <div className="flex items-start gap-2">
                   <div className="flex-shrink-0">
-                    {uploadStatus === 'uploading' && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
-                    {uploadStatus === 'success' && <CheckCircle className="h-5 w-5 text-green-600" />}
-                    {uploadStatus === 'error' && <AlertCircle className="h-5 w-5 text-red-600" />}
+                    {uploadStatus === 'uploading' && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
+                    {uploadStatus === 'success' && <CheckCircle className="h-4 w-4 text-green-600" />}
+                    {uploadStatus === 'error' && <AlertCircle className="h-4 w-4 text-red-600" />}
                   </div>
-                  <div className="flex-1">
-                    <p className={`text-sm font-medium ${
+                  <div className="flex-1 text-sm">
+                    <p className={`${
                       uploadStatus === 'success' 
                         ? 'text-green-800' 
                         : uploadStatus === 'error'
                         ? 'text-red-800'
                         : 'text-blue-800'
                     }`}>
-                      {uploadStatus === 'uploading' ? 'Processing...' : 
-                       uploadStatus === 'success' ? 'Success!' : 'Error'}
+                      {uploadStatus === 'uploading' ? 'Processing…' : 
+                       uploadStatus === 'success' ? 'Success' : 'Error'}
                     </p>
-                    <p className={`text-sm mt-1 ${
+                    <p className={`${
                       uploadStatus === 'success' 
                         ? 'text-green-700' 
                         : uploadStatus === 'error'
@@ -943,12 +930,12 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
               </div>
             )}
           </div>
-
-          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-3 border-t">
             <Button 
               variant="outline" 
               onClick={resetImportModal}
               disabled={uploadStatus === 'uploading'}
+              size="sm"
               className="order-3 sm:order-1"
             >
               Cancel
@@ -957,40 +944,43 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
               variant="outline"
               onClick={() => handleFileUpload(true)}
               disabled={!selectedFile || uploadStatus === 'uploading'}
-              className="border-amber-500 text-amber-700 hover:bg-amber-50 hover:border-amber-600 order-2 sm:order-2 transition-all duration-200"
+              size="sm"
+              className="order-2 sm:order-2"
             >
               {uploadStatus === 'uploading' ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Validating...
+                  Validating…
                 </>
               ) : (
                 <>
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Test Run (Validate Only)
+                  Validate
                 </>
               )}
             </Button>
             <Button 
               onClick={() => handleFileUpload(false)}
               disabled={!selectedFile || uploadStatus === 'uploading'}
-              className="bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-200 order-1 sm:order-3"
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 order-1 sm:order-3"
             >
               {uploadStatus === 'uploading' ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Importing...
+                  Importing…
                 </>
               ) : (
                 <>
                   <Upload className="h-4 w-4 mr-2" />
-                  Import Hierarchy
+                  Import
                 </>
               )}
             </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1169,27 +1159,27 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
             
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edit-manager" className="text-right">
-                Manager
+                HoD
               </Label>
               <div className="col-span-3">
                 <Select
-                  value={editingDepartment?.manager || 'no-manager'}
+                  value={editingDepartment?.manager || 'no-HoD'}
                   onValueChange={(value) => setEditingDepartment(prev => 
                     prev ? { 
                       ...prev, 
-                      manager: value === 'no-manager' ? '' : value
+                      manager: value === 'no-HoD' ? '' : value
                     } : null
                   )}
                 >
                   <SelectTrigger className={validationErrors.manager ? 'border-red-500' : ''}>
-                    <SelectValue placeholder="Select a manager (optional)" />
+                    <SelectValue placeholder="Select a HoD (optional)" />
                   </SelectTrigger>
                   <SelectContent>
                     {managersLoading ? (
-                      <SelectItem value="loading" disabled>Loading managers...</SelectItem>
+                      <SelectItem value="loading" disabled>Loading HoD...</SelectItem>
                     ) : (
                       <>
-                        <SelectItem value="no-manager">No Manager</SelectItem>
+                        <SelectItem value="no-manager">No HoD</SelectItem>
                         {Array.isArray(managers) && managers.map((manager) => (
                           <SelectItem key={manager.employee_id} value={manager.user_id}>
                             {manager.name} ({manager.role})

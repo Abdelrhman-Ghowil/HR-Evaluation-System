@@ -215,13 +215,13 @@ const ProfilePage: React.FC = () => {
   const [selfEvaluationsLoading, setSelfEvaluationsLoading] = useState(false);
   const [selfEvaluationsError, setSelfEvaluationsError] = useState<string | null>(null);
   const [creatingSelfEval, setCreatingSelfEval] = useState(false);
-  const [newSelfType, setNewSelfType] = useState<'Quarterly' | 'Annual' | 'Optional'>('Quarterly');
-  const getCurrentQuarterString = () => {
+  const [newSelfType, setNewSelfType] = useState<'Quarterly' | 'Annual' | 'Optional'>('Annual');
+  const getCurrentAnnualPeriod = () => {
     const d = new Date();
-    const q = Math.floor(d.getMonth() / 3) + 1;
-    return `${d.getFullYear()}-Q${q}`;
+    const suffix = d.getMonth() < 6 ? 'Mid' : 'End';
+    return `${d.getFullYear()}-${suffix}`;
   };
-  const [newSelfPeriod, setNewSelfPeriod] = useState<string>(getCurrentQuarterString());
+  const [newSelfPeriod, setNewSelfPeriod] = useState<string>(getCurrentAnnualPeriod());
   const [isDeletingSelfId, setIsDeletingSelfId] = useState<string | null>(null);
   const [confirmSelfDeleteOpen, setConfirmSelfDeleteOpen] = useState(false);
   const [selfEvalToDelete, setSelfEvalToDelete] = useState<ApiEvaluation | null>(null);
@@ -583,7 +583,7 @@ const ProfilePage: React.FC = () => {
   const [editingCompetencyId, setEditingCompetencyId] = useState<string | null>(null);
   const [competencyFieldEdits, setCompetencyFieldEdits] = useState<Record<string, Partial<UpdateCompetencyRequest>>>({});
 
-  const [newObjective, setNewObjective] = useState<{ title: string; description: string; target: number; achieved: number; status: 'Not started' | 'In-progress' | 'Completed' } | null>({ title: '', description: '', target: 0, achieved: 0, status: 'Not started' });
+  const [newObjective, setNewObjective] = useState<{ title: string; description: string; target: number; achieved: number; weight: number; status: 'Not started' | 'In-progress' | 'Completed' } | null>({ title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' });
   const [newCompetency, setNewCompetency] = useState<{ name: string; category: 'Core' | 'Leadership' | 'Functional'; required_level: number; actual_level: number; description: string } | null>({ name: '', category: 'Core', required_level: 5, actual_level: 0, description: '' });
 
   const handleSubmitSelfEvaluation = async () => {
@@ -2087,27 +2087,31 @@ const ProfilePage: React.FC = () => {
                               </AccordionTrigger>
                               <AccordionContent>
                                 <div className="space-y-3">
-                                  <div className="flex flex-wrap gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => setNewObjective({ title: 'Increase KPI', description: 'Improve quarterly KPI performance', target: 10, achieved: 0, status: 'Not started' })} className="rounded-full">Increase KPI</Button>
-                                    <Button variant="outline" size="sm" onClick={() => setNewObjective({ title: 'Reduce Incidents', description: 'Lower monthly incident rate', target: 10, achieved: 0, status: 'Not started' })} className="rounded-full">Reduce Incidents</Button>
-                                    <Button variant="outline" size="sm" onClick={() => setNewObjective({ title: 'Improve Quality', description: 'Enhance deliverable quality benchmarks', target: 10, achieved: 0, status: 'Not started' })} className="rounded-full">Improve Quality</Button>
-                                  </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      <Button variant="outline" size="sm" onClick={() => setNewObjective({ title: 'Increase KPI', description: 'Improve quarterly KPI performance', target: 10, achieved: 0, weight: 10, status: 'Not started' })} className="rounded-full">Increase KPI</Button>
+                                      <Button variant="outline" size="sm" onClick={() => setNewObjective({ title: 'Reduce Incidents', description: 'Lower monthly incident rate', target: 10, achieved: 0, weight: 10, status: 'Not started' })} className="rounded-full">Reduce Incidents</Button>
+                                      <Button variant="outline" size="sm" onClick={() => setNewObjective({ title: 'Improve Quality', description: 'Enhance deliverable quality benchmarks', target: 10, achieved: 0, weight: 10, status: 'Not started' })} className="rounded-full">Improve Quality</Button>
+                                    </div>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                       <Label>Title</Label>
-                                      <Input value={newObjective?.title ?? ''} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, status: 'Not started' }), title: e.target.value }))} />
+                                      <Input value={newObjective?.title ?? ''} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }), title: e.target.value }))} />
                                     </div>
                                     <div className="space-y-1">
                                       <Label>Target</Label>
-                                      <Input type="number" min={0} max={10} value={newObjective?.target ?? 0} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, status: 'Not started' }), target: Math.min(parseFloat(e.target.value) || 0, 10) }))} />
+                                      <Input type="number" min={0} max={10} value={newObjective?.target ?? 0} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }), target: Math.min(parseFloat(e.target.value) || 0, 10) }))} />
                                     </div>
                                     <div className="space-y-1">
                                       <Label>Achieved</Label>
-                                      <Input type="number" min={0} max={10} value={newObjective?.achieved ?? 0} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, status: 'Not started' }), achieved: Math.min(parseFloat(e.target.value) || 0, 10) }))} />
+                                      <Input type="number" min={0} max={10} value={newObjective?.achieved ?? 0} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }), achieved: Math.min(parseFloat(e.target.value) || 0, 10) }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Weight (%)</Label>
+                                      <Input type="number" min={10} max={40} value={newObjective?.weight ?? 10} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }), weight: Math.max(10, Math.min(parseFloat(e.target.value) || 10, 40)) }))} />
                                     </div>
                                     <div className="space-y-1">
                                       <Label>Status</Label>
-                                      <Select value={newObjective?.status ?? 'Not started'} onValueChange={(v) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, status: 'Not started' }), status: v as any }))}>
+                                      <Select value={newObjective?.status ?? 'Not started'} onValueChange={(v) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }), status: v as any }))}>
                                         <SelectTrigger className="w-40">
                                           <SelectValue placeholder="Select status" />
                                         </SelectTrigger>
@@ -2120,7 +2124,7 @@ const ProfilePage: React.FC = () => {
                                     </div>
                                     <div className="space-y-1 md:col-span-2">
                                       <Label>Description</Label>
-                                      <Textarea rows={2} value={newObjective?.description ?? ''} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, status: 'Not started' }), description: e.target.value }))} />
+                                      <Textarea rows={2} value={newObjective?.description ?? ''} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }), description: e.target.value }))} />
                                     </div>
                                   </div>
                                   <div>
@@ -2161,12 +2165,12 @@ const ProfilePage: React.FC = () => {
                                             description: newObjective.description,
                                             target: newObjective.target,
                                             achieved: newObjective.achieved,
-                                            weight: 0,
+                                            weight: newObjective.weight,
                                             status: newObjective.status,
                                           };
                                           const created = await createObjectiveMutation.mutateAsync(payload as any);
                                           setObjectives(prev => [created, ...prev]);
-                                          setNewObjective({ title: '', description: '', target: 0, achieved: 0, status: 'Not started' });
+                                          setNewObjective({ title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' });
                                           toast.success('Objective added');
                                         } catch (err: any) {
                                           toast.error(err?.message || 'Failed to add objective');
@@ -2216,12 +2220,10 @@ const ProfilePage: React.FC = () => {
                                         <span className="text-gray-500">Achieved:</span>
                                         <span className="font-medium ml-1">{objective.achieved}</span>
                                       </div>
-                                      {!isSelfEvalMode && (
-                                        <div className="text-sm">
-                                          <span className="text-gray-500">Weight:</span>
-                                          <span className="font-medium ml-1">{objective.weight}%</span>
-                                        </div>
-                                      )}
+                                      <div className="text-sm">
+                                        <span className="text-gray-500">Weight:</span>
+                                        <span className="font-medium ml-1">{objective.weight}%</span>
+                                      </div>
                                     </div>
                                   </div>
                                   <div className="text-right space-y-2">
@@ -2296,6 +2298,10 @@ const ProfilePage: React.FC = () => {
                                     <div className="space-y-1">
                                       <Label>Target</Label>
                                       <Input type="number" min={0} max={10} defaultValue={objective.target} onChange={(e) => setObjectiveFieldEdits(prev => ({ ...prev, [objective.objective_id]: { ...prev[objective.objective_id], target: Math.min(parseFloat(e.target.value) || 0, 10) } }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Weight (%)</Label>
+                                      <Input type="number" min={10} max={40} defaultValue={objective.weight} onChange={(e) => setObjectiveFieldEdits(prev => ({ ...prev, [objective.objective_id]: { ...prev[objective.objective_id], weight: Math.max(10, Math.min(parseFloat(e.target.value) || 10, 40)) } }))} />
                                     </div>
                                     
                                     <div className="md:col-span-3 space-y-1">

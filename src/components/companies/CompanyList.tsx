@@ -6,13 +6,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, Users, MapPin, Plus, Loader2, Edit, Trash2, Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Search, Filter, Eye, Building } from 'lucide-react';
+import { Building2, Users, MapPin, Plus, Loader2, Edit, Trash2, Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Search, Filter, Eye, Building, Download } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { ApiCompany, CreateCompanyRequest, UpdateCompanyRequest, ApiDepartment, CompanySize } from '@/types/api';
 import { useUpdateCompany, useDeleteCompany, useImportCompanies, useCompanies } from '@/hooks/useApi';
+import { useAuth } from '../../hooks/useAuth';
 
 const CompanyList = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canImport = user?.role === 'admin' || user?.role === 'hr';
   const [companies, setCompanies] = useState<ApiCompany[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +43,7 @@ const CompanyList = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [showCompanyImportDetails, setShowCompanyImportDetails] = useState(false);
 
   // Normalize company size values coming from API or user input
   const normalizeCompanySize = (value: unknown): CompanySize => {
@@ -458,25 +462,29 @@ const CompanyList = () => {
           <p className="text-gray-600">Manage your organization's companies</p>
         </div>
         <div className="flex gap-3">
-          <Button 
-            onClick={handleImportClick}
-            disabled={isImporting}
-            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-          >
-            {isImporting ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Upload className="h-4 w-4 mr-2" />
-            )}
-            {isImporting ? 'Importing...' : 'Import Excel'}
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleFileChange}
-            className="hidden"
-          />
+          {canImport && (
+            <>
+              <Button 
+                onClick={handleImportClick}
+                disabled={isImporting}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+              >
+                {isImporting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4 mr-2" />
+                )}
+                {isImporting ? 'Importing...' : 'Import Excel'}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </>
+          )}
           <Dialog open={isAddModalOpen} onOpenChange={handleModalClose}>
              <DialogTrigger asChild>
                <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
@@ -913,20 +921,21 @@ const CompanyList = () => {
       </Dialog>
 
       {/* Import Companies Modal */}
-      <Dialog open={isImportModalOpen} onOpenChange={handleImportModalClose}>
-        <DialogContent className="sm:max-w-2xl">
+      {canImport && (
+        <Dialog open={isImportModalOpen} onOpenChange={handleImportModalClose}>
+          <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-lg">
               <FileSpreadsheet className="h-5 w-5 text-green-600" />
               Import Companies from Excel
             </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* File Upload Area */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                className={`border border-dashed rounded-md p-4 text-center transition-colors ${
                   isDragOver
                     ? 'border-green-400 bg-green-50'
                     : selectedFile
@@ -936,56 +945,38 @@ const CompanyList = () => {
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
+                onClick={handleFileSelect}
               >
                 {selectedFile ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center">
-                      <div className="bg-green-100 p-3 rounded-full">
-                        <FileSpreadsheet className="h-8 w-8 text-green-600" />
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-gray-900 truncate max-w-[220px]">{selectedFile.name}</p>
+                        <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
                       </div>
                     </div>
-                    <div>
-                      <p className="text-lg font-medium text-gray-900">{selectedFile.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
                       onClick={handleRemoveFile}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="h-8 px-2 text-red-600 hover:text-red-700"
                     >
-                      <X className="h-4 w-4 mr-1" />
-                      Remove File
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-center">
-                      <div className="bg-gray-100 p-3 rounded-full">
-                        <Upload className="h-8 w-8 text-gray-400" />
+                      <div className="bg-gray-100 p-2 rounded-full">
+                        <Upload className="h-6 w-6 text-gray-400" />
                       </div>
                     </div>
                     <div>
-                      <p className="text-lg font-medium text-gray-900">
-                        Drag and drop your Excel or CSV file here
-                      </p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        or click to browse files
-                      </p>
+                      <p className="text-sm font-medium text-gray-900">Drag and drop Excel/CSV here</p>
+                      <p className="text-xs text-gray-500">or click to browse</p>
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={handleFileSelect}
-                      className="bg-white hover:bg-gray-50"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Choose File
-                    </Button>
-                    <p className="text-xs text-gray-400">
-                      Supports .xlsx, .xls, and .csv files up to 50MB
-                    </p>
+                    <p className="text-xs text-gray-400">.xlsx, .xls, .csv • max 50MB</p>
                   </div>
                 )}
               </div>
@@ -997,36 +988,59 @@ const CompanyList = () => {
                 onChange={handleFileChange}
                 className="hidden"
               />
+              <div className="flex items-center justify-between rounded-md border p-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <FileSpreadsheet className="h-4 w-4 text-indigo-600" />
+                  <span className="text-gray-700">Download Excel template</span>
+                </div>
+                <Button
+                  asChild
+                  variant="link"
+                  size="sm"
+                  className="text-indigo-700"
+                >
+                  <a
+                    href="https://docs.google.com/spreadsheets/d/1rWkpqGAKIpdGqIvdIk6rwp6luwafNVAV/edit?usp=sharing&ouid=102577459244863862882&rtpof=true&sd=true"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Template
+                  </a>
+                </Button>
+              </div>
             </div>
 
             {/* Action Buttons */}
             {selectedFile && (
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <Button
                   onClick={handleTestRun}
                   disabled={isImporting}
                   variant="outline"
-                  className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+                  size="sm"
+                  className="flex-1"
                 >
                   {isImporting ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
                     <CheckCircle className="h-4 w-4 mr-2" />
                   )}
-                  {isImporting ? 'Testing...' : 'Test Run (Validate Only)'}
+                  {isImporting ? 'Testing...' : 'Validate'}
                 </Button>
                 <Button
                   onClick={handleActualImport}
                   // disabled={isImporting || !importResults?.success}
                   disabled={isImporting}
-                  className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                  size="sm"
+                  className="flex-1 bg-green-600 hover:bg-green-700"
                 >
                   {isImporting ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
                     <Upload className="h-4 w-4 mr-2" />
                   )}
-                  {isImporting ? 'Importing...' : 'Import Companies'}
+                  {isImporting ? 'Importing...' : 'Import'}
                 </Button>
               </div>
             )}
@@ -1042,88 +1056,90 @@ const CompanyList = () => {
                   !((importResults as any).errors && (importResults as any).errors.length > 0)
                 );
                 return (
-                  <div className={`rounded-lg p-4 ${
+                  <div className={`rounded-md p-3 ${
                     derivedSuccess ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
                   }`}>
-                  <div className="flex items-start gap-3">
-                  <div className={`p-1 rounded-full ${
-                    derivedSuccess ? 'bg-green-100' : 'bg-red-100'
-                  }`}>
-                    {derivedSuccess ? (
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    ) : (
-                      <AlertCircle className="h-5 w-5 text-red-600" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h4 className={`font-medium ${
-                      derivedSuccess ? 'text-green-800' : 'text-red-800'
-                    }`}>
-                      {derivedSuccess ? 'Success!' : 'Error'}
-                    </h4>
-                    <p className={`text-sm mt-1 ${
-                      derivedSuccess ? 'text-green-700' : 'text-red-700'
-                    }`}>
-                      {importResults.message}
-                    </p>
-                    
-                    {/* Display validation results for dry run */}
-                    {importResults.data?.validation_results && (
-                      <div className="mt-3 space-y-2">
-                        <p className="text-sm font-medium text-green-800">
-                          Validation Summary:
-                        </p>
-                        <p className="text-sm text-green-700">
-                          {importResults.data.validation_results.summary}
-                        </p>
-                        {importResults.data.total_records && (
-                          <div className="text-xs text-green-600 space-y-1">
-                            <p>Total Records: {importResults.data.total_records}</p>
-                            <p>Valid Records: {importResults.data.valid_records}</p>
-                            <p>Invalid Records: {importResults.data.invalid_records}</p>
+                    <div className="flex items-start gap-2">
+                      <div className={`p-1 rounded-full ${derivedSuccess ? 'bg-green-100' : 'bg-red-100'}`}>
+                        {derivedSuccess ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-red-600" />
+                        )}
+                      </div>
+                      <div className="flex-1 text-sm">
+                        <div className="flex items-center justify-between">
+                          <p className={`font-medium ${derivedSuccess ? 'text-green-800' : 'text-red-800'}`}>
+                            {importResults.data?.validation_results ? 'Validation successful' : derivedSuccess ? 'Import successful' : 'Import failed'}
+                          </p>
+                          <div className="text-xs text-gray-700 flex gap-3">
+                            {importResults.data?.imported_count !== undefined && (
+                              <span>Imported: {importResults.data.imported_count}</span>
+                            )}
+                            {importResults.data?.skipped_count !== undefined && (
+                              <span>Skipped: {importResults.data.skipped_count}</span>
+                            )}
+                            {importResults.data?.total_processed !== undefined && (
+                              <span>Total: {importResults.data.total_processed}</span>
+                            )}
+                            {importResults.data?.valid_records !== undefined && (
+                              <span>Valid: {importResults.data.valid_records}</span>
+                            )}
+                            {importResults.data?.invalid_records !== undefined && (
+                              <span>Invalid: {importResults.data.invalid_records}</span>
+                            )}
+                          </div>
+                        </div>
+                        {importResults.errors && importResults.errors.length > 0 && (
+                          <div className="mt-2">
+                            <div className="flex items-center gap-2">
+                              <Button size="sm" variant="outline" onClick={() => setShowCompanyImportDetails((v) => !v)}>
+                                {showCompanyImportDetails ? 'Hide details' : 'View details'}
+                              </Button>
+                            </div>
+                            {showCompanyImportDetails && (
+                              <div className="mt-2 space-y-2">
+                                {importResults.data?.validation_results && (
+                                  <div className="bg-gray-50 border rounded p-2">
+                                    <p className="text-xs font-semibold text-gray-800">Validation Summary</p>
+                                    <p className="text-xs text-gray-700 mt-1">{importResults.data.validation_results.summary}</p>
+                                  </div>
+                                )}
+                                {importResults.data?.imported_count !== undefined && (
+                                  <div className="bg-gray-50 border rounded p-2">
+                                    <p className="text-xs font-semibold text-gray-800">Import Summary</p>
+                                    <div className="text-[11px] text-gray-700 mt-1 space-y-1">
+                                      <p>Imported: {importResults.data.imported_count}</p>
+                                      <p>Skipped: {importResults.data.skipped_count || 0}</p>
+                                      <p>Total: {importResults.data.total_processed}</p>
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="bg-gray-50 border rounded p-2">
+                                  <p className="text-xs font-semibold text-gray-800 mb-1">Errors</p>
+                                  <div className="max-h-40 overflow-y-auto space-y-1">
+                                    {importResults.errors.map((error, index) => (
+                                      <p key={index} className="text-[11px] text-red-700">
+                                        Row {error.row}: {error.message}
+                                      </p>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-                    
-                    {/* Display import results */}
-                    {importResults.data?.imported_count !== undefined && (
-                      <div className="mt-3 space-y-2">
-                        <p className="text-sm font-medium text-green-800">
-                          Import Summary:
-                        </p>
-                        <div className="text-xs text-green-600 space-y-1">
-                          <p>Imported: {importResults.data.imported_count} companies</p>
-                          <p>Skipped: {importResults.data.skipped_count || 0} companies</p>
-                          <p>Total Processed: {importResults.data.total_processed}</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Display errors if any */}
-                    {importResults.errors && importResults.errors.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-sm font-medium text-red-800 mb-2">Errors:</p>
-                        <div className="max-h-32 overflow-y-auto">
-                          {importResults.errors.map((error, index) => (
-                            <p key={index} className="text-xs text-red-700 mb-1">
-                              Row {error.row}: {error.message}
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    </div>
                   </div>
-                </div>
-              </div>
                 );
               })()
             )}
 
             {/* Help Text */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-blue-800 mb-2">File Requirements:</h4>
-              <ul className="text-xs text-blue-700 space-y-1">
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
+              <h4 className="text-sm font-medium text-blue-800 mb-1">File Requirements</h4>
+              <ul className="text-xs text-blue-700 space-y-0.5">
                 <li>• Required columns: Company Name, Company Code, Email</li>
                 <li>• Optional columns: Phone, Address, City, Country, Industry, Website, Description</li>
                 <li>• First row should contain column headers</li>
@@ -1132,8 +1148,9 @@ const CompanyList = () => {
               </ul>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
