@@ -135,15 +135,15 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
     if (!obj.title?.trim()) errors.title = 'Title is required';
     if (!obj.target || obj.target < 1 || obj.target > 10) errors.target = 'Target must be between 1-10';
     if (!obj.achieved || obj.achieved < 1 || obj.achieved > 10) errors.achieved = 'Achieved must be between 1-10';
+    if (obj.weight === undefined || obj.weight < 10 || obj.weight > 40) errors.weight = 'Weight must be between 10-40%';
     return errors;
   };
 
   const validateCompetency = (comp: Partial<Competency>): Record<string, string> => {
     const errors: Record<string, string> = {};
     if (!comp.name?.trim()) errors.name = 'Name is required';
-    if (!comp.description?.trim()) errors.description = 'Description is required';
-    if (!comp.required_level || comp.required_level < 1 || comp.required_level > 10) errors.required_level = 'Required level must be between 1-10';
-    if (!comp.actual_level || comp.actual_level < 1 || comp.actual_level > 10) errors.actual_level = 'Actual level must be between 1-10';
+    if (!comp.required_level || comp.required_level > 4) errors.required_level = 'Required level must be between 1-4';
+    if (comp.actual_level > 4 ) errors.actual_level = 'Actual level must be between 0-4';
     return errors;
   };
 
@@ -157,6 +157,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       description: '',
       target: 10,
       achieved: 1,
+      weight: 10,
       status: 'Not started'
     });
     setObjectiveErrors({});
@@ -171,6 +172,8 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   };
 
   const handleSaveObjective = async () => {
+    const isPending = editingObjective ? updateObjectiveMutation.isPending : createObjectiveMutation.isPending;
+    if (isPending) return;
     const errors = validateObjective(objectiveForm);
     if (Object.keys(errors).length > 0) {
       setObjectiveErrors(errors);
@@ -180,13 +183,14 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
     try {
        if (editingObjective) {
          // Update existing objective using evaluation_id endpoint
-         const updateData = {
-           title: objectiveForm.title!,
-           target: objectiveForm.target!,
-           achieved: objectiveForm.achieved!,
-           status: objectiveForm.status!,
-           ...(objectiveForm.description !== undefined ? { description: objectiveForm.description } : {})
-         };
+        const updateData = {
+          title: objectiveForm.title!,
+          target: objectiveForm.target!,
+          achieved: objectiveForm.achieved!,
+          status: objectiveForm.status!,
+          weight: objectiveForm.weight!,
+          ...(objectiveForm.description !== undefined ? { description: objectiveForm.description } : {})
+        };
          await updateObjectiveMutation.mutateAsync({
            objectiveId: editingObjective.id,
            evaluationId: evaluation.id,
@@ -195,20 +199,20 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
          // Explicitly refetch objectives to ensure UI updates immediately
          await refetchObjectives();
        } else {
-         // Create new objective
-         const createData = {
-           evaluation_id: evaluation.id,
-           title: objectiveForm.title!,
-           description: objectiveForm.description ?? '',
-           target: objectiveForm.target!,
-           achieved: objectiveForm.achieved!,
-           status: objectiveForm.status!,
-           weight: objectiveForm.weight!
-         };
+        
+        const createData = {
+          evaluation_id: evaluation.id,
+          title: objectiveForm.title!,
+          description: objectiveForm.description ?? '',
+          target: objectiveForm.target!,
+          achieved: objectiveForm.achieved!,
+          status: objectiveForm.status!,
+          weight: objectiveForm.weight!
+        };
          await createObjectiveMutation.mutateAsync(createData);
          // Explicitly refetch objectives to ensure UI updates immediately
          await refetchObjectives();
-       }
+      }
 
       setIsObjectiveModalOpen(false);
       setObjectiveForm({});
@@ -239,8 +243,8 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       evaluation_id: evaluation.id,
       name: '',
       category: 'Core',
-      required_level: 10,
-      actual_level: 1,
+      required_level: 4,
+      actual_level: 0,
       description: ''
     });
     setCompetencyErrors({});
@@ -879,7 +883,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100">
+                          <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-100">
                             <div className="bg-blue-50 rounded-lg p-3">
                               <p className="text-xs font-medium text-blue-700 mb-1">Target</p>
                               <p className="text-lg font-bold text-blue-900">{objective.target}<span className="text-sm text-blue-600">/10</span></p>
@@ -887,6 +891,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                             <div className="bg-green-50 rounded-lg p-3">
                               <p className="text-xs font-medium text-green-700 mb-1">Achieved</p>
                               <p className="text-lg font-bold text-green-900">{objective.achieved}<span className="text-sm text-green-600">/10</span></p>
+                            </div>
+                            <div className="bg-purple-50 rounded-lg p-3">
+                              <p className="text-xs font-medium text-purple-700 mb-1">Weight</p>
+                              <p className="text-lg font-bold text-purple-900">{objective.weight}<span className="text-sm text-purple-600">%</span></p>
                             </div>
                           </div>
                         </div>
@@ -995,11 +1003,11 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                         <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100">
                           <div className="bg-amber-50 rounded-lg p-3">
                             <p className="text-xs font-medium text-amber-700 mb-1">Required Level</p>
-                            <p className="text-lg font-bold text-amber-900">{competency.required_level}<span className="text-sm text-amber-600">/10</span></p>
+                            <p className="text-lg font-bold text-amber-900">{competency.required_level}<span className="text-sm text-amber-600">/4</span></p>
                           </div>
                           <div className="bg-emerald-50 rounded-lg p-3">
                             <p className="text-xs font-medium text-emerald-700 mb-1">Actual Level</p>
-                            <p className="text-lg font-bold text-emerald-900">{competency.actual_level}<span className="text-sm text-emerald-600">/10</span></p>
+                            <p className="text-lg font-bold text-emerald-900">{competency.actual_level}<span className="text-sm text-emerald-600">/4</span></p>
                           </div>
                         </div>
                       </div>
@@ -1348,6 +1356,32 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
               </div>
               
               <div className="space-y-2">
+                <Label htmlFor="weight" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                  Weight (%) 10–40
+                  <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="weight"
+                  type="number"
+                  min="10"
+                  max="40"
+                  value={objectiveForm.weight ?? 10}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value);
+                    const clamped = isNaN(v) ? 10 : Math.max(10, Math.min(40, v));
+                    setObjectiveForm(prev => ({ ...prev, weight: clamped }));
+                  }}
+                  className={`transition-all duration-200 ${objectiveErrors.weight ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
+                />
+                {objectiveErrors.weight && (
+                  <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
+                    <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                    {objectiveErrors.weight}
+                  </p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
                 <Label htmlFor="status" className="text-sm font-medium text-gray-700 flex items-center gap-1">
                   Status
                   <span className="text-red-500">*</span>
@@ -1380,10 +1414,34 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 </Button>
                 <Button 
                   onClick={handleSaveObjective}
-                  className="w-full sm:w-auto bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-200"
+                  disabled={editingObjective ? updateObjectiveMutation.isPending : createObjectiveMutation.isPending}
+                  className="w/full sm:w-auto bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-200"
                 >
-                  <Save className="h-4 w-4 mr-2" />
-                  {editingObjective ? 'Update' : 'Create'} Objective
+                  {editingObjective ? (
+                    updateObjectiveMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Updating Objective
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Update Objective
+                      </>
+                    )
+                  ) : (
+                    createObjectiveMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating Objective
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Create Objective
+                      </>
+                    )
+                  )}
                 </Button>
               </div>
             </DialogFooter>
@@ -1446,16 +1504,16 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="required_level" className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    Required Level (1-10)
+                    Required Level (1-4)
                     <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="required_level"
                     type="number"
                     min="1"
-                    max="10"
-                    value={competencyForm.required_level || 1}
-                    onChange={(e) => setCompetencyForm(prev => ({ ...prev, required_level: parseInt(e.target.value) || 1 }))}
+                    max="4"
+                    value={competencyForm.required_level || 4}
+                    onChange={(e) => setCompetencyForm(prev => ({ ...prev, required_level: parseInt(e.target.value) || 4 }))}
                     className={`transition-all duration-200 ${competencyErrors.required_level ? 'border-red-500 focus:ring-red-500' : 'focus:ring-purple-500 focus:border-purple-500'}`}
                   />
                   {competencyErrors.required_level && (
@@ -1468,16 +1526,16 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 
                 <div className="space-y-2">
                   <Label htmlFor="actual_level" className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    Actual Level (1-10)
+                    Actual Level (0-4)
                     <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="actual_level"
                     type="number"
-                    min="1"
-                    max="10"
-                    value={competencyForm.actual_level || 1}
-                    onChange={(e) => setCompetencyForm(prev => ({ ...prev, actual_level: parseInt(e.target.value) || 1 }))}
+                    min="0"
+                    max="4"
+                    value={competencyForm.actual_level || 0}
+                    onChange={(e) => setCompetencyForm(prev => ({ ...prev, actual_level: parseInt(e.target.value) || 0 }))}
                     className={`transition-all duration-200 ${competencyErrors.actual_level ? 'border-red-500 focus:ring-red-500' : 'focus:ring-purple-500 focus:border-purple-500'}`}
                   />
                   {competencyErrors.actual_level && (
@@ -1492,7 +1550,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
               <div className="space-y-2">
                 <Label htmlFor="comp_description" className="text-sm font-medium text-gray-700 flex items-center gap-1">
                   Description
-                  <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   id="comp_description"

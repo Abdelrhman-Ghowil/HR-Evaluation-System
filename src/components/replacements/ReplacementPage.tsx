@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Search, Edit, Trash2, Eye, UserCheck, Building, Users, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, Edit, Trash2, Eye, UserCheck, Building, Users, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle, Download } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -14,6 +14,7 @@ import { ApiPlacement, CreatePlacementRequest, ApiCompany, ApiDepartment, ApiSub
 import HierarchicalDropdown from './HierarchicalDropdown';
 import { apiService } from '../../services/api';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../hooks/useAuth';
 
 
 
@@ -46,6 +47,8 @@ const ReplacementPage: React.FC = () => {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [uploadMessage, setUploadMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
+  const canImport = user?.role === 'admin' || user?.role === 'hr';
 
   // API Hooks
   // Use global React Query defaults to retain cached data across navigation
@@ -448,14 +451,20 @@ const handleSubSectionChange = (subSectionId: string) => {
     
     try {
       const response = await apiService.importPlacements(selectedFile, dryRun);
+      const derivedSuccess = Boolean(
+        (response as any)?.success === true ||
+        String((response as any)?.message || '').toLowerCase().includes('success') ||
+        String((response as any)?.message || '').toLowerCase().includes('imported') ||
+        String((response as any)?.data?.status || '').toLowerCase() === 'imported' ||
+        !((response as any)?.errors) ||
+        (Array.isArray((response as any)?.errors) && (response as any).errors.length === 0)
+      );
       
-      if (response.success) {
+      if (derivedSuccess) {
         setUploadStatus('success');
-        setUploadMessage(response.message || (dryRun ? 'File validation completed successfully!' : 'File uploaded successfully!'));
+        setUploadMessage((response as any)?.message || (dryRun ? 'File validation completed successfully!' : 'File uploaded successfully!'));
         if (!dryRun) {
           setSelectedFile(null);
-          
-          // Close modal after success
           setTimeout(() => {
             setIsImportModalOpen(false);
             setUploadStatus('idle');
@@ -464,7 +473,7 @@ const handleSubSectionChange = (subSectionId: string) => {
         }
       } else {
         setUploadStatus('error');
-        setUploadMessage(response.message || 'Failed to process file. Please try again.');
+        setUploadMessage((response as any)?.message || 'Failed to process file. Please try again.');
       }
       
     } catch (error: unknown) {
@@ -497,59 +506,27 @@ const handleSubSectionChange = (subSectionId: string) => {
         </div>
         
         <div className="flex gap-3">
-          <Button 
-            variant="outline" 
-            className="border-blue-600 text-blue-600 hover:bg-blue-50"
-            onClick={() => setIsImportModalOpen(true)}
-          >
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Import Excel
-          </Button>
-          <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
-            <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700" disabled>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Placement
-              </Button>
-            </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Create New Placement</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <HierarchicalDropdown
-                values={{
-                  employee_id: newPlacement.employee_id || '',
-                  company_id: newPlacement.company_id || '',
-                  department_id: newPlacement.department_id || '',
-                  sub_department_id: newPlacement.sub_department_id || '',
-                  section_id: newPlacement.section_id || '',
-                  sub_section_id: newPlacement.sub_section_id || ''
-                }}
-                onChange={(field, value) => {
-                  setNewPlacement(prev => ({ ...prev, [field]: value }));
-                }}
-              />
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setShowCreateForm(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreatePlacement}>
-                  Create Placement
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+          {canImport && (
+            <Button 
+              variant="outline" 
+              className="border-blue-600 text-blue-600 hover:bg-blue-50"
+              onClick={() => setIsImportModalOpen(true)}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Import Excel
+            </Button>
+          )}
+          {/* Add Placement button removed as requested */}
         </div>
       </div>
 
       {/* Import Excel Modal */}
-      <Dialog open={isImportModalOpen} onOpenChange={(open) => {
-        setIsImportModalOpen(open);
-        if (!open) resetImportModal();
-      }}>
-        <DialogContent className="max-w-2xl">
+      {canImport && (
+        <Dialog open={isImportModalOpen} onOpenChange={(open) => {
+          setIsImportModalOpen(open);
+          if (!open) resetImportModal();
+        }}>
+          <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
               <FileSpreadsheet className="h-6 w-6 text-blue-600" />
@@ -559,14 +536,14 @@ const handleSubSectionChange = (subSectionId: string) => {
               Upload an Excel (.xlsx, .xls) or CSV file to import employee placements. You can validate your file first before importing.
             </p>
           </DialogHeader>
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* File Upload Area */}
             <div
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer ${
+              className={`border border-dashed rounded-md p-4 text-center transition-all duration-200 cursor-pointer ${
                 isDragOver
-                  ? 'border-blue-500 bg-blue-50 scale-[1.02] shadow-lg'
+                  ? 'border-blue-500 bg-blue-50'
                   : selectedFile
-                  ? 'border-green-500 bg-green-50 shadow-md'
+                  ? 'border-green-500 bg-green-50'
                   : uploadStatus === 'error'
                   ? 'border-red-300 bg-red-50'
                   : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
@@ -577,83 +554,42 @@ const handleSubSectionChange = (subSectionId: string) => {
               onClick={handleFileSelect}
             >
               {selectedFile ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-center">
-                    <div className="bg-green-100 p-4 rounded-full animate-pulse">
-                      <CheckCircle className="h-10 w-10 text-green-600" />
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-lg p-4 border border-green-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <FileSpreadsheet className="h-8 w-8 text-green-600" />
-                        <div>
-                          <p className="text-lg font-medium text-gray-900 truncate max-w-xs">
-                            {selectedFile.name}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • {selectedFile.type.includes('sheet') ? 'Excel' : 'CSV'} File
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedFile(null);
-                          setUploadStatus('idle');
-                          setUploadMessage('');
-                        }}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 truncate max-w-[220px]">{selectedFile.name}</p>
+                      <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB • {selectedFile.type.includes('sheet') ? 'Excel' : 'CSV'}</p>
                     </div>
                   </div>
                   <Button
-                    variant="outline"
+                    variant="ghost"
+                    size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleFileSelect();
+                      setSelectedFile(null);
+                      setUploadStatus('idle');
+                      setUploadMessage('');
                     }}
-                    className="bg-white hover:bg-gray-50 border-dashed"
+                    className="h-8 px-2 text-red-600 hover:text-red-700"
                   >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Choose Different File
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-2">
                   <div className="flex items-center justify-center">
-                    <div className={`p-4 rounded-full transition-colors ${
-                      isDragOver ? 'bg-blue-100' : 'bg-gray-100'
-                    }`}>
-                      <Upload className={`h-12 w-12 transition-colors ${
-                        isDragOver ? 'text-blue-600' : 'text-gray-400'
-                      }`} />
+                    <div className={`p-2 rounded-full ${isDragOver ? 'bg-blue-100' : 'bg-gray-100'}`}> 
+                      <Upload className={`h-6 w-6 ${isDragOver ? 'text-blue-600' : 'text-gray-400'}`} />
                     </div>
                   </div>
                   <div>
-                    <p className="text-xl font-medium text-gray-900">
-                      {isDragOver ? 'Drop your file here' : 'Drag and drop your file here'}
+                    <p className="text-sm font-medium text-gray-900">
+                      {isDragOver ? 'Drop your file here' : 'Drag and drop Excel/CSV here'}
                     </p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      or click to browse files from your computer
-                    </p>
+                    <p className="text-xs text-gray-500">or click to browse</p>
                   </div>
-                  <div className="flex flex-col items-center gap-3">
-                    <Button
-                      onClick={handleFileSelect}
-                      className="bg-blue-600 hover:bg-blue-700 px-6 py-2"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Browse Files
-                    </Button>
-                    <p className="text-xs text-gray-400">
-                      Supported formats: .xlsx, .xls, .csv (Max 50MB)
-                    </p>
-                  </div>
+                  <p className="text-xs text-gray-400">.xlsx, .xls, .csv • max 50MB</p>
                 </div>
               )}
             </div>
@@ -666,14 +602,30 @@ const handleSubSectionChange = (subSectionId: string) => {
               onChange={handleFileChange}
               className="hidden"
             />
+            <div className="flex items-center justify-between rounded-md border p-2">
+              <div className="flex items-center gap-2 text-xs">
+                <FileSpreadsheet className="h-4 w-4 text-indigo-600" />
+                <span className="text-gray-700">Download Excel template</span>
+              </div>
+              <Button asChild variant="link" size="sm" className="text-indigo-700">
+                <a
+                  href="https://docs.google.com/spreadsheets/d/1rYIqOMGAfAC8Ae60P5cPNa1kDB7gWJ5_/edit?gid=1553600812#gid=1553600812"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  Template
+                </a>
+              </Button>
+            </div>
             
             {/* File Requirements */}
-            <div className="bg-gray-50 rounded-lg p-4 border">
-              <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+            <div className="bg-gray-50 rounded-md p-2 border">
+              <h4 className="text-sm font-medium text-gray-900 mb-1 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-blue-600" />
                 File Requirements
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-gray-600">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-3 w-3 text-green-500" />
                   Excel (.xlsx, .xls) or CSV files
@@ -695,31 +647,31 @@ const handleSubSectionChange = (subSectionId: string) => {
 
             {/* Upload Status */}
             {uploadMessage && (
-              <div className={`p-4 rounded-lg border-l-4 ${
+              <div className={`p-3 rounded-md border-l-4 ${
                 uploadStatus === 'success' 
                   ? 'bg-green-50 border-green-400 border border-green-200' 
                   : uploadStatus === 'error'
                   ? 'bg-red-50 border-red-400 border border-red-200'
                   : 'bg-blue-50 border-blue-400 border border-blue-200'
               }`}>
-                <div className="flex items-start space-x-3">
+                <div className="flex items-start gap-2">
                   <div className="flex-shrink-0">
-                    {uploadStatus === 'uploading' && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
-                    {uploadStatus === 'success' && <CheckCircle className="h-5 w-5 text-green-600" />}
-                    {uploadStatus === 'error' && <AlertCircle className="h-5 w-5 text-red-600" />}
+                    {uploadStatus === 'uploading' && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
+                    {uploadStatus === 'success' && <CheckCircle className="h-4 w-4 text-green-600" />}
+                    {uploadStatus === 'error' && <AlertCircle className="h-4 w-4 text-red-600" />}
                   </div>
-                  <div className="flex-1">
-                    <p className={`text-sm font-medium ${
+                  <div className="flex-1 text-sm">
+                    <p className={`${
                       uploadStatus === 'success' 
                         ? 'text-green-800' 
                         : uploadStatus === 'error'
                         ? 'text-red-800'
                         : 'text-blue-800'
                     }`}>
-                      {uploadStatus === 'uploading' ? 'Processing...' : 
-                       uploadStatus === 'success' ? 'Success!' : 'Error'}
+                      {uploadStatus === 'uploading' ? 'Processing…' : 
+                       uploadStatus === 'success' ? 'Success' : 'Error'}
                     </p>
-                    <p className={`text-sm mt-1 ${
+                    <p className={`${
                       uploadStatus === 'success' 
                         ? 'text-green-700' 
                         : uploadStatus === 'error'
@@ -734,11 +686,12 @@ const handleSubSectionChange = (subSectionId: string) => {
             )}
             
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-3 border-t">
               <Button 
                 variant="outline" 
-                onClick={() => setIsImportModalOpen(false)}
+                onClick={resetImportModal}
                 disabled={uploadStatus === 'uploading'}
+                size="sm"
                 className="order-3 sm:order-1"
               >
                 Cancel
@@ -747,41 +700,44 @@ const handleSubSectionChange = (subSectionId: string) => {
                 variant="outline"
                 onClick={() => handleFileUpload(true)}
                 disabled={!selectedFile || uploadStatus === 'uploading'}
-                className="border-amber-500 text-amber-700 hover:bg-amber-50 hover:border-amber-600 order-2 sm:order-2 transition-all duration-200"
+                size="sm"
+                className="order-2 sm:order-2"
               >
                 {uploadStatus === 'uploading' ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Validating...
+                    Validating…
                   </>
                 ) : (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    Test Run (Validate Only)
+                    Validate
                   </>
                 )}
               </Button>
               <Button 
                 onClick={() => handleFileUpload(false)}
                 disabled={!selectedFile || uploadStatus === 'uploading'}
-                className="bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-200 order-1 sm:order-3"
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 order-1 sm:order-3"
               >
                 {uploadStatus === 'uploading' ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Importing...
+                    Importing…
                   </>
                 ) : (
                   <>
                     <Upload className="h-4 w-4 mr-2" />
-                    Import Placements
+                    Import
                   </>
                 )}
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Search and Filters */}
       <Card>
@@ -1065,11 +1021,25 @@ const handleSubSectionChange = (subSectionId: string) => {
                 </Select>
               </div>
               <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setShowEditForm(false)}>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowEditForm(false)}
+                  disabled={updatePlacementMutation.isPending}
+                >
                   Cancel
                 </Button>
-                <Button onClick={handleEditPlacement}>
-                  Update Placement
+                <Button 
+                  onClick={handleEditPlacement}
+                  disabled={updatePlacementMutation.isPending}
+                >
+                  {updatePlacementMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Placement'
+                  )}
                 </Button>
               </div>
             </div>

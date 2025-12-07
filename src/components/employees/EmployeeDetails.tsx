@@ -53,7 +53,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const [isEditEvaluationOpen, setIsEditEvaluationOpen] = useState(false);
   const [editingEvaluation, setEditingEvaluation] = useState<EvaluationInput | null>(null);
   const [newEvaluation, setNewEvaluation] = useState<NewEvaluation>({
-    type: 'Quarterly',
+    type: 'Annual',
     year: new Date().getFullYear(),
     status: 'Draft'
   });
@@ -318,7 +318,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     
     // Reset form and close modal
     setNewEvaluation({
-      type: 'Quarterly',
+      type: 'Annual',
       year: new Date().getFullYear(),
       status: 'Draft'
     });
@@ -811,11 +811,9 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                     <Label htmlFor="type">Evaluation Type</Label>
                     <Select
                       value={newEvaluation.type}
-                      onValueChange={(value: 'Quarterly' | 'Annual' | 'Optional') => 
-                        setNewEvaluation(prev => ({ ...prev, type: value, quarter: undefined }))
-                      }
+                      disabled
                     >
-                      <SelectTrigger id="type">
+                      <SelectTrigger id="type" disabled>
                         <SelectValue placeholder="Select evaluation type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1164,12 +1162,9 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                 </Label>
                 <Select
                   value={editingEvaluation.type}
-                  onValueChange={(value) => setEditingEvaluation({
-                    ...editingEvaluation,
-                    type: value as 'Quarterly' | 'Annual' | 'Optional'
-                  })}
+                  disabled
                 >
-                  <SelectTrigger className="col-span-3">
+                  <SelectTrigger className="col-span-3" disabled>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
