@@ -16,6 +16,7 @@ interface User {
   last_name?: string;
   phone?: string;
   position?: string;
+  api_role?: UserRole;
 }
 
 // Helper function to map API user role to local role
@@ -48,6 +49,7 @@ const convertApiUserToLocalUser = (apiUser: ApiUser): User => {
     last_name: apiUser.last_name,
     phone: apiUser.phone,
     position: apiUser.position,
+    api_role: apiUser.role,
   };
 };
 

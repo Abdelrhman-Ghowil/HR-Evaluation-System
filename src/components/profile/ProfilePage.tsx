@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,7 +21,6 @@ import {
   Edit3, 
   Save, 
   X,
-  Camera,
   Shield,
   TrendingUp,
   Target,
@@ -138,7 +136,7 @@ const ProfilePage: React.FC = () => {
         return '';
       case 'username':
         if (!value.trim()) return 'Username is required';
-        if (value.trim().length < 3) return 'Username must be at least 3 characters';
+        if (value.trim().length < 2) return 'Username must be at least 2 characters';
         if (!/^[a-zA-Z0-9_]+$/.test(value)) return 'Username can only contain letters, numbers, and underscores';
         return '';
       case 'email':
@@ -883,22 +881,6 @@ const ProfilePage: React.FC = () => {
         <Card className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0 shadow-xl">
           <CardContent className="p-8">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-              <div className="relative">
-                <Avatar className="h-32 w-32 border-4 border-white shadow-lg">
-                  <AvatarImage src="/placeholder.svg" alt={profileData.name} />
-                  <AvatarFallback className="text-2xl font-bold bg-white text-blue-600">
-                    {getInitials(profileData.name)}
-                  </AvatarFallback>
-                </Avatar>
-                {isEditing && (
-                  <Button 
-                    size="sm" 
-                    className="absolute -bottom-2 -right-2 rounded-full h-10 w-10 bg-white text-blue-600 hover:bg-gray-100"
-                  >
-                    <Camera className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
               
               <div className="flex-1 text-center md:text-left">
                 <h2 className="text-3xl font-bold mb-2">{profileData.name}</h2>

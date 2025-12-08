@@ -37,9 +37,13 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'sub-sections', name: 'Sub-Sections', roles: ['admin', 'hr', 'manager'] },
   ];
 
-  const filteredNavigation = navigation.filter(item => 
-    user?.role && item.roles.includes(user.role)
-  );
+  const filteredNavigation = navigation.filter(item => {
+    if (!user?.role) return false;
+    if (item.id === 'replacements') {
+      return user.role === 'admin' || user.role === 'hr' || user.api_role === 'HOD';
+    }
+    return item.roles.includes(user.role);
+  });
 
   return (
     <div className={cn(

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useUsers, queryKeys } from '../../hooks/useApi';
-import { ApiUser, UserRole } from '../../types/api';
+import { ApiUser, UserRole, CreateUserRequest } from '../../types/api';
 import { apiService } from '../../services/api';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -62,6 +62,70 @@ interface UserManagementProps {
 }
 
 const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
+  const lastGeneratedEditUsernameRef = useRef<string>('');
+  const lastGeneratedCreateUsernameRef = useRef<string>('');
+  const generateUsername = (fullName: string) => {
+    const cleanName = fullName.trim().replace(/\s+/g, ' ');
+    if (!cleanName) return '';
+    const parts = cleanName.split(' ').filter(p => p.length > 0);
+    let username = '';
+    if (parts.length === 1) {
+      username = parts[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    } else if (parts.length === 2) {
+      const firstInitial = parts[0].charAt(0).toLowerCase();
+      const cleanLast = parts[1].toLowerCase().replace(/[^a-z0-9]/g, '');
+      username = firstInitial + cleanLast;
+    } else {
+      const firstInitial = parts[0].charAt(0).toLowerCase();
+      const lastFirstWord = parts[1].toLowerCase().replace(/[^a-z0-9]/g, '');
+      username = firstInitial + lastFirstWord;
+    }
+    if (username.length < 2) {
+      username = parts[0].toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
+    }
+    return username.substring(0, 20);
+  };
+  const handleEditNameChange = (fullName: string) => {
+    const generated = generateUsername(fullName);
+    const input = document.getElementById('username') as HTMLInputElement | null;
+    if (input) {
+      if (input.value.trim() === '' || input.value === lastGeneratedEditUsernameRef.current) {
+        input.value = generated;
+        lastGeneratedEditUsernameRef.current = generated;
+      }
+    }
+  };
+  const handleCreateNameChange = (fullName: string) => {
+    const generated = generateUsername(fullName);
+    const input = document.getElementById('new-username') as HTMLInputElement | null;
+    if (input) {
+      if (input.value.trim() === '' || input.value === lastGeneratedCreateUsernameRef.current) {
+        input.value = generated;
+        lastGeneratedCreateUsernameRef.current = generated;
+      }
+    }
+  };
+  const mapRoleInputToApiRole = (value: string): UserRole => {
+    switch (value) {
+      case 'Admin':
+        return 'ADMIN';
+      case 'HR':
+        return 'HR';
+      case 'Head-of-Dept':
+        return 'HOD';
+      case 'Line Manager':
+        return 'LM';
+      case 'Employee':
+      default:
+        return 'EMP';
+    }
+  };
+  const handleUseDefaultPassword = () => {
+    const input = document.getElementById('new-password') as HTMLInputElement | null;
+    if (input) {
+      input.value = 'Password123';
+    }
+  };
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,6 +135,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole | ''>('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
   const PERMISSIONS_COMING_SOON = true;
 
   // Fetch users from API
@@ -198,8 +263,6 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     try {
       // Get form data from the dialog inputs
       const nameInput = document.getElementById('name') as HTMLInputElement;
-      const firstNameInput = document.getElementById('first_name') as HTMLInputElement;
-      const lastNameInput = document.getElementById('last_name') as HTMLInputElement;
       const usernameInput = document.getElementById('username') as HTMLInputElement;
       const emailInput = document.getElementById('email') as HTMLInputElement;
       const phoneInput = document.getElementById('phone') as HTMLInputElement;
@@ -210,8 +273,6 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
         username?: string;
         email?: string;
         password?: string;
-        first_name?: string;
-        last_name?: string;
         name?: string;
         phone?: string;
         role?: UserRole;
@@ -220,8 +281,6 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
       } = {
         username: usernameInput?.value || user.username,
         email: emailInput?.value || user.email,
-        first_name: firstNameInput?.value || user.first_name,
-        last_name: lastNameInput?.value || user.last_name,
         name: nameInput?.value || user.name,
         phone: phoneInput?.value || user.phone,
         role: selectedRole as UserRole || user.role,
@@ -248,8 +307,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
         const updatedSelectedUser = {
           ...selectedUser,
           username: updatedUser.username || updateData.username || selectedUser.username,
-          first_name: updatedUser.first_name || updateData.first_name || selectedUser.first_name,
-          last_name: updatedUser.last_name || updateData.last_name || selectedUser.last_name,
+          first_name: updatedUser.first_name || selectedUser.first_name,
+          last_name: updatedUser.last_name || selectedUser.last_name,
           name: updatedUser.name || updateData.name || selectedUser.name,
           email: updatedUser.email || updateData.email || selectedUser.email,
           phone: updatedUser.phone || updateData.phone || selectedUser.phone,
@@ -291,14 +350,11 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     try {
       // Get form data from the create dialog inputs
       const nameInput = document.getElementById('new-name') as HTMLInputElement;
-      const firstNameInput = document.getElementById('new-first-name') as HTMLInputElement;
-      const lastNameInput = document.getElementById('new-last-name') as HTMLInputElement;
       const usernameInput = document.getElementById('new-username') as HTMLInputElement;
       const emailInput = document.getElementById('new-email') as HTMLInputElement;
       const passwordInput = document.getElementById('new-password') as HTMLInputElement;
       const phoneInput = document.getElementById('new-phone') as HTMLInputElement;
       const positionInput = document.getElementById('new-position') as HTMLInputElement;
-      const avatarInput = document.getElementById('new-avatar') as HTMLInputElement;
       const roleSelect = document.querySelector('[id="new-role"] input') as HTMLInputElement;
       
       // Validate required fields
@@ -307,44 +363,44 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
         return;
       }
       
+      // Derive first and last name from full name
+      const cleanName = nameInput.value.trim().replace(/\s+/g, ' ');
+      const parts = cleanName.split(' ');
+      const first_name = parts[0] || '';
+      const last_name = parts.length > 1 ? parts.slice(1).join(' ') : '';
+
       // Create user data payload matching API structure
-      const createData = {
+      const createData: CreateUserRequest = {
         username: usernameInput.value,
         email: emailInput.value,
         password: passwordInput.value,
-        first_name: firstNameInput?.value || '',
-        last_name: lastNameInput?.value || '',
+        first_name,
+        last_name,
         name: nameInput.value,
         phone: phoneInput?.value || '',
-        role: roleSelect?.value || 'Employee',
-        position: positionInput?.value || '',
-        avatar: avatarInput?.value || ''
+        role: mapRoleInputToApiRole(roleSelect?.value || 'Employee'),
+        title: positionInput?.value || ''
       };
       
-      console.log('Creating user with data:', createData);
+      console.log('Creating user with data (API payload):', createData);
       
-      // TODO: Replace with actual API call when endpoint is available
-      // const response = await apiService.post('/users', createData);
-      
-      // Simulate successful creation for now
-      console.log('User created successfully');
+      // Make POST request to create user
+      const createdUser = await apiService.createUser(createData);
+      console.log('User created successfully:', createdUser);
       
       // Invalidate and refetch users query to update the UI
-      await queryClient.invalidateQueries({ queryKey: ['users'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.users });
       
       // Close the dialog after successful creation
       setIsCreateDialogOpen(false);
       
       // Clear form fields
       if (nameInput) nameInput.value = '';
-      if (firstNameInput) firstNameInput.value = '';
-      if (lastNameInput) lastNameInput.value = '';
       if (usernameInput) usernameInput.value = '';
       if (emailInput) emailInput.value = '';
       if (passwordInput) passwordInput.value = '';
       if (phoneInput) phoneInput.value = '';
       if (positionInput) positionInput.value = '';
-      if (avatarInput) avatarInput.value = '';
       
       console.log('User created and UI refreshed successfully');
       
@@ -552,15 +608,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="name">Name</Label>
-                    <Input id="name" defaultValue={selectedUser.name} />
-                  </div>
-                  <div>
-                    <Label htmlFor="first_name">First Name</Label>
-                    <Input id="first_name" defaultValue={selectedUser.first_name} />
-                  </div>
-                  <div>
-                    <Label htmlFor="last_name">Last Name</Label>
-                    <Input id="last_name" defaultValue={selectedUser.last_name} />
+                    <Input id="name" defaultValue={selectedUser.name} onChange={(e) => handleEditNameChange(e.target.value)} />
                   </div>
                   <div>
                     <Label htmlFor="username">Username</Label>
@@ -695,15 +743,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="new-name">Name</Label>
-                <Input id="new-name" placeholder="Enter full name" />
-              </div>
-              <div>
-                <Label htmlFor="new-first-name">First Name</Label>
-                <Input id="new-first-name" placeholder="Enter first name" />
-              </div>
-              <div>
-                <Label htmlFor="new-last-name">Last Name</Label>
-                <Input id="new-last-name" placeholder="Enter last name" />
+                <Input id="new-name" placeholder="Enter full name" onChange={(e) => handleCreateNameChange(e.target.value)} />
               </div>
               <div>
                 <Label htmlFor="new-username">Username</Label>
@@ -715,7 +755,37 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
               </div>
               <div>
                 <Label htmlFor="new-password">Password</Label>
-                <Input id="new-password" type="password" placeholder="Enter password" />
+                <div className="relative">
+                  <Input 
+                    id="new-password" 
+                    type={showCreatePassword ? "text" : "password"} 
+                    placeholder="Enter password" 
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowCreatePassword(!showCreatePassword)}
+                    aria-label={showCreatePassword ? "Hide password" : "Show password"}
+                  >
+                    {showCreatePassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </Button>
+                </div>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={handleUseDefaultPassword}
+                >
+                  Use Default Password
+                </Button>
               </div>
               <div>
                 <Label htmlFor="new-phone">Phone</Label>
@@ -739,10 +809,6 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
               <div>
                 <Label htmlFor="new-position">Position</Label>
                 <Input id="new-position" placeholder="Enter position/title" />
-              </div>
-              <div>
-                <Label htmlFor="new-avatar">Avatar URL</Label>
-                <Input id="new-avatar" placeholder="Enter avatar URL (optional)" />
               </div>
             </div>
           </div>
