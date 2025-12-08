@@ -13,6 +13,7 @@ import { useSubDepartments, useDepartments } from '../../hooks/useApi';
 import { useManagers } from '../../hooks/usemanagers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Label } from '../ui/label';
+import { useAuth } from '../../hooks/useAuth';
 
 interface SectionsPageProps {
   onViewChange: (view: string) => void;
@@ -21,6 +22,8 @@ interface SectionsPageProps {
 const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
   const { selectedDepartment, selectedSubDepartment, setSection } = useOrganizational();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const canManageSections = user?.role === 'admin' || user?.role === 'hr';
   const { data: subDepartmentsData, isLoading: subDepartmentsLoading } = useSubDepartments();
   const { data: departmentsData, isLoading: departmentsLoading } = useDepartments();
   
@@ -180,6 +183,10 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
 
   const handleCreateSection = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageSections) {
+      toast({ title: 'Unauthorized', description: 'You do not have permission to manage sections.', variant: 'destructive' });
+      return;
+    }
     if (!newSection.sub_department_id) {
       toast({
         title: 'Error',
@@ -220,6 +227,10 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
   };
 
   const handleEditSection = (section: ApiSection) => {
+    if (!canManageSections) {
+      toast({ title: 'Unauthorized', description: 'You do not have permission to edit sections.', variant: 'destructive' });
+      return;
+    }
     console.log('=== DEBUG: handleEditSection ===');
     console.log('Section data:', section);
     console.log('Available managers:', managers);
@@ -303,6 +314,10 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
 
   const handleUpdateSection = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageSections) {
+      toast({ title: 'Unauthorized', description: 'You do not have permission to update sections.', variant: 'destructive' });
+      return;
+    }
     if (!editingSection || !editingSection.sub_department) {
       toast({
         title: 'Error',
@@ -356,6 +371,10 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
   };
 
   const handleDeleteSection = async (section: ApiSection) => {
+    if (!canManageSections) {
+      toast({ title: 'Unauthorized', description: 'You do not have permission to delete sections.', variant: 'destructive' });
+      return;
+    }
     // Client-side validation: check if section has associated sub-sections
     const hasSubSections = await checkSectionHasSubSections(section.section_id);
     if (hasSubSections) {
@@ -373,6 +392,10 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
 
   const confirmDeleteSection = async () => {
     if (!sectionToDelete) return;
+    if (!canManageSections) {
+      toast({ title: 'Unauthorized', description: 'You do not have permission to delete sections.', variant: 'destructive' });
+      return;
+    }
 
     setIsDeleting(true);
     try {
@@ -513,10 +536,12 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
             </div>
           )}
         </div>
+        {canManageSections && (
         <Button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           Add Section
         </Button>
+        )}
       </div>
 
       {/* Statistics Cards */}
@@ -813,20 +838,24 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
                     </p>
                   </div>
                   <div className="flex space-x-1">
-                    <Button 
-                      size="sm" 
-                      variant="ghost"
-                      onClick={() => handleEditSection(section)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={() => handleDeleteSection(section)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canManageSections && (
+                      <>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => handleEditSection(section)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => handleDeleteSection(section)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardHeader>
