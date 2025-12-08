@@ -691,14 +691,12 @@ const EmployeeList = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
-  // Fetch departments when selected company changes
+  // Fetch departments when a specific company is selected (avoid duplicate fetch for 'all')
   useEffect(() => {
-    if (selectedCompany) {
+    if (selectedCompany && selectedCompany !== 'all') {
       const selectedCompanyData = companies.find(company => company.name === selectedCompany);
       const companyId = selectedCompanyData?.company_id;
       fetchDepartments(companyId);
-      
-      // Reset department filter when company changes
       setSelectedDepartment('all');
     }
   }, [selectedCompany, companies]);
@@ -1789,14 +1787,16 @@ const EmployeeList = () => {
                       onCheckedChange={() => handleToggleStatus(employee.id)}
                     />
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEditEmployee(employee)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                  {(user?.role === 'admin' || user?.role === 'hr' || user?.api_role === 'HOD') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditEmployee(employee)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
               
@@ -2040,11 +2040,13 @@ const EmployeeList = () => {
                       disabled
                       className="w-full"
                     />
-                    <div className="flex justify-end">
-                      <Button variant="outline" onClick={goToPlacementForEmployee}>
-                        Change via Placement
-                      </Button>
-                    </div>
+                    {(user?.role === 'admin' || user?.role === 'hr' || user?.api_role === 'HOD') && (
+                      <div className="flex justify-end">
+                        <Button variant="outline" onClick={goToPlacementForEmployee}>
+                          Change via Placement
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-position" className="text-sm font-medium">Position *</Label>

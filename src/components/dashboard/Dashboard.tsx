@@ -74,7 +74,7 @@ const Dashboard = () => {
     'sub-departments': ['admin', 'hr', 'manager'],
     sections: ['admin', 'hr', 'manager'],
     'sub-sections': ['admin', 'hr', 'manager'],
-    replacements: ['admin', 'hr', 'manager'],
+    replacements: ['admin', 'hr'],
     admin: ['admin'],
     'weights-configuration': ['admin'],
     'user-management': ['admin'],
@@ -86,8 +86,8 @@ const Dashboard = () => {
   useEffect(() => {
     if (!user?.role) return;
     const allowed = viewAccess[activeView] || ['admin', 'hr', 'manager', 'employee'];
-    if (!allowed.includes(user.role)) {
-      // Send user to a safe default
+    const isAllowed = allowed.includes(user.role) || (activeView === 'replacements' && user.api_role === 'HOD');
+    if (!isAllowed) {
       const fallbackPath = '/';
       if (location.pathname !== fallbackPath) {
         toast({
@@ -97,7 +97,7 @@ const Dashboard = () => {
         navigate(fallbackPath, { replace: true });
       }
     }
-  }, [activeView, user?.role, navigate, location.pathname]);
+  }, [activeView, user?.role, user?.api_role, navigate, location.pathname]);
 
   const handleViewChange = (view: string) => {
     const path = view === 'dashboard' ? '/' : `/${view}`;
