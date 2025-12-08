@@ -14,6 +14,7 @@ import { Badge } from '../ui/badge';
 import { Search, Plus, Edit, Trash2, Users, Building2, UserCheck, Eye } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ConfirmationDialog } from '../ui/confirmation-dialog';
+import { useAuth } from '../../hooks/useAuth';
 
 interface SubDepartmentsPageProps {
   className?: string;
@@ -54,6 +55,8 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
   }
   const { selectedDepartment, setDepartment, setSubDepartment } = useOrganizational();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const canManageSubDepartments = user?.role === 'admin' || user?.role === 'hr';
   
   // Fetch departments for dropdown
   const { data: departmentsData, isLoading: departmentsLoading, error: departmentsError } = useDepartments();
@@ -164,6 +167,10 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
   // Handle form submission for create
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageSubDepartments) {
+      toast({ title: "Unauthorized", description: "You do not have permission to manage sub-departments.", variant: "destructive" });
+      return;
+    }
     
     if (!formData.name.trim()) {
       toast({
@@ -205,6 +212,10 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
   // Handle form submission for edit
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageSubDepartments) {
+      toast({ title: "Unauthorized", description: "You do not have permission to manage sub-departments.", variant: "destructive" });
+      return;
+    }
     
     if (!editingSubDepartment || !formData.name.trim()) {
       toast({
@@ -262,6 +273,10 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
 
   // Handle delete - open confirmation dialog with validation
   const handleDelete = async (subDepartmentId: string) => {
+    if (!canManageSubDepartments) {
+      toast({ title: "Unauthorized", description: "You do not have permission to delete sub-departments.", variant: "destructive" });
+      return;
+    }
     const subDepartment = subDepartments.find(sd => sd.sub_department_id === subDepartmentId);
     if (!subDepartment) return;
 
@@ -290,6 +305,10 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
   // Confirm delete sub-department
   const confirmDeleteSubDepartment = async () => {
     if (!subDepartmentToDelete) return;
+    if (!canManageSubDepartments) {
+      toast({ title: "Unauthorized", description: "You do not have permission to delete sub-departments.", variant: "destructive" });
+      return;
+    }
 
     setIsDeleting(true);
     try {
@@ -338,6 +357,10 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
 
   // Open edit modal
   const openEditModal = (subDepartment: ApiSubDepartment) => {
+    if (!canManageSubDepartments) {
+      toast({ title: "Unauthorized", description: "You do not have permission to edit sub-departments.", variant: "destructive" });
+      return;
+    }
     setEditingSubDepartment(subDepartment);
     
     // Find the department ID that matches the department name
@@ -536,94 +559,96 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
 
           </div>
           
-          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-            <DialogTrigger asChild>
-              <Button className="flex items-center gap-2">
-                <Plus className="w-4 h-4" />
-                Add Sub-Department
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Sub-Department</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Sub-Department Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Enter sub-department name"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="department">Department</Label>
-                  <Select 
-                    value={formData.department || (selectedDepartment?.department_id || '')}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, department: value }))}
-                    disabled={departmentsLoading}
-                  >
-                    <SelectTrigger id="department">
-                      <SelectValue placeholder={departmentsLoading ? "Loading departments..." : "Select department"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept.department_id} value={dept.department_id}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
-                      {departments.length === 0 && !departmentsLoading && (
-                        <SelectItem value="no-department" disabled>
-                          No departments available
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="manager">Manager</Label>
-                  <Select 
-                    value={formData.manager}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, manager: value }))}
-                    disabled={!formData.department || managersLoading}
-                  >
-                    <SelectTrigger id="manager">
-                      <SelectValue placeholder="Select manager" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Manager</SelectItem>
-                      {managersLoading ? (
-                        <SelectItem value="loading" disabled>Loading managers...</SelectItem>
-                      ) : managersError ? (
-                        <SelectItem value="error" disabled>Error loading managers</SelectItem>
-                      ) : managers.length === 0 ? (
-                        <SelectItem value="no-managers" disabled>No managers available</SelectItem>
-                      ) : (
-                        managers.map((manager) => (
-                          <SelectItem key={manager.employee_id} value={manager.user_id}>
-                            {manager.name} - ({manager.role})
+          {canManageSubDepartments && (
+            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+              <DialogTrigger asChild>
+                <Button className="flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Add Sub-Department
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Sub-Department</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreate} className="space-y-4">
+                  <div>
+                    <Label htmlFor="name">Sub-Department Name *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Enter sub-department name"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="department">Department</Label>
+                    <Select 
+                      value={formData.department || (selectedDepartment?.department_id || '')}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, department: value }))}
+                      disabled={departmentsLoading}
+                    >
+                      <SelectTrigger id="department">
+                        <SelectValue placeholder={departmentsLoading ? "Loading departments..." : "Select department"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map((dept) => (
+                          <SelectItem key={dept.department_id} value={dept.department_id}>
+                            {dept.name}
                           </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">
-                    Create Sub-Department
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                        ))}
+                        {departments.length === 0 && !departmentsLoading && (
+                          <SelectItem value="no-department" disabled>
+                            No departments available
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="manager">Manager</Label>
+                    <Select 
+                      value={formData.manager}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, manager: value }))}
+                      disabled={!formData.department || managersLoading}
+                    >
+                      <SelectTrigger id="manager">
+                        <SelectValue placeholder="Select manager" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Manager</SelectItem>
+                        {managersLoading ? (
+                          <SelectItem value="loading" disabled>Loading managers...</SelectItem>
+                        ) : managersError ? (
+                          <SelectItem value="error" disabled>Error loading managers</SelectItem>
+                        ) : managers.length === 0 ? (
+                          <SelectItem value="no-managers" disabled>No managers available</SelectItem>
+                        ) : (
+                          managers.map((manager) => (
+                            <SelectItem key={manager.employee_id} value={manager.user_id}>
+                              {manager.name} - ({manager.role})
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-2">
+                    <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit">
+                      Create Sub-Department
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 
@@ -695,10 +720,12 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
                   : 'No sub-departments available'
               }
             </p>
+            {canManageSubDepartments && (
             <Button onClick={() => setIsCreateModalOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Create First Sub-Department
             </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -722,21 +749,25 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEditModal(subDepartment)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(subDepartment.sub_department_id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {canManageSubDepartments && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditModal(subDepartment)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(subDepartment.sub_department_id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardHeader>

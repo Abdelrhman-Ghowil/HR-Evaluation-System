@@ -12,6 +12,7 @@ import { ApiSubSection, ApiSection, CreateSubSectionRequest } from '../../types/
 import { useToast } from '../../hooks/use-toast';
 import { useSubDepartments, useDepartments } from '../../hooks/useApi';
 import { useManagers } from '../../hooks/usemanagers';
+import { useAuth } from '../../hooks/useAuth';
 
 interface SubSectionsPageProps {
   onViewChange: (view: string) => void;
@@ -20,6 +21,8 @@ interface SubSectionsPageProps {
 const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
   const { selectedDepartment, selectedSubDepartment, selectedSection } = useOrganizational();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const canManageSubSections = user?.role === 'admin' || user?.role === 'hr';
   const { data: subDepartmentsData, isLoading: subDepartmentsLoading } = useSubDepartments();
   const { data: departmentsData, isLoading: departmentsLoading } = useDepartments();
   
@@ -244,6 +247,10 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
   };
 
   const handleCreateSubSection = async () => {
+    if (!canManageSubSections) {
+      toast({ title: 'Unauthorized', description: 'You do not have permission to manage sub-sections.', variant: 'destructive' });
+      return;
+    }
     if (!newSubSection.name.trim()) {
       toast({
         title: 'Validation Error',
@@ -281,6 +288,10 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
   };
 
   const handleEditSubSectionClick = (subSection: ApiSubSection) => {
+    if (!canManageSubSections) {
+      toast({ title: 'Unauthorized', description: 'You do not have permission to edit sub-sections.', variant: 'destructive' });
+      return;
+    }
     // Find the section ID by matching the section name
     const section = sections.find(s => s.name === subSection.section);
     // Resolve manager to Select-friendly user_id for prefill
@@ -300,6 +311,10 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
   };
 
   const handleEditSubSection = async () => {
+    if (!canManageSubSections) {
+      toast({ title: 'Unauthorized', description: 'You do not have permission to update sub-sections.', variant: 'destructive' });
+      return;
+    }
     if (!editingSubSection || !editingSubSection.name.trim()) {
       toast({
         title: 'Validation Error',
@@ -340,6 +355,10 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
   };
 
   const handleDeleteSubSection = async (subSectionId: string) => {
+    if (!canManageSubSections) {
+      toast({ title: 'Unauthorized', description: 'You do not have permission to delete sub-sections.', variant: 'destructive' });
+      return;
+    }
     if (!confirm('Are you sure you want to delete this sub-section?')) {
       return;
     }
@@ -459,10 +478,12 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
           <h1 className="text-2xl font-bold text-gray-900">Sub-Sections</h1>
           <p className="text-gray-600">{contextMessage}</p>
         </div>
+        {canManageSubSections && (
         <Button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           Add Sub-Section
         </Button>
+        )}
       </div>
 
       {/* Independent Navigation Info */}
@@ -562,20 +583,24 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">{subSection.name}</CardTitle>
                   <div className="flex items-center space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditSubSectionClick(subSection)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteSubSection(subSection.sub_section_id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canManageSubSections && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditSubSectionClick(subSection)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteSubSection(subSection.sub_section_id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardHeader>

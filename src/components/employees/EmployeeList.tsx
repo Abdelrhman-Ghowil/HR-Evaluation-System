@@ -52,6 +52,7 @@ const EmployeeList = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canImport = user?.role === 'admin' || user?.role === 'hr';
+  const canAddEmployee = user?.role === 'admin' || user?.role === 'hr';
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [selectedCompany, setSelectedCompany] = useState('all');
@@ -1187,18 +1188,19 @@ const EmployeeList = () => {
               Import Excel/CSV
             </Button>
           )}
-          <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Employee
-              </Button>
-            </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-semibold">Add New Employee</DialogTitle>
-              <p className="text-sm text-gray-600">Fill in the employee details below</p>
-            </DialogHeader>
+          {canAddEmployee && (
+            <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Employee
+                </Button>
+              </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-semibold">Add New Employee</DialogTitle>
+                <p className="text-sm text-gray-600">Fill in the employee details below</p>
+              </DialogHeader>
             <div className="space-y-6 py-4">
               {createError && (
                 <div className="bg-red-50 border border-red-200 rounded-md p-3">
@@ -1707,8 +1709,9 @@ const EmployeeList = () => {
                 )}
               </Button>
             </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+          )}
         </div>
       </div>
 

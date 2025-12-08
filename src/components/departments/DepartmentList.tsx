@@ -49,6 +49,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const { user } = useAuth();
   const canImport = user?.role === 'admin' || user?.role === 'hr';
+  const canManageDepartments = user?.role === 'admin' || user?.role === 'hr';
 
   // Import Excel state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -203,6 +204,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
 
   // Handle create department
   const handleCreateDepartment = async () => {
+    if (!canManageDepartments) return;
     if (!validateDepartmentForm()) {
       return;
     }
@@ -275,6 +277,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
 
   // Handle edit department
   const handleEditDepartment = (department: ApiDepartment) => {
+    if (!canManageDepartments) return;
     // Convert empty manager to "no-manager" for the dropdown
     const departmentForEdit = {
       ...department,
@@ -286,6 +289,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
 
   // Handle update department
   const handleUpdateDepartment = async () => {
+    if (!canManageDepartments) return;
     if (!editingDepartment) return;
 
     setIsUpdating(true);
@@ -343,6 +347,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
 
   // Handle delete department - open confirmation dialog
   const handleDeleteDepartment = (department: ApiDepartment) => {
+    if (!canManageDepartments) return;
     // Client-side validation: check if department has associated records
     if (department.employee_count && department.employee_count > 0) {
       toast({
@@ -359,6 +364,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
 
   // Confirm delete department
   const confirmDeleteDepartment = async () => {
+    if (!canManageDepartments) return;
     if (!departmentToDelete) return;
 
     setIsDeleting(true);
@@ -545,10 +551,12 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
               {selectedCompany ? `Manage departments for ${selectedCompany.name}` : 'Manage organizational departments'}
             </p>
           </div>
-          <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Department
-          </Button>
+          {canManageDepartments && (
+            <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Department
+            </Button>
+          )}
         </div>
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
@@ -572,10 +580,12 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
               {selectedCompany ? `Manage departments for ${selectedCompany.name}` : 'Manage organizational departments'}
             </p>
           </div>
-          <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Department
-          </Button>
+          {canManageDepartments && (
+            <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Department
+            </Button>
+          )}
         </div>
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
@@ -657,14 +667,15 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
               Import Hierarchy
             </Button>
           )}
-          <Dialog open={isAddModalOpen} onOpenChange={handleModalClose}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Department
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+          {canManageDepartments && (
+            <Dialog open={isAddModalOpen} onOpenChange={handleModalClose}>
+              <DialogTrigger asChild>
+                <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Department
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle className="text-xl font-semibold">Add New Department</DialogTitle>
                 <p className="text-sm text-gray-600">Create a new department for your organization</p>
@@ -762,8 +773,9 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
                   )}
                 </Button>
               </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 
@@ -1057,26 +1069,28 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
                   <p className="font-medium text-gray-900">{department.company}</p>
                 </div>
                 <div className="pt-3 border-t space-y-2">
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1 flex items-center gap-2"
-                      onClick={() => handleEditDepartment(department)}
-                    >
-                      <Edit className="h-4 w-4" />
-                      Edit
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1 flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleDeleteDepartment(department)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </Button>
-                  </div>
+                  {canManageDepartments && (
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1 flex items-center gap-2"
+                        onClick={() => handleEditDepartment(department)}
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1 flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDeleteDepartment(department)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </Button>
+                    </div>
+                  )}
                   {onViewChange && (
                     <Button 
                       variant="outline" 
@@ -1099,6 +1113,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       )}
 
       {/* Edit Department Modal */}
+      {canManageDepartments && (
       <Dialog open={isEditModalOpen} onOpenChange={handleEditModalClose}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -1213,20 +1228,23 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
           </div>
         </DialogContent>
       </Dialog>
+      )}
 
       {/* Delete Confirmation Dialog */}
-      <ConfirmationDialog
-        open={deleteConfirmOpen}
-        onOpenChange={setDeleteConfirmOpen}
-        title="Delete Department"
-        description={`Are you sure you want to delete the department "${departmentToDelete?.name}"? This action cannot be undone.`}
-        confirmText="Delete Department"
-        cancelText="Cancel"
-        onConfirm={confirmDeleteDepartment}
-        onCancel={cancelDeleteDepartment}
-        variant="destructive"
-        loading={isDeleting}
-      />
+      {canManageDepartments && (
+        <ConfirmationDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+          title="Delete Department"
+          description={`Are you sure you want to delete the department "${departmentToDelete?.name}"? This action cannot be undone.`}
+          confirmText="Delete Department"
+          cancelText="Cancel"
+          onConfirm={confirmDeleteDepartment}
+          onCancel={cancelDeleteDepartment}
+          variant="destructive"
+          loading={isDeleting}
+        />
+      )}
     </div>
   );
 };
