@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ import {
   BarChart3,
   FileText,
   Eye,
+  EyeOff,
   Award,
   ChevronDown,
   ChevronUp,
@@ -41,7 +43,7 @@ import {
 import { Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/api';
-import { ApiEmployee, ApiEvaluation, ApiObjective, ApiCompetency, ApiMyProfile } from '../../types/api';
+import { ApiEmployee, ApiEvaluation, ApiObjective, ApiCompetency, ApiMyProfile, ApiError } from '../../types/api';
 import { useEvaluations, useUpdateObjective, useUpdateCompetency, useUpdateEvaluation, useCreateObjective, useDeleteObjective, useCreateCompetency, useDeleteCompetency } from '../../hooks/useApi';
 import { toast } from 'sonner';
 import EvaluationDetails from '../employees/EvaluationDetails';
@@ -81,7 +83,8 @@ interface ProfileData {
 }
 
 const ProfilePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -238,6 +241,9 @@ const ProfilePage: React.FC = () => {
   });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordChangeSuccess, setPasswordChangeSuccess] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // React Query: Evaluations (cached)
   const {
@@ -245,9 +251,9 @@ const ProfilePage: React.FC = () => {
     isLoading: evaluationsQueryLoading,
     error: evaluationsQueryError,
   } = useEvaluations(
-    user?.user_id ? { user_id: user.user_id } : undefined,
+    { status: 'Approved' },
     {
-      enabled: !!user?.user_id,
+      enabled: true,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
       select: (data: any) => {
@@ -763,62 +769,31 @@ const ProfilePage: React.FC = () => {
     setPasswordErrors(prev => ({ ...prev, general: '' }));
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}api/accounts/users/change-password/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          old_password: passwordData.currentPassword,
-          new_password: passwordData.newPassword,
-          new_password_confirm: passwordData.confirmPassword
-        })
+      await apiService.changePassword({
+        old_password: passwordData.currentPassword,
+        new_password: passwordData.newPassword,
+        new_password_confirm: passwordData.confirmPassword
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        
-        // Handle specific error cases
-        if (response.status === 400) {
-          if (errorData.old_password) {
-            setPasswordErrors(prev => ({ ...prev, currentPassword: 'Error: Current Password Incorrect' }));
-          } else if (errorData.new_password) {
-            setPasswordErrors(prev => ({ ...prev, newPassword: errorData.new_password[0] || 'Error: Password too weak' }));
-          } else {
-            setPasswordErrors(prev => ({ ...prev, general: errorData.detail || 'Password change failed' }));
-          }
-        } else {
-          setPasswordErrors(prev => ({ ...prev, general: 'Password change failed. Please try again.' }));
-        }
-        return;
-      }
-
-      // Success
-      setPasswordChangeSuccess(true);
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-      setPasswordErrors({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-        general: ''
-      });
-
-      // Auto-hide success message after 5 seconds
-      setTimeout(() => {
-        setPasswordChangeSuccess(false);
-      }, 5000);
+      toast.success('Password changed successfully. Please log in again.');
+      await logout();
+      navigate('/');
 
     } catch (error) {
-      console.error('Password change error:', error);
-      setPasswordErrors(prev => ({ 
-        ...prev, 
-        general: 'Network error. Please check your connection and try again.' 
-      }));
+      const apiError = error as ApiError;
+      const details = (apiError?.details || {}) as Record<string, unknown>;
+      if (apiError?.status === 400) {
+        if (details && 'old_password' in details) {
+          setPasswordErrors(prev => ({ ...prev, currentPassword: 'Error: Current Password Incorrect' }));
+        } else if (details && 'new_password' in details) {
+          const val = (details as Record<string, unknown>)['new_password'];
+          const msg = Array.isArray(val) ? String(val[0]) : String(val || 'Error: Password too weak');
+          setPasswordErrors(prev => ({ ...prev, newPassword: msg }));
+        } else {
+          setPasswordErrors(prev => ({ ...prev, general: apiError?.message || 'Password change failed' }));
+        }
+      } else {
+        setPasswordErrors(prev => ({ ...prev, general: apiError?.message || 'Password change failed. Please try again.' }));
+      }
     } finally {
       setIsChangingPassword(false);
     }
@@ -1899,14 +1874,31 @@ const ProfilePage: React.FC = () => {
                     <form onSubmit={handlePasswordSubmit} className="space-y-4">
                       <div>
                         <Label htmlFor="current-password">Current Password *</Label>
-                        <Input 
-                          id="current-password" 
-                          type="password" 
-                          value={passwordData.currentPassword}
-                          onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
-                          className={passwordErrors.currentPassword ? 'border-red-500' : ''}
-                          disabled={isChangingPassword}
-                        />
+                        <div className="relative">
+                          <Input 
+                            id="current-password" 
+                            type={showCurrentPassword ? 'text' : 'password'} 
+                            value={passwordData.currentPassword}
+                            onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
+                            className={`${passwordErrors.currentPassword ? 'border-red-500' : ''} pr-10`}
+                            disabled={isChangingPassword}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                            aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
+                            disabled={isChangingPassword}
+                          >
+                            {showCurrentPassword ? (
+                              <EyeOff className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-gray-400" />
+                            )}
+                          </Button>
+                        </div>
                         {passwordErrors.currentPassword && (
                           <p className="text-red-600 text-sm mt-1">{passwordErrors.currentPassword}</p>
                         )}
@@ -1914,14 +1906,31 @@ const ProfilePage: React.FC = () => {
 
                       <div>
                         <Label htmlFor="new-password">New Password *</Label>
-                        <Input 
-                          id="new-password" 
-                          type="password" 
-                          value={passwordData.newPassword}
-                          onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
-                          className={passwordErrors.newPassword ? 'border-red-500' : ''}
-                          disabled={isChangingPassword}
-                        />
+                        <div className="relative">
+                          <Input 
+                            id="new-password" 
+                            type={showNewPassword ? 'text' : 'password'} 
+                            value={passwordData.newPassword}
+                            onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
+                            className={`${passwordErrors.newPassword ? 'border-red-500' : ''} pr-10`}
+                            disabled={isChangingPassword}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                            disabled={isChangingPassword}
+                          >
+                            {showNewPassword ? (
+                              <EyeOff className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-gray-400" />
+                            )}
+                          </Button>
+                        </div>
                         {passwordErrors.newPassword && (
                           <p className="text-red-600 text-sm mt-1">{passwordErrors.newPassword}</p>
                         )}
@@ -1955,14 +1964,31 @@ const ProfilePage: React.FC = () => {
 
                       <div>
                         <Label htmlFor="confirm-password">Confirm New Password *</Label>
-                        <Input 
-                          id="confirm-password" 
-                          type="password" 
-                          value={passwordData.confirmPassword}
-                          onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
-                          className={passwordErrors.confirmPassword ? 'border-red-500' : ''}
-                          disabled={isChangingPassword}
-                        />
+                        <div className="relative">
+                          <Input 
+                            id="confirm-password" 
+                            type={showConfirmPassword ? 'text' : 'password'} 
+                            value={passwordData.confirmPassword}
+                            onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
+                            className={`${passwordErrors.confirmPassword ? 'border-red-500' : ''} pr-10`}
+                            disabled={isChangingPassword}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                            disabled={isChangingPassword}
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-gray-400" />
+                            )}
+                          </Button>
+                        </div>
                         {passwordErrors.confirmPassword && (
                           <p className="text-red-600 text-sm mt-1">{passwordErrors.confirmPassword}</p>
                         )}

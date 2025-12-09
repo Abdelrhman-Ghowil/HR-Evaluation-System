@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useUsers, queryKeys } from '../../hooks/useApi';
-import { ApiUser, UserRole, CreateUserRequest } from '../../types/api';
+import { ApiUser, UserRole, CreateUserRequest, ApiError } from '../../types/api';
 import { apiService } from '../../services/api';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -136,6 +136,12 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   const [selectedRole, setSelectedRole] = useState<UserRole | ''>('');
   const [showPassword, setShowPassword] = useState(false);
   const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createErrorItems, setCreateErrorItems] = useState<string[]>([]);
+  const [createValidationErrors, setCreateValidationErrors] = useState<{[key: string]: string}>({});
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editErrorItems, setEditErrorItems] = useState<string[]>([]);
+  const [editValidationErrors, setEditValidationErrors] = useState<{[key: string]: string}>({});
   const PERMISSIONS_COMING_SOON = true;
 
   // Fetch users from API
@@ -238,12 +244,18 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
 
 
   const handleCreateUser = () => {
+    setCreateError(null);
+    setCreateErrorItems([]);
+    setCreateValidationErrors({});
     setSelectedUser(null);
     setIsCreateDialogOpen(true);
   };
 
   const handleEditUser = (user: User) => {
     console.log('Edit user clicked:', user);
+    setEditError(null);
+    setEditErrorItems([]);
+    setEditValidationErrors({});
     setSelectedUser(user);
     setSelectedRole(user.role);
     setIsEditDialogOpen(true);
@@ -325,9 +337,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
       
       // Update React Query cache in-place to keep the row position
       queryClient.setQueryData<ApiUser[]>(queryKeys.users, (old) => {
-        if (!old) return old as any;
+        if (!old) return old;
         const idx = old.findIndex(u => u.user_id === user.id);
-        if (idx === -1) return old as any;
+        if (idx === -1) return old;
         const merged = { ...old[idx], ...updatedUser } as ApiUser;
         const next = old.slice();
         next[idx] = merged;
@@ -341,8 +353,49 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
       console.log('User updated and UI refreshed successfully');
       
     } catch (error) {
-      console.error('Error updating user:', error);
-      // Handle error - show error message to user
+      const apiError = error as ApiError;
+      const fieldMessages: Record<string, string[]> = {};
+      const normalizeField = (path: string) => {
+        const key = path.split('.').filter(Boolean).pop() || path;
+        if (key === 'title') return 'position';
+        if (key === 'non_field_errors') return 'general';
+        return key;
+      };
+      const toMessages = (value: unknown): string[] => {
+        if (!value) return [];
+        if (Array.isArray(value)) return (value as unknown[]).map(v => String(v));
+        if (typeof value === 'object') {
+          const rec = value as Record<string, unknown>;
+          if ('message' in rec && typeof rec.message === 'string') return [String(rec.message)];
+          return [JSON.stringify(value)];
+        }
+        return [String(value)];
+      };
+      const walk = (obj: Record<string, unknown>, base = '') => {
+        if (!obj || typeof obj !== 'object') return;
+        Object.entries(obj).forEach(([k, v]) => {
+          const path = base ? `${base}.${k}` : k;
+          if (v && typeof v === 'object' && !Array.isArray(v)) {
+            walk(v as Record<string, unknown>, path);
+          } else {
+            const field = normalizeField(path);
+            const msgs = toMessages(v);
+            if (msgs.length) fieldMessages[field] = (fieldMessages[field] || []).concat(msgs);
+          }
+        });
+      };
+      if (apiError?.details) {
+        walk(apiError.details as Record<string, unknown>);
+      }
+      const firstMessages: { [key: string]: string } = {};
+      Object.entries(fieldMessages).forEach(([k, v]) => {
+        if (v.length) firstMessages[k] = v[0];
+      });
+      setEditValidationErrors(firstMessages);
+      const items = Object.entries(fieldMessages).flatMap(([field, msgs]) => msgs.map(m => `${field}: ${m}`));
+      setEditErrorItems(items);
+      const message = apiError?.message || items[0] || 'Failed to update user. Please try again.';
+      setEditError(message);
     }
   };
 
@@ -403,10 +456,55 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
       if (positionInput) positionInput.value = '';
       
       console.log('User created and UI refreshed successfully');
-      
+      setCreateError(null);
+      setCreateErrorItems([]);
+      setCreateValidationErrors({});
+    
     } catch (error) {
-      console.error('Error creating user:', error);
-      alert('Error creating user. Please try again.');
+      const apiError = error as ApiError;
+      const fieldMessages: Record<string, string[]> = {};
+      const normalizeField = (path: string) => {
+        const key = path.split('.').filter(Boolean).pop() || path;
+        if (key === 'first_name' || key === 'last_name') return 'name';
+        if (key === 'title') return 'title';
+        if (key === 'non_field_errors') return 'general';
+        return key;
+      };
+      const toMessages = (value: unknown): string[] => {
+        if (!value) return [];
+        if (Array.isArray(value)) return (value as unknown[]).map(v => String(v));
+        if (typeof value === 'object') {
+          const rec = value as Record<string, unknown>;
+          if ('message' in rec && typeof rec.message === 'string') return [String(rec.message)];
+          return [JSON.stringify(value)];
+        }
+        return [String(value)];
+      };
+      const walk = (obj: Record<string, unknown>, base = '') => {
+        if (!obj || typeof obj !== 'object') return;
+        Object.entries(obj).forEach(([k, v]) => {
+          const path = base ? `${base}.${k}` : k;
+          if (v && typeof v === 'object' && !Array.isArray(v)) {
+            walk(v as Record<string, unknown>, path);
+          } else {
+            const field = normalizeField(path);
+            const msgs = toMessages(v);
+            if (msgs.length) fieldMessages[field] = (fieldMessages[field] || []).concat(msgs);
+          }
+        });
+      };
+      if (apiError?.details) {
+        walk(apiError.details as Record<string, unknown>);
+      }
+      const firstMessages: { [key: string]: string } = {};
+      Object.entries(fieldMessages).forEach(([k, v]) => {
+        if (v.length) firstMessages[k] = v[0];
+      });
+      setCreateValidationErrors(firstMessages);
+      const items = Object.entries(fieldMessages).flatMap(([field, msgs]) => msgs.map(m => `${field}: ${m}`));
+      setCreateErrorItems(items);
+      const message = apiError?.message || items[0] || 'Failed to create user. Please try again.';
+      setCreateError(message);
     }
   };
 
@@ -605,18 +703,39 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                 <TabsTrigger value="permissions">Permissions</TabsTrigger>
               </TabsList>
               <TabsContent value="details" className="space-y-4">
+                {editError && (
+                  <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                    <p className="text-sm text-red-600">{editError}</p>
+                    {editErrorItems && editErrorItems.length > 0 && (
+                      <ul className="mt-2 list-disc list-inside text-sm text-red-600">
+                        {editErrorItems.map((item, idx) => (
+                          <li key={`edit-error-item-${idx}`}>{item}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="name">Name</Label>
                     <Input id="name" defaultValue={selectedUser.name} onChange={(e) => handleEditNameChange(e.target.value)} />
+                    {editValidationErrors.name && (
+                      <p className="text-sm text-red-500">{editValidationErrors.name}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="username">Username</Label>
                     <Input id="username" defaultValue={selectedUser.username} />
+                    {editValidationErrors.username && (
+                      <p className="text-sm text-red-500">{editValidationErrors.username}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="email">Email</Label>
                     <Input id="email" type="email" defaultValue={selectedUser.email} />
+                    {editValidationErrors.email && (
+                      <p className="text-sm text-red-500">{editValidationErrors.email}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="role">Role</Label>
@@ -632,14 +751,23 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                         <SelectItem key="edit-Employee" value="Employee">Employee</SelectItem>
                       </SelectContent>
                     </Select>
+                    {editValidationErrors.role && (
+                      <p className="text-sm text-red-500">{editValidationErrors.role}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="phone">Phone</Label>
                     <Input id="phone" defaultValue={selectedUser.phone} />
+                    {editValidationErrors.phone && (
+                      <p className="text-sm text-red-500">{editValidationErrors.phone}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="position">Position</Label>
                     <Input id="position" defaultValue={selectedUser.position} />
+                    {editValidationErrors.position && (
+                      <p className="text-sm text-red-500">{editValidationErrors.position}</p>
+                    )}
                   </div>
                   <div>
                    <div>
@@ -666,6 +794,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                          )}
                        </Button>
                      </div>
+                      {editValidationErrors.password && (
+                        <p className="text-sm text-red-500">{editValidationErrors.password}</p>
+                      )}
                    </div>
                   </div>
                 </div>
@@ -740,18 +871,39 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
             <DialogTitle>Create New User</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {createError && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                <p className="text-sm text-red-600">{createError}</p>
+                {createErrorItems && createErrorItems.length > 0 && (
+                  <ul className="mt-2 list-disc list-inside text-sm text-red-600">
+                    {createErrorItems.map((item, idx) => (
+                      <li key={`create-error-item-${idx}`}>{item}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="new-name">Name</Label>
                 <Input id="new-name" placeholder="Enter full name" onChange={(e) => handleCreateNameChange(e.target.value)} />
+                {createValidationErrors.name && (
+                  <p className="text-sm text-red-500">{createValidationErrors.name}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="new-username">Username</Label>
                 <Input id="new-username" placeholder="Enter username" />
+                {createValidationErrors.username && (
+                  <p className="text-sm text-red-500">{createValidationErrors.username}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="new-email">Email</Label>
                 <Input id="new-email" type="email" placeholder="Enter email address" />
+                {createValidationErrors.email && (
+                  <p className="text-sm text-red-500">{createValidationErrors.email}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="new-password">Password</Label>
@@ -777,6 +929,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                     )}
                   </Button>
                 </div>
+                {createValidationErrors.password && (
+                  <p className="text-sm text-red-500">{createValidationErrors.password}</p>
+                )}
                 <Button 
                   type="button" 
                   variant="outline" 
@@ -790,6 +945,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
               <div>
                 <Label htmlFor="new-phone">Phone</Label>
                 <Input id="new-phone" placeholder="Enter phone number" />
+                {createValidationErrors.phone && (
+                  <p className="text-sm text-red-500">{createValidationErrors.phone}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="new-role">Role</Label>
@@ -805,10 +963,16 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                      <SelectItem key="create-Employee" value="Employee">Employee</SelectItem>
                    </SelectContent>
                 </Select>
+                {createValidationErrors.role && (
+                  <p className="text-sm text-red-500">{createValidationErrors.role}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="new-position">Position</Label>
                 <Input id="new-position" placeholder="Enter position/title" />
+                {createValidationErrors.title && (
+                  <p className="text-sm text-red-500">{createValidationErrors.title}</p>
+                )}
               </div>
             </div>
           </div>
