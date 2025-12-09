@@ -49,6 +49,7 @@ const ReplacementPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const canImport = user?.role === 'admin' || user?.role === 'hr';
+  const canEditPlacement = user?.role === 'admin' || user?.role === 'hr';
 
   // API Hooks
   // Use global React Query defaults to retain cached data across navigation
@@ -839,22 +840,23 @@ const handleSubSectionChange = (subSectionId: string) => {
                       </td>
                       <td className="p-3">
                         <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              // Use existing company_name from placement data, or look it up in companies array as fallback
-                              const companyName = placement.company_name || companies.find(c => c.company_id === placement.company_id)?.name || '';
-                              setEditingPlacement({
-                                ...placement,
-                                company_name: companyName
-                              });
-                              setSelectedCompanyId(placement.company_id);
-                              setShowEditForm(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          {canEditPlacement && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const companyName = placement.company_name || companies.find(c => c.company_id === placement.company_id)?.name || '';
+                                setEditingPlacement({
+                                  ...placement,
+                                  company_name: companyName
+                                });
+                                setSelectedCompanyId(placement.company_id);
+                                setShowEditForm(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
                           {/* <Button
                             variant="ghost"
                             size="sm"

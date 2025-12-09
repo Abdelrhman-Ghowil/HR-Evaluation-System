@@ -67,12 +67,14 @@ const EmployeeList = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [createErrorItems, setCreateErrorItems] = useState<string[]>([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [originalEmployee, setOriginalEmployee] = useState<Employee | null>(null);
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [editValidationErrors, setEditValidationErrors] = useState<{[key: string]: string}>({});
   const [statusUpdatingEmployees, setStatusUpdatingEmployees] = useState<Set<string>>(new Set());
+  const [lastCreatedEmployeeId, setLastCreatedEmployeeId] = useState<string | null>(null);
   const [newEmployee, setNewEmployee] = useState({
     name: '',
     email: '',
@@ -81,7 +83,6 @@ const EmployeeList = () => {
     employeeCode: '',
     warnings: [] as string[],
     warnings_count: 0,
-    avatar: '',
     department: '',
     departmentId: '',
     position: '',
@@ -355,7 +356,6 @@ const EmployeeList = () => {
       employeeCode: '',
       warnings: [] as string[],
       warnings_count: 0,
-      avatar: '',
       department: '',
       departmentId: '',
       position: '',
@@ -878,10 +878,7 @@ const EmployeeList = () => {
           userDataChanges.last_name = nameParts.slice(1).join(' ') || '';
         }
         
-        if (editingEmployee.avatar !== originalEmployee.avatar) {
-          // Send avatar as path, not URL
-          userDataChanges.avatar = editingEmployee.avatar || '';
-        }
+        
         
         if (editingEmployee.position !== originalEmployee.position) {
           userDataChanges.position = editingEmployee.position;
@@ -1062,7 +1059,6 @@ const EmployeeList = () => {
             password: newEmployee.password,
             role: newEmployee.role,
             name: newEmployee.name,
-            avatar: newEmployee.avatar || '',
             first_name: firstName,
             last_name: lastName,
             position: newEmployee.position || '',
@@ -1078,14 +1074,17 @@ const EmployeeList = () => {
           country_code: newEmployee.countryCode,
           warnings: newEmployee.warnings,
           warnings_count: newEmployee.warnings_count,
-  
+
           direct_manager: newEmployee.directManager,
           job_type: newEmployee.jobType,
           location: newEmployee.location,
           branch: newEmployee.branch
         };
         
-        await apiService.createEmployee(employeeData);
+        const createdApi = await apiService.createEmployee(employeeData);
+        const createdLocal = transformApiEmployee(createdApi);
+        setEmployees(prev => [createdLocal, ...prev.filter(e => (e.employee_id || e.id) !== createdLocal.employee_id)]);
+        setLastCreatedEmployeeId(createdLocal.employee_id);
         
         // Refresh the employee list via cached query
         await refetchEmployees();
@@ -1099,7 +1098,6 @@ const EmployeeList = () => {
           employeeCode: '',
           warnings: [] as string[],
           warnings_count: 0,
-          avatar: '',
           department: '',
           departmentId: '',
           position: '',
@@ -1120,10 +1118,60 @@ const EmployeeList = () => {
           gender: '',
         });
         setValidationErrors({});
+        setCreateErrorItems([]);
         setIsAddModalOpen(false);
         setIsCreating(false);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to create employee. Please try again.';
+        const apiError = error as ApiError;
+        const fieldMessages: Record<string, string[]> = {};
+        const normalizeField = (path: string) => {
+          const parts = path.split('.').filter(Boolean);
+          const key = parts[parts.length - 1];
+          if (key === 'first_name') return 'firstName';
+          if (key === 'last_name') return 'lastName';
+          if (key === 'employee_code') return 'employeeCode';
+          if (key === 'company_id') return 'companyName';
+          if (key === 'department_id') return 'department';
+          if (key === 'managerial_level') return 'managerialLevel';
+          if (key === 'join_date') return 'joinDate';
+          if (key === 'country_code') return 'countryCode';
+          if (key === 'non_field_errors') return 'general';
+          return key;
+        };
+        const toMessages = (value: unknown): string[] => {
+          if (!value) return [];
+          if (Array.isArray(value)) return (value as unknown[]).map(v => String(v));
+          if (typeof value === 'object') {
+            const rec = value as Record<string, unknown>;
+            if ('message' in rec && typeof rec.message === 'string') return [String(rec.message)];
+            return [JSON.stringify(value)];
+          }
+          return [String(value)];
+        };
+        const walk = (obj: Record<string, unknown>, base = '') => {
+          if (!obj || typeof obj !== 'object') return;
+          Object.entries(obj).forEach(([k, v]) => {
+            const path = base ? `${base}.${k}` : k;
+            if (v && typeof v === 'object' && !Array.isArray(v)) {
+              walk(v as Record<string, unknown>, path);
+            } else {
+              const field = normalizeField(path);
+              const msgs = toMessages(v);
+              if (msgs.length) fieldMessages[field] = (fieldMessages[field] || []).concat(msgs);
+            }
+          });
+        };
+        if (apiError?.details) {
+          walk(apiError.details as Record<string, unknown>);
+        }
+        const firstMessages: { [key: string]: string } = {};
+        Object.entries(fieldMessages).forEach(([k, v]) => {
+          if (v.length) firstMessages[k] = v[0];
+        });
+        setValidationErrors(firstMessages);
+        const items = Object.entries(fieldMessages).flatMap(([field, msgs]) => msgs.map(m => `${field}: ${m}`));
+        setCreateErrorItems(items);
+        const message = apiError?.message || items[0] || 'Failed to create employee. Please try again.';
         setCreateError(message);
         setIsCreating(false);
       }
@@ -1148,6 +1196,19 @@ const EmployeeList = () => {
     const matchesCompany = selectedCompany === 'all' || employee.companyName === selectedCompany;
     return matchesSearch && matchesDepartment && matchesCompany;
   });
+
+  const displayEmployees = React.useMemo(() => {
+    if (!lastCreatedEmployeeId) return filteredEmployees;
+    const arr = filteredEmployees.slice();
+    arr.sort((a, b) => {
+      const aIsNew = String(a.employee_id || a.id) === String(lastCreatedEmployeeId);
+      const bIsNew = String(b.employee_id || b.id) === String(lastCreatedEmployeeId);
+      if (aIsNew && !bIsNew) return -1;
+      if (!aIsNew && bIsNew) return 1;
+      return 0;
+    });
+    return arr;
+  }, [filteredEmployees, lastCreatedEmployeeId]);
 
   if (selectedEmployee) {
     return (
@@ -1203,6 +1264,13 @@ const EmployeeList = () => {
               {createError && (
                 <div className="bg-red-50 border border-red-200 rounded-md p-3">
                   <p className="text-sm text-red-600">{createError}</p>
+                  {createErrorItems && createErrorItems.length > 0 && (
+                    <ul className="mt-2 list-disc list-inside text-sm text-red-600">
+                      {createErrorItems.map((item, idx) => (
+                        <li key={`create-error-item-${idx}`}>{item}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
 
@@ -1339,52 +1407,10 @@ const EmployeeList = () => {
                         className={`flex-1 ${validationErrors.phone ? 'border-red-500' : ''}`}
                       />
                     </div>
-                    {validationErrors.phone && (
-                      <p className="text-sm text-red-500">{validationErrors.phone}</p>
-                    )}
+                  {validationErrors.phone && (
+                    <p className="text-sm text-red-500">{validationErrors.phone}</p>
+                  )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="avatar" className="text-sm font-medium">Profile Image</Label>
-                    <div className="flex items-center space-x-4">
-                      {newEmployee.avatar && (
-                        <div className="relative">
-                          <img 
-                            src={newEmployee.avatar} 
-                            alt="Preview" 
-                            className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                            onClick={() => setNewEmployee(prev => ({ ...prev, avatar: '' }))}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <Input
-                          id="avatar"
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                setNewEmployee(prev => ({ ...prev, avatar: event.target?.result as string }));
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                          className="w-full"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Upload an image file (JPG, PNG, GIF)</p>
-                       </div>
-                     </div>
-                   </div>
                    </div>
                  </div>
                </div>
@@ -1760,7 +1786,7 @@ const EmployeeList = () => {
 
       {/* Employee Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredEmployees.map((employee) => (
+        {displayEmployees.map((employee) => (
           <Card key={employee.id} className="hover:shadow-lg transition-all duration-200 group">
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-4 gap-2">
@@ -1938,56 +1964,14 @@ const EmployeeList = () => {
                         placeholder="123-456-7890"
                         className={`flex-1 ${editValidationErrors.phone ? 'border-red-500' : ''}`}
                       />
-                    {editValidationErrors.phone && (<p className="text-sm text-red-500">{editValidationErrors.phone}</p>)}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-avatar" className="text-sm font-medium">Profile Image</Label>
-                    <div className="flex items-center space-x-4">
-                      {editingEmployee.avatar && (
-                        <div className="relative">
-                          <img 
-                            src={editingEmployee.avatar} 
-                            alt="Preview" 
-                            className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                            onClick={() => setEditingEmployee(prev => prev ? { ...prev, avatar: '' } : null)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <Input
-                          id="edit-avatar"
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                setEditingEmployee(prev => prev ? { ...prev, avatar: event.target?.result as string } : null);
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                          className="w-full"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Upload an image file (JPG, PNG, GIF)</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-gender" className="text-sm font-medium">Gender</Label>
-                    <Select 
-                      value={editingEmployee.gender || ''} 
-                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, gender: value } : null)}>
+                {editValidationErrors.phone && (<p className="text-sm text-red-500">{editValidationErrors.phone}</p>)}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-gender" className="text-sm font-medium">Gender</Label>
+                <Select 
+                  value={editingEmployee.gender || ''} 
+                  onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, gender: value } : null)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select gender" />
                       </SelectTrigger>
