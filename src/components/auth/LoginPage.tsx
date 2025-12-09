@@ -66,11 +66,12 @@ const LoginPage = () => {
     let hasValidUsername = false;
     
     if (loginMethod === 'email' || loginMethod === 'both') {
-      if (!email) {
+      const trimmedEmail = email.trim();
+      if (!trimmedEmail) {
         setEmailError('Email is required');
         return;
       }
-      if (!validateEmail(email)) {
+      if (!validateEmail(trimmedEmail)) {
         setEmailError('Please enter a valid email address');
         return;
       }
@@ -78,41 +79,45 @@ const LoginPage = () => {
     }
     
     if (loginMethod === 'username' || loginMethod === 'both') {
-      if (!username) {
+      const trimmedUsername = username.trim();
+      if (!trimmedUsername) {
         setUsernameError('Username is required');
         return;
       }
-      if (!validateUsername(username)) {
+      if (!validateUsername(trimmedUsername)) {
         setUsernameError('Username must be 3-20 characters, letters, numbers, and underscores only');
         return;
       }
       hasValidUsername = true;
     }
     
-    if (!password) {
+    const trimmedPassword = password.trim();
+    if (!trimmedPassword) {
       setError('Password is required');
+      return;
+    }
+    if (trimmedPassword.length < 6) {
+      setError('Password must be at least 6 characters');
       return;
     }
     
     // Additional validation for 'both' method: ensure username and email refer to the same user
     if (loginMethod === 'both' && hasValidEmail && hasValidUsername) {
-      // Note: This validation will be handled by the backend API
-      // The backend should verify that the provided username and email belong to the same user
-      // If they don't match, the API will return an authentication error
-      // We include both in the payload and let the backend handle the validation
+      // To avoid backend mismatch false-negatives, prefer a single identifier.
+      // We will send only the username when both are provided.
     }
     
     // Construct credentials object based on what's provided
     const credentials: { email?: string; username?: string; password: string } = {
-      password
+      password: trimmedPassword
     };
     
-    if (hasValidEmail) {
-      credentials.email = email;
-    }
-    
-    if (hasValidUsername) {
-      credentials.username = username;
+    if (loginMethod === 'both') {
+      // Prefer username-only to reduce intermittent backend validation errors
+      if (hasValidUsername) credentials.username = username.trim();
+    } else {
+      if (hasValidEmail) credentials.email = email.trim().toLowerCase();
+      if (hasValidUsername) credentials.username = username.trim();
     }
     
     try {

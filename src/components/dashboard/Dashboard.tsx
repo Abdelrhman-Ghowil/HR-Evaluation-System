@@ -70,7 +70,7 @@ const Dashboard = () => {
     employees: ['admin', 'hr', 'manager'],
     evaluations: ['admin', 'hr', 'manager'],
     companies: ['admin', 'hr'],
-    departments: ['admin', 'hr', 'manager'],
+    departments: ['admin', 'hr'],
     'sub-departments': ['admin', 'hr', 'manager'],
     sections: ['admin', 'hr', 'manager'],
     'sub-sections': ['admin', 'hr', 'manager'],
@@ -86,7 +86,9 @@ const Dashboard = () => {
   useEffect(() => {
     if (!user?.role) return;
     const allowed = viewAccess[activeView] || ['admin', 'hr', 'manager', 'employee'];
-    const isAllowed = allowed.includes(user.role) || (activeView === 'replacements' && user.api_role === 'HOD');
+    const isAllowed =
+      allowed.includes(user.role) ||
+      ((activeView === 'replacements' || activeView === 'departments') && user.api_role === 'HOD');
     if (!isAllowed) {
       const fallbackPath = '/';
       if (location.pathname !== fallbackPath) {
