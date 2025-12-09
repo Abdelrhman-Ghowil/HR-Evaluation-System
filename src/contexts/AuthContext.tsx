@@ -109,7 +109,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         details: error.details,
         stack: error.stack
       });
-      toast.error(error.message || 'Login failed. Please check your credentials.');
+      const msg = error?.status === 401 
+        ? 'Invalid credentials. Please check and try again.' 
+        : (error.message || 'Login failed. Please check your credentials.');
+      toast.error(msg);
       setIsLoading(false);
       return false;
     }

@@ -42,8 +42,21 @@ const Sidebar: React.FC<SidebarProps> = ({
     if (item.id === 'replacements') {
       return user.role === 'admin' || user.role === 'hr' || user.api_role === 'HOD';
     }
+    if (item.id === 'departments') {
+      return user.role === 'admin' || user.role === 'hr' || user.api_role === 'HOD';
+    }
     return item.roles.includes(user.role);
   });
+
+  const lmAdditionalNav = (user?.role === 'manager' && user?.api_role !== 'HOD')
+    ? [
+        { id: 'sub-departments', name: 'Sub-Departments', icon: Building2, roles: ['manager'] },
+        { id: 'sections', name: 'Sections', icon: Building2, roles: ['manager'] },
+        { id: 'sub-sections', name: 'Sub-Sections', icon: Building2, roles: ['manager'] },
+      ]
+    : [];
+
+  const finalNavigation = [...filteredNavigation, ...lmAdditionalNav];
 
   return (
     <div className={cn(
@@ -94,7 +107,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Navigation */}
       <nav className="p-4 space-y-2" role="navigation" aria-label="Main navigation">
-        {filteredNavigation.map((item, index) => {
+        {finalNavigation.map((item, index) => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
           const isDepartments = item.id === 'departments';

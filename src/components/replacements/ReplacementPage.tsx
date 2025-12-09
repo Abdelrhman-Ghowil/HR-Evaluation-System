@@ -690,7 +690,7 @@ const handleSubSectionChange = (subSectionId: string) => {
             <div className="flex flex-col sm:flex-row justify-end gap-2 pt-3 border-t">
               <Button 
                 variant="outline" 
-                onClick={resetImportModal}
+                onClick={() => { setIsImportModalOpen(false); resetImportModal(); }}
                 disabled={uploadStatus === 'uploading'}
                 size="sm"
                 className="order-3 sm:order-1"

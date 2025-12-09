@@ -129,6 +129,14 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const [objectiveErrors, setObjectiveErrors] = useState<Record<string, string>>({});
   const [competencyErrors, setCompetencyErrors] = useState<Record<string, string>>({});
 
+  const toPercent = (w: number): number => (w <= 1 ? w * 100 : w);
+  const usedPercentExcludingCurrent = objectives.reduce((sum, obj) => {
+    if (editingObjective && obj.id === editingObjective.id) return sum;
+    return sum + toPercent(obj.weight);
+  }, 0);
+  const remainingPercent = Math.max(0, 100 - usedPercentExcludingCurrent);
+  const allowedMaxWeightPercent = Math.min(40, remainingPercent);
+
   // Validation functions
   const validateObjective = (obj: Partial<Objective>): Record<string, string> => {
     const errors: Record<string, string> = {};
@@ -136,6 +144,12 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
     if (!obj.target || obj.target < 1 || obj.target > 10) errors.target = 'Target must be between 1-10';
     if (!obj.achieved || obj.achieved < 1 || obj.achieved > 10) errors.achieved = 'Achieved must be between 1-10';
     if (obj.weight === undefined || obj.weight < 10 || obj.weight > 40) errors.weight = 'Weight must be between 10-40%';
+    if (remainingPercent < 10) errors.weight = `Only ${remainingPercent}% remaining. Minimum weight is 10%`;
+    if (obj.weight !== undefined) {
+      const totalIfApplied = usedPercentExcludingCurrent + obj.weight;
+      if (totalIfApplied > 100) errors.weight = `Total weight exceeds 100% (remaining ${remainingPercent}%)`;
+      if (obj.weight > allowedMaxWeightPercent) errors.weight = `Weight cannot exceed ${allowedMaxWeightPercent}% for this objective`;
+    }
     return errors;
   };
 
@@ -166,7 +180,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
 
   const handleEditObjective = (objective: Objective) => {
     setEditingObjective(objective);
-    setObjectiveForm(objective);
+    setObjectiveForm({ ...objective, weight: toPercent(objective.weight) });
     setObjectiveErrors({});
     setIsObjectiveModalOpen(true);
   };
@@ -188,7 +202,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           target: objectiveForm.target!,
           achieved: objectiveForm.achieved!,
           status: objectiveForm.status!,
-          weight: objectiveForm.weight!,
+          weight: Number(((objectiveForm.weight as number) / 100).toFixed(4)),
           ...(objectiveForm.description !== undefined ? { description: objectiveForm.description } : {})
         };
          await updateObjectiveMutation.mutateAsync({
@@ -207,7 +221,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           target: objectiveForm.target!,
           achieved: objectiveForm.achieved!,
           status: objectiveForm.status!,
-          weight: objectiveForm.weight!
+          weight: Number(((objectiveForm.weight as number) / 100).toFixed(4))
         };
          await createObjectiveMutation.mutateAsync(createData);
          // Explicitly refetch objectives to ensure UI updates immediately
@@ -894,7 +908,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                             </div>
                             <div className="bg-purple-50 rounded-lg p-3">
                               <p className="text-xs font-medium text-purple-700 mb-1">Weight</p>
-                              <p className="text-lg font-bold text-purple-900">{objective.weight}<span className="text-sm text-purple-600">%</span></p>
+                              <p className="text-lg font-bold text-purple-900">{(toPercent(objective.weight)).toFixed(0)}<span className="text-sm text-purple-600">%</span></p>
                             </div>
                           </div>
                         </div>
@@ -1364,15 +1378,17 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   id="weight"
                   type="number"
                   min="10"
-                  max="40"
+                  max={Math.max(10, allowedMaxWeightPercent)}
                   value={objectiveForm.weight ?? 10}
                   onChange={(e) => {
                     const v = parseInt(e.target.value);
-                    const clamped = isNaN(v) ? 10 : Math.max(10, Math.min(40, v));
+                    const clampedMax = Math.max(10, allowedMaxWeightPercent);
+                    const clamped = isNaN(v) ? 10 : Math.max(10, Math.min(clampedMax, v));
                     setObjectiveForm(prev => ({ ...prev, weight: clamped }));
                   }}
                   className={`transition-all duration-200 ${objectiveErrors.weight ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
                 />
+                <p className="text-xs text-gray-500">Remaining: {remainingPercent}% • Max allowed: {Math.max(10, allowedMaxWeightPercent)}%</p>
                 {objectiveErrors.weight && (
                   <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
                     <span className="w-1 h-1 bg-red-500 rounded-full"></span>
@@ -1414,7 +1430,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 </Button>
                 <Button 
                   onClick={handleSaveObjective}
-                  disabled={editingObjective ? updateObjectiveMutation.isPending : createObjectiveMutation.isPending}
+                  disabled={(editingObjective ? updateObjectiveMutation.isPending : createObjectiveMutation.isPending) || allowedMaxWeightPercent < 10}
                   className="w/full sm:w-auto bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-200"
                 >
                   {editingObjective ? (

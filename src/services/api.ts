@@ -207,27 +207,27 @@ class ApiService {
 
   // Authentication methods
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    // Construct dynamic payload based on provided fields
+    // Construct dynamic payload based on provided fields (sanitized)
     const payload: any = {
-      password: credentials.password
+      password: (credentials.password || '').toString()
     };
     
     // Add username if provided
-    if (credentials.username) {
-      payload.username = credentials.username;
+    if (credentials.username && credentials.username.trim()) {
+      payload.username = credentials.username.trim();
     }
     
     // Add email if provided
-    if (credentials.email) {
-      payload.email = credentials.email;
+    if (credentials.email && credentials.email.trim()) {
+      payload.email = credentials.email.trim().toLowerCase();
     }
     
     // Validate that at least one identifier is provided
-    if (!credentials.username && !credentials.email) {
+    if (!payload.username && !payload.email) {
       throw new Error('Either username or email must be provided');
     }
     
-    console.log('Login payload:', payload);
+    console.log('Login payload keys:', Object.keys(payload).filter(k => k !== 'password'));
     
     const response: AxiosResponse<{access: string, refresh: string}> = await this.api.post('/api/auth/login/', payload);
     const { access, refresh } = response.data;
@@ -237,7 +237,7 @@ class ApiService {
       localStorage.setItem('refresh_token', refresh);
     }
 
-    // Extract user info from JWT token
+    // Extract user info from JWT token (robust decoding)
     const user = this.extractUserFromToken(access);
     
     return {
@@ -249,22 +249,39 @@ class ApiService {
 
   // Helper method to extract user info from JWT token
   private extractUserFromToken(token: string): ApiUser {
+    const base64Url = token.split('.')[1] || '';
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    let payload: any = null;
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      console.error('user from token:', payload);
-      return {
-        user_id: payload.user_id || payload.id || 'unknown',
-        username: payload.username || payload.name?.split(' ')[0] || 'user',
-        email: payload.email || '',
-        first_name: payload.first_name || payload.name?.split(' ')[0] || '',
-        last_name: payload.last_name || payload.name?.split(' ').slice(1).join(' ') || '',
-        name: payload.name || payload.username || 'Unknown User',
-        role: payload.role || 'EMP'
-      };
+      const json = atob(padded);
+      payload = JSON.parse(json);
     } catch (error) {
-      console.error('Error extracting user from token:', error);
-      throw new Error('Invalid token format');
+      console.error('Error decoding JWT payload:', error);
     }
+    
+    if (!payload || typeof payload !== 'object') {
+      // Fallback minimal user to avoid failing login due to decode issues
+      return {
+        user_id: 'unknown',
+        username: 'user',
+        email: '',
+        first_name: '',
+        last_name: '',
+        name: 'Unknown User',
+        role: 'EMP'
+      };
+    }
+    
+    return {
+      user_id: payload.user_id || payload.id || 'unknown',
+      username: payload.username || payload.name?.split(' ')[0] || 'user',
+      email: payload.email || '',
+      first_name: payload.first_name || payload.name?.split(' ')[0] || '',
+      last_name: payload.last_name || payload.name?.split(' ').slice(1).join(' ') || '',
+      name: payload.name || payload.username || 'Unknown User',
+      role: payload.role || 'EMP'
+    };
   }
 
   async logout(): Promise<void> {
