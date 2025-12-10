@@ -128,6 +128,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   // Error states
   const [objectiveErrors, setObjectiveErrors] = useState<Record<string, string>>({});
   const [competencyErrors, setCompetencyErrors] = useState<Record<string, string>>({});
+  const [objectivesUiError, setObjectivesUiError] = useState('');
+
+  const MIN_OBJECTIVES = 4;
+  const MAX_OBJECTIVES = 6;
 
   const toPercent = (w: number): number => (w <= 1 ? w * 100 : w);
   const usedPercentExcludingCurrent = objectives.reduce((sum, obj) => {
@@ -163,6 +167,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
 
   // Handlers for objectives
   const handleAddObjective = () => {
+    if (objectives.length >= MAX_OBJECTIVES) {
+      setObjectivesUiError('Maximum of 6 objectives reached. Delete one to add more.');
+      return;
+    }
     setEditingObjective(null);
     setObjectiveForm({
       employee_id: employee.id,
@@ -213,7 +221,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
          // Explicitly refetch objectives to ensure UI updates immediately
          await refetchObjectives();
        } else {
-        
+        if (objectives.length >= MAX_OBJECTIVES) {
+          setObjectiveErrors({ general: 'Maximum of 6 objectives allowed.' });
+          return;
+        }
         const createData = {
           evaluation_id: evaluation.id,
           title: objectiveForm.title!,
@@ -539,6 +550,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
 
   const approve = () => {
     setActionError('');
+    if (objectives.length < MIN_OBJECTIVES) {
+      setActionError('At least 4 objectives are required to approve or reject.');
+      return;
+    }
     if (currentRole === 'hod' && currentStatus === 'Pending HoD Approval') {
       setCurrentStatus('Pending HR Approval');
       addLog({
@@ -578,6 +593,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   };
 
   const reject = () => {
+    if (objectives.length < MIN_OBJECTIVES) {
+      setActionError('At least 4 objectives are required to approve or reject.');
+      return;
+    }
     if (!commentText.trim()) {
       setActionError('Comment is required for rejection');
       return;
@@ -815,16 +834,23 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
               <CardHeader className="pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <CardTitle className="flex items-center gap-3 text-xl">
-                      <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
-                        <Target className="h-5 w-5 text-white" />
-                      </div>
-                      Objectives & Goals
-                    </CardTitle>
-                    <p className="text-gray-600 mt-1">Performance objectives and achievements</p>
+                  <CardTitle className="flex items-center gap-3 text-xl">
+                    <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
+                      <Target className="h-5 w-5 text-white" />
+                    </div>
+                    Objectives & Goals
+                  </CardTitle>
+                  <p className="text-gray-600 mt-1">Performance objectives and achievements</p>
+                  {objectives.length >= MAX_OBJECTIVES && (
+                    <div className="text-red-600 text-xs font-medium mt-1">Maximum of 6 objectives reached. Delete one to add more.</div>
+                  )}
+                  {objectivesUiError && (
+                    <div className="text-red-600 text-xs font-medium mt-1">{objectivesUiError}</div>
+                  )}
                   </div>
                   <Button 
                     onClick={handleAddObjective} 
+                    disabled={objectives.length >= MAX_OBJECTIVES}
                     className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-200 w-full sm:w-auto"
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -1057,12 +1083,18 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {objectives.length < MIN_OBJECTIVES && (
+                <div className="text-red-600 text-xs sm:text-sm flex items-center gap-2">
+                  <XCircle className="h-4 w-4" />
+                  <span>At least 4 objectives are required to approve or reject.</span>
+                </div>
+              )}
               <div className="flex items-center gap-3">
-                <Button onClick={() => { if (panelSubmitted) return; setPanelError(''); setPanelAction('approve'); setPanelComment('HoD approved and forwarded to HR.'); }} className="bg-green-600 hover:bg-green-700" disabled={isSubmittingAction || panelSubmitted}>
+                <Button onClick={() => { if (panelSubmitted) return; const notEnough = objectives.length < MIN_OBJECTIVES; setPanelAction('approve'); setPanelComment('HoD approved and forwarded to HR.'); setPanelError(notEnough ? 'At least 4 objectives are required to approve or reject.' : ''); }} className="bg-green-600 hover:bg-green-700" disabled={isSubmittingAction || panelSubmitted}>
                   <Check className="h-4 w-4 mr-2" />
                   Approve
                 </Button>
-                <Button variant="destructive" onClick={() => { if (panelSubmitted) return; setPanelError(''); setPanelAction('reject'); setPanelComment(''); }} className="bg-red-600 hover:bg-red-700" disabled={isSubmittingAction || panelSubmitted}>
+                <Button variant="destructive" onClick={() => { if (panelSubmitted) return; const notEnough = objectives.length < MIN_OBJECTIVES; setPanelAction('reject'); setPanelComment(''); setPanelError(notEnough ? 'At least 4 objectives are required to approve or reject.' : ''); }} className="bg-red-600 hover:bg-red-700" disabled={isSubmittingAction || panelSubmitted}>
                   <X className="h-4 w-4 mr-2" />
                   Reject
                 </Button>
@@ -1081,7 +1113,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button onClick={() => { if (panelAction === 'reject' && !panelComment.trim()) { setPanelError('Comment is required'); return; } setIsConfirmOpen(true); }} className="bg-blue-600 hover:bg-blue-700" disabled={isSubmittingAction}>
+                    <Button onClick={() => { if (panelAction === 'reject' && !panelComment.trim()) { setPanelError('Comment is required'); return; } if (objectives.length < MIN_OBJECTIVES) { setPanelError('At least 4 objectives are required to approve or reject.'); return; } setIsConfirmOpen(true); }} className="bg-blue-600 hover:bg-blue-700" disabled={isSubmittingAction}>
                       Submit
                     </Button>
                     <Button variant="outline" onClick={() => { setPanelAction(null); setPanelComment(''); setPanelError(''); }} disabled={isSubmittingAction}>
@@ -1126,6 +1158,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={isSubmittingAction}>Cancel</Button>
                 <Button onClick={async () => {
                   if (!panelAction) return;
+                  if (objectives.length < MIN_OBJECTIVES) { setPanelError('At least 4 objectives are required to approve or reject.'); setIsConfirmOpen(false); return; }
                   const nextUiStatus = panelAction === 'approve' ? getNextWorkflowStatus(currentStatus) : getPrevWorkflowStatus(currentStatus);
                   const nextActivityKey = statusKeyMap[nextUiStatus] || 'DRAFT';
                   const payload = {
@@ -1289,6 +1322,12 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
             </DialogHeader>
             
             <div className="space-y-6 py-6">
+              {objectiveErrors.general && (
+                <div className="text-red-600 text-sm flex items-center gap-2">
+                  <XCircle className="h-4 w-4" />
+                  <span>{objectiveErrors.general}</span>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="title" className="text-sm font-medium text-gray-700 flex items-center gap-1">
                   Title

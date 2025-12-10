@@ -86,8 +86,24 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
                 <p className="text-xs leading-none text-muted-foreground">
                   {user?.email}
                 </p>
-                <p className="text-xs leading-none text-muted-foreground capitalize">
-                  {user?.role} • {user?.department}
+                <p className="text-xs leading-none text-muted-foreground">
+                  {(() => {
+                    if (!user?.api_role) return user?.role || '';
+                    switch (user.api_role) {
+                      case 'LM':
+                        return 'LM';
+                      case 'HOD':
+                        return 'HoD';
+                      case 'HR':
+                        return 'HR';
+                      case 'ADMIN':
+                        return 'Admin';
+                      case 'EMP':
+                        return 'Employee';
+                      default:
+                        return user?.role || '';
+                    }
+                  })()} 
                 </p>
               </div>
             </DropdownMenuLabel>
@@ -96,7 +112,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/profile?tab=security')}>
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
             </DropdownMenuItem>

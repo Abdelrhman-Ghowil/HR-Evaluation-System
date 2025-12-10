@@ -266,12 +266,16 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
     }
   };
 
-  // Reset form when modal closes
   const handleModalClose = (open: boolean) => {
     setIsAddModalOpen(open);
     if (!open) {
       setNewDepartment({ name: '', company_id: '', manager_id: '' });
       setValidationErrors({});
+    } else {
+      setNewDepartment(prev => ({
+        ...prev,
+        company_id: selectedCompany?.company_id || companyIdFromUrl || ''
+      }));
     }
   };
 
@@ -707,6 +711,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
                     <Select
                       value={newDepartment.company_id}
                       onValueChange={(value) => setNewDepartment(prev => ({ ...prev, company_id: value }))}
+                      disabled={Boolean(selectedCompany || companyIdFromUrl)}
                     >
                       <SelectTrigger className={validationErrors.company ? 'border-red-500' : ''}>
                         <SelectValue placeholder="Select a company" />

@@ -164,6 +164,16 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
   const totalEmployees = filteredSubDepartments.reduce((sum, subDept) => sum + (subDept.employee_count || 0), 0);
   const averageEmployees = totalSubDepartments > 0 ? Math.round(totalEmployees / totalSubDepartments) : 0;
 
+  const handleCreateModalOpenChange = (open: boolean) => {
+    setIsCreateModalOpen(open);
+    if (open) {
+      setFormData(prev => ({
+        ...prev,
+        department: selectedDepartment?.department_id || prev.department
+      }));
+    }
+  };
+
   // Handle form submission for create
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -560,7 +570,7 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
           </div>
           
           {canManageSubDepartments && (
-            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+            <Dialog open={isCreateModalOpen} onOpenChange={handleCreateModalOpenChange}>
               <DialogTrigger asChild>
                 <Button className="flex items-center gap-2">
                   <Plus className="w-4 h-4" />
@@ -588,10 +598,10 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
                     <Select 
                       value={formData.department || (selectedDepartment?.department_id || '')}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, department: value }))}
-                      disabled={departmentsLoading}
+                      disabled={departmentsLoading || Boolean(selectedDepartment)}
                     >
-                      <SelectTrigger id="department">
-                        <SelectValue placeholder={departmentsLoading ? "Loading departments..." : "Select department"} />
+                      <SelectTrigger id="department" disabled={departmentsLoading || Boolean(selectedDepartment)}>
+                        <SelectValue placeholder={selectedDepartment ? selectedDepartment.name : (departmentsLoading ? "Loading departments..." : "Select department")} />
                       </SelectTrigger>
                       <SelectContent>
                         {departments.map((dept) => (

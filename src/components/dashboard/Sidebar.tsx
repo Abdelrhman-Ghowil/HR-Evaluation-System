@@ -43,7 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       return user.role === 'admin' || user.role === 'hr' || user.api_role === 'HOD';
     }
     if (item.id === 'departments') {
-      return user.role === 'admin' || user.role === 'hr' || user.api_role === 'HOD';
+      return user.api_role === 'HOD' || user.role === 'manager';
     }
     return item.roles.includes(user.role);
   });
@@ -218,8 +218,24 @@ const Sidebar: React.FC<SidebarProps> = ({
               <p className="text-sm font-medium text-gray-900 truncate">
                 {user.name}
               </p>
-              <p className="text-xs text-gray-500 capitalize truncate">
-                {user.role}
+              <p className="text-xs text-gray-500 truncate">
+                {(() => {
+                  if (!user?.api_role) return user?.role || '';
+                  switch (user.api_role) {
+                    case 'LM':
+                      return 'LM';
+                    case 'HOD':
+                      return 'HoD';
+                    case 'HR':
+                      return 'HR';
+                    case 'ADMIN':
+                      return 'Admin';
+                    case 'EMP':
+                      return 'Employee';
+                    default:
+                      return user.role;
+                  }
+                })()}
               </p>
             </div>
           </div>
