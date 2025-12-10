@@ -54,6 +54,14 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
   const [sectionToDelete, setSectionToDelete] = useState<ApiSection | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const handleOpenCreateForm = () => {
+    setNewSection(prev => ({
+      ...prev,
+      sub_department_id: selectedSubDepartment?.sub_department_id || prev.sub_department_id
+    }));
+    setShowCreateForm(true);
+  };
+
   // Get sub-departments list from API response with proper array handling
   const subDepartments = React.useMemo(() => {
     if (!subDepartmentsData) return [];
@@ -473,19 +481,34 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb - Dynamic based on context */}
       <nav className="flex" aria-label="Breadcrumb">
         <ol className="flex items-center space-x-4">
           <li>
             <button
-              onClick={() => onViewChange('departments')}
+              onClick={() => onViewChange('companies')}
               className="text-gray-400 hover:text-gray-500"
             >
-              Departments
+              Companies
             </button>
           </li>
           {selectedDepartment && (
             <>
+              <li>
+                <span className="text-gray-400">/</span>
+              </li>
+              <li>
+                <button
+                  onClick={() => {
+                    onViewChange('departments');
+                    if (selectedDepartment.company_id) {
+                      window.location.href = `/departments?company_id=${selectedDepartment.company_id}`;
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  {selectedDepartment.company}
+                </button>
+              </li>
               <li>
                 <span className="text-gray-400">/</span>
               </li>
@@ -505,7 +528,18 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
                 <span className="text-gray-400">/</span>
               </li>
               <li>
-                <span className="text-gray-900 font-medium">{selectedSubDepartment.name}</span>
+                <button
+                  onClick={() => onViewChange('sections')}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  {selectedSubDepartment.name}
+                </button>
+              </li>
+              <li>
+                <span className="text-gray-400">/</span>
+              </li>
+              <li>
+                <span className="text-gray-900 font-medium">Sections</span>
               </li>
             </>
           )}
@@ -537,7 +571,7 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
           )}
         </div>
         {canManageSections && (
-        <Button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2">
+        <Button onClick={handleOpenCreateForm} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           Add Section
         </Button>
@@ -610,10 +644,10 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
                 <Select 
                   value={newSection.sub_department_id}
                   onValueChange={(value) => setNewSection({ ...newSection, sub_department_id: value })}
-                  disabled={subDepartmentsLoading}
+                  disabled={subDepartmentsLoading || Boolean(selectedSubDepartment)}
                 >
-                  <SelectTrigger id="sub_department">
-                    <SelectValue placeholder={subDepartmentsLoading ? "Loading sub-departments..." : "Select sub-department"} />
+                  <SelectTrigger id="sub_department" disabled={subDepartmentsLoading || Boolean(selectedSubDepartment)}>
+                    <SelectValue placeholder={selectedSubDepartment ? selectedSubDepartment.name : (subDepartmentsLoading ? "Loading sub-departments..." : "Select sub-department")} />
                   </SelectTrigger>
                   <SelectContent>
                     {subDepartments.map((subDept) => (

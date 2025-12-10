@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -85,6 +85,11 @@ interface ProfileData {
 const ProfilePage: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('tab') || 'personal';
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +134,12 @@ const ProfilePage: React.FC = () => {
       [section]: !prev[section]
     }));
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab') || 'personal';
+    setActiveTab(tab);
+  }, [location.search]);
 
   // Validation functions
   const validateField = (field: string, value: string): string => {
@@ -892,7 +903,7 @@ const ProfilePage: React.FC = () => {
         </Card>
 
         {/* Main Content */}
-        <Tabs defaultValue="personal" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5 bg-white border shadow-sm">
             <TabsTrigger value="personal" className="flex items-center gap-2">
               <User className="h-4 w-4" />

@@ -52,6 +52,14 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
     manager_id: ''
   });
 
+  const handleOpenCreateForm = () => {
+    setNewSubSection(prev => ({
+      ...prev,
+      section_id: selectedSection?.section_id || prev.section_id
+    }));
+    setShowCreateForm(true);
+  };
+
   // Get sub-departments list from API response with proper array handling
   const subDepartments = React.useMemo(() => {
     if (!subDepartmentsData) return [];
@@ -408,19 +416,34 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
       <nav className="flex" aria-label="Breadcrumb">
         <ol className="flex items-center space-x-4">
           <li>
             <button
-              onClick={() => onViewChange('departments')}
+              onClick={() => onViewChange('companies')}
               className="text-gray-400 hover:text-gray-500"
             >
-              Departments
+              Companies
             </button>
           </li>
           {selectedDepartment && (
             <>
+              <li>
+                <span className="text-gray-400">/</span>
+              </li>
+              <li>
+                <button
+                  onClick={() => {
+                    onViewChange('departments');
+                    if (selectedDepartment.company_id) {
+                      window.location.href = `/departments?company_id=${selectedDepartment.company_id}`;
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  {selectedDepartment.company}
+                </button>
+              </li>
               <li>
                 <span className="text-gray-400">/</span>
               </li>
@@ -457,6 +480,12 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
               <li>
                 <span className="text-gray-900 font-medium">{selectedSection.name}</span>
               </li>
+              <li>
+                <span className="text-gray-400">/</span>
+              </li>
+              <li>
+                <span className="text-gray-900 font-medium">Sub-Sections</span>
+              </li>
             </>
           )}
           {!selectedSection && (
@@ -479,7 +508,7 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
           <p className="text-gray-600">{contextMessage}</p>
         </div>
         {canManageSubSections && (
-        <Button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2">
+        <Button onClick={handleOpenCreateForm} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           Add Sub-Section
         </Button>
@@ -652,7 +681,7 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
                   onValueChange={(value) => setNewSubSection(prev => ({ ...prev, section_id: value }))}
                   disabled={!!selectedSection || sectionsLoading}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger disabled={!!selectedSection || sectionsLoading}>
                     <SelectValue placeholder={selectedSection ? selectedSection.name : "Select a section"} />
                   </SelectTrigger>
                   <SelectContent>
