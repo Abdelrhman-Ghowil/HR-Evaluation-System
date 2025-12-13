@@ -151,9 +151,6 @@ const CompanyList = () => {
     if (!newCompany.name.trim()) {
       errors.name = 'Company name is required';
     }
-    if (!newCompany.address.trim()) {
-      errors.address = 'Address is required';
-    }
     
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -304,10 +301,6 @@ const CompanyList = () => {
     
     if (!editCompany.name?.trim()) {
       errors.name = 'Company name is required';
-    }
-    
-    if (!editCompany.address?.trim()) {
-      errors.address = 'Address is required';
     }
     
     setValidationErrors(errors);
@@ -577,13 +570,12 @@ const CompanyList = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="address" className="text-sm font-medium">Address *</Label>
+                <Label htmlFor="address" className="text-sm font-medium">Address</Label>
                 <Input
                   id="address"
                   value={newCompany.address}
                   onChange={(e) => setNewCompany(prev => ({ ...prev, address: e.target.value }))}
                   placeholder="Company address"
-                  required
                   className={validationErrors.address ? 'border-red-300 focus:border-red-500' : ''}
                 />
                 {validationErrors.address && (
@@ -861,7 +853,7 @@ const CompanyList = () => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="edit-address" className="text-sm font-medium">Address *</Label>
+              <Label htmlFor="edit-address" className="text-sm font-medium">Address</Label>
               <Input
                 id="edit-address"
                 value={editCompany.address}

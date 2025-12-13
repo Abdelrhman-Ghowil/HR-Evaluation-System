@@ -72,6 +72,8 @@ const EmployeeList = () => {
   const [createErrorItems, setCreateErrorItems] = useState<string[]>([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editErrorItems, setEditErrorItems] = useState<string[]>([]);
   const [originalEmployee, setOriginalEmployee] = useState<Employee | null>(null);
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
   const [editValidationErrors, setEditValidationErrors] = useState<{[key: string]: string}>({});
@@ -115,6 +117,50 @@ const EmployeeList = () => {
   const [errorFilter, setErrorFilter] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [showImportDetails, setShowImportDetails] = useState(false);
+  React.useEffect(() => {
+    if (!isAddModalOpen) return;
+    const keys = Object.keys(validationErrors || {});
+    if (keys.length === 0) return;
+    const map: Record<string, string> = {
+      name: 'name',
+      email: 'email',
+      phone: 'phone',
+      companyName: 'companyName',
+      department: 'department',
+      position: 'position',
+      employeeCode: 'employeeCode',
+      joinDate: 'joinDate',
+    };
+    const k = keys[0];
+    const id = map[k] || k;
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      (el as HTMLElement).focus();
+    }
+  }, [validationErrors, isAddModalOpen]);
+
+  React.useEffect(() => {
+    if (!isEditModalOpen) return;
+    const keys = Object.keys(editValidationErrors || {});
+    if (keys.length === 0) return;
+    const map: Record<string, string> = {
+      name: 'edit-name',
+      email: 'edit-email',
+      phone: 'edit-phone',
+      companyName: 'edit-companyName',
+      position: 'edit-position',
+      employeeCode: 'edit-employeeCode',
+      joinDate: 'edit-joinDate',
+    };
+    const k = keys[0];
+    const id = map[k] || k;
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      (el as HTMLElement).focus();
+    }
+  }, [editValidationErrors, isEditModalOpen]);
 
   // React Query: Employees caching
   const {
@@ -449,6 +495,14 @@ const EmployeeList = () => {
 
 
 
+  // Map country code '966.0' to '+966'
+  const normalizeCountryCodeValue = (code?: string): string => {
+    if (!code) return '';
+    const val = String(code).trim();
+    if (val === '966.0'||val === '966') return '+966';
+    return val;
+  };
+
   // Transform API employee data to local Employee interface
   const transformApiEmployee = (apiEmployee: ApiEmployee): Employee => {
     const { countryCode, phone } = parsePhoneNumber(apiEmployee.phone);
@@ -460,7 +514,7 @@ const EmployeeList = () => {
       name: apiEmployee.name,
       email: apiEmployee.email,
       phone: phone,
-      countryCode: apiEmployee.country_code || countryCode,
+      countryCode: normalizeCountryCodeValue(apiEmployee.country_code || countryCode),
       warnings: apiEmployee.warnings || [],
       warningsCount: apiEmployee.warnings_count || 0,
       avatar: apiEmployee.avatar || '/placeholder.svg',
@@ -852,6 +906,8 @@ const EmployeeList = () => {
   const handleSaveEdit = async () => {
     if (editingEmployee && originalEmployee && validateEditForm()) {
       try {
+        setEditError(null);
+        setEditErrorItems([]);
         // Prepare the update payload with only changed fields
         const updateData: Partial<CreateEmployeeRequest> = {};
         
@@ -992,10 +1048,60 @@ const EmployeeList = () => {
         setEditingEmployee(null);
         setOriginalEmployee(null);
         setEditValidationErrors({});
+        setEditError(null);
+        setEditErrorItems([]);
         
       } catch (error) {
-        console.error('Error updating employee:', error);
-        // You can add error handling here, such as showing a toast notification
+        const apiError = error as ApiError;
+        const fieldMessages: Record<string, string[]> = {};
+        const normalizeField = (path: string) => {
+          const parts = path.split('.').filter(Boolean);
+          const key = parts[parts.length - 1];
+          if (key === 'first_name' || key === 'last_name') return 'name';
+          if (key === 'employee_code') return 'employeeCode';
+          if (key === 'company_id') return 'companyName';
+          if (key === 'department_id') return 'department';
+          if (key === 'managerial_level') return 'managerialLevel';
+          if (key === 'join_date') return 'joinDate';
+          if (key === 'country_code') return 'countryCode';
+          if (key === 'non_field_errors') return 'general';
+          return key;
+        };
+        const toMessages = (value: unknown): string[] => {
+          if (!value) return [];
+          if (Array.isArray(value)) return (value as unknown[]).map(v => String(v));
+          if (typeof value === 'object') {
+            const rec = value as Record<string, unknown>;
+            if ('message' in rec && typeof rec.message === 'string') return [String(rec.message)];
+            return [JSON.stringify(value)];
+          }
+          return [String(value)];
+        };
+        const walk = (obj: Record<string, unknown>, base = '') => {
+          if (!obj || typeof obj !== 'object') return;
+          Object.entries(obj).forEach(([k, v]) => {
+            const path = base ? `${base}.${k}` : k;
+            if (v && typeof v === 'object' && !Array.isArray(v)) {
+              walk(v as Record<string, unknown>, path);
+            } else {
+              const field = normalizeField(path);
+              const msgs = toMessages(v);
+              if (msgs.length) fieldMessages[field] = (fieldMessages[field] || []).concat(msgs);
+            }
+          });
+        };
+        if (apiError?.details) {
+          walk(apiError.details as Record<string, unknown>);
+        }
+        const firstMessages: { [key: string]: string } = {};
+        Object.entries(fieldMessages).forEach(([k, v]) => {
+          if (v.length) firstMessages[k] = v[0];
+        });
+        setEditValidationErrors(firstMessages);
+        const items = Object.entries(fieldMessages).flatMap(([field, msgs]) => msgs.map(m => `${field}: ${m}`));
+        setEditErrorItems(items);
+        const message = apiError?.message || items[0] || 'Failed to update employee. Please review the fields and try again.';
+        setEditError(message);
       }
     }
   };
@@ -1439,7 +1545,7 @@ const EmployeeList = () => {
                         }));
                       }}
                     >
-                      <SelectTrigger className={`w-full ${validationErrors.companyName ? 'border-red-500' : ''}`}>
+                      <SelectTrigger id="companyName" className={`w-full ${validationErrors.companyName ? 'border-red-500' : ''}`}>
                         <SelectValue placeholder="Select company" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1467,7 +1573,7 @@ const EmployeeList = () => {
                         }));
                       }}
                     >
-                      <SelectTrigger className={`w-full ${validationErrors.department ? 'border-red-500' : ''}`}>
+                      <SelectTrigger id="department" className={`w-full ${validationErrors.department ? 'border-red-500' : ''}`}>
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1915,6 +2021,18 @@ const EmployeeList = () => {
           </DialogHeader>
           {editingEmployee && (
             <div className="space-y-6 py-4">
+              {editError && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <p className="text-sm text-red-600">{editError}</p>
+                  {editErrorItems && editErrorItems.length > 0 && (
+                    <ul className="mt-2 list-disc list-inside text-sm text-red-600">
+                      {editErrorItems.map((item, idx) => (
+                        <li key={`edit-error-item-${idx}`}>{item}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
               
               {/* Personal Information Section */}
               <div className="space-y-4">
@@ -1959,6 +2077,21 @@ const EmployeeList = () => {
                         <SelectContent>
                           <SelectItem value="+966">🇸🇦 +966</SelectItem>
                           <SelectItem value="+20">🇪🇬 +20</SelectItem>
+                          <SelectItem value="+1">🇺🇸 +1</SelectItem>
+                          <SelectItem value="+44">🇬🇧 +44</SelectItem>
+                          <SelectItem value="+33">🇫🇷 +33</SelectItem>
+                          <SelectItem value="+49">🇩🇪 +49</SelectItem>
+                          <SelectItem value="+39">🇮🇹 +39</SelectItem>
+                          <SelectItem value="+34">🇪🇸 +34</SelectItem>
+                          <SelectItem value="+86">🇨🇳 +86</SelectItem>
+                          <SelectItem value="+81">🇯🇵 +81</SelectItem>
+                          <SelectItem value="+82">🇰🇷 +82</SelectItem>
+                          <SelectItem value="+91">🇮🇳 +91</SelectItem>
+                          <SelectItem value="+61">🇦🇺 +61</SelectItem>
+                          <SelectItem value="+55">🇧🇷 +55</SelectItem>
+                          <SelectItem value="+52">🇲🇽 +52</SelectItem>
+                          <SelectItem value="+7">🇷🇺 +7</SelectItem>
+                          <SelectItem value="+27">🇿🇦 +27</SelectItem>
                         </SelectContent>
                       </Select>
                       <Input
@@ -1968,8 +2101,10 @@ const EmployeeList = () => {
                         placeholder="123-456-7890"
                         className={`flex-1 ${editValidationErrors.phone ? 'border-red-500' : ''}`}
                       />
-                {editValidationErrors.phone && (<p className="text-sm text-red-500">{editValidationErrors.phone}</p>)}
-                </div>
+                    </div>
+                    {editValidationErrors.phone && (
+                      <p className="text-sm text-red-500">{editValidationErrors.phone}</p>
+                    )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-gender" className="text-sm font-medium">Gender</Label>
@@ -2005,7 +2140,7 @@ const EmployeeList = () => {
                         } : null);
                       }}
                     >
-                      <SelectTrigger className={`w-full ${editValidationErrors.companyName ? 'border-red-500' : ''}`}>
+                      <SelectTrigger id="edit-companyName" className={`w-full ${editValidationErrors.companyName ? 'border-red-500' : ''}`}>
                         <SelectValue placeholder="Select company" />
                       </SelectTrigger>
                       <SelectContent>
