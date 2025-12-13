@@ -234,8 +234,7 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
       console.log('Creating department with data:', departmentData);
       const createdDepartment = await apiService.createDepartment(departmentData);
       
-      // Add the new department to the list
-      setDepartments(prev => [...prev, createdDepartment]);
+      await refetchDepartments();
       
       // Reset form and close modal
       setNewDepartment({ name: '', company_id: '', manager_id: '' });

@@ -43,7 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       return user.role === 'admin' || user.role === 'hr' || user.api_role === 'HOD';
     }
     if (item.id === 'departments') {
-      return user.api_role === 'HOD' || user.role === 'manager';
+      return user.api_role === 'HOD';
     }
     return item.roles.includes(user.role);
   });
@@ -223,7 +223,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   if (!user?.api_role) return user?.role || '';
                   switch (user.api_role) {
                     case 'LM':
-                      return 'LM';
+                      return 'Line Manager';
                     case 'HOD':
                       return 'HoD';
                     case 'HR':

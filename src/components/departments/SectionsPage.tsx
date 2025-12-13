@@ -9,11 +9,12 @@ import { useOrganizational } from '../../contexts/OrganizationalContext';
 import { apiService } from '../../services/api';
 import { ApiSection, CreateSectionRequest, UpdateSectionRequest } from '../../types/api';
 import { useToast } from '../../hooks/use-toast';
-import { useSubDepartments, useDepartments } from '../../hooks/useApi';
+import { useSubDepartments, useDepartments, useCompanies } from '../../hooks/useApi';
 import { useManagers } from '../../hooks/usemanagers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Label } from '../ui/label';
 import { useAuth } from '../../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 interface SectionsPageProps {
   onViewChange: (view: string) => void;
@@ -23,9 +24,11 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
   const { selectedDepartment, selectedSubDepartment, setSection } = useOrganizational();
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const canManageSections = user?.role === 'admin' || user?.role === 'hr';
   const { data: subDepartmentsData, isLoading: subDepartmentsLoading } = useSubDepartments();
   const { data: departmentsData, isLoading: departmentsLoading } = useDepartments();
+  const { data: companiesData } = useCompanies();
   
   // State for selected company ID and department ID for manager filtering
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
@@ -500,8 +503,12 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
                 <button
                   onClick={() => {
                     onViewChange('departments');
-                    if (selectedDepartment.company_id) {
-                      window.location.href = `/departments?company_id=${selectedDepartment.company_id}`;
+                    const list = Array.isArray(companiesData) ? companiesData : companiesData?.results || [];
+                    const cid = selectedDepartment?.company_id || list.find((c: any) => c.name === selectedDepartment?.company)?.company_id;
+                    if (cid) {
+                      navigate(`/departments?company_id=${cid}`);
+                    } else {
+                      navigate('/departments');
                     }
                   }}
                   className="text-gray-400 hover:text-gray-500"
@@ -642,7 +649,7 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
               <div>
                 <Label htmlFor="sub_department">Sub-Department *</Label>
                 <Select 
-                  value={newSection.sub_department_id}
+                  value={newSection.sub_department_id || (selectedSubDepartment?.sub_department_id || '')}
                   onValueChange={(value) => setNewSection({ ...newSection, sub_department_id: value })}
                   disabled={subDepartmentsLoading || Boolean(selectedSubDepartment)}
                 >
@@ -650,6 +657,11 @@ const SectionsPage: React.FC<SectionsPageProps> = ({ onViewChange }) => {
                     <SelectValue placeholder={selectedSubDepartment ? selectedSubDepartment.name : (subDepartmentsLoading ? "Loading sub-departments..." : "Select sub-department")} />
                   </SelectTrigger>
                   <SelectContent>
+                    {selectedSubDepartment && (
+                      <SelectItem key={`selected-${selectedSubDepartment.sub_department_id}`} value={selectedSubDepartment.sub_department_id}>
+                        {selectedSubDepartment.name}
+                      </SelectItem>
+                    )}
                     {subDepartments.map((subDept) => (
                       <SelectItem key={subDept.sub_department_id} value={subDept.sub_department_id}>
                         {subDept.name}
