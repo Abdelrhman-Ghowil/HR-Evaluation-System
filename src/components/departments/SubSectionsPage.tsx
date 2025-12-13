@@ -10,9 +10,10 @@ import { useOrganizational } from '../../contexts/OrganizationalContext';
 import { apiService } from '../../services/api';
 import { ApiSubSection, ApiSection, CreateSubSectionRequest } from '../../types/api';
 import { useToast } from '../../hooks/use-toast';
-import { useSubDepartments, useDepartments } from '../../hooks/useApi';
+import { useSubDepartments, useDepartments, useCompanies } from '../../hooks/useApi';
 import { useManagers } from '../../hooks/usemanagers';
 import { useAuth } from '../../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 interface SubSectionsPageProps {
   onViewChange: (view: string) => void;
@@ -22,9 +23,11 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
   const { selectedDepartment, selectedSubDepartment, selectedSection } = useOrganizational();
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const canManageSubSections = user?.role === 'admin' || user?.role === 'hr';
   const { data: subDepartmentsData, isLoading: subDepartmentsLoading } = useSubDepartments();
   const { data: departmentsData, isLoading: departmentsLoading } = useDepartments();
+  const { data: companiesData } = useCompanies();
   
   // State for selected company ID and department ID for manager filtering
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
@@ -276,7 +279,8 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
       };
 
       const response = await apiService.createSubSection(subSectionData);
-      setSubSections(prev => [...prev, response]);
+      
+      await loadSubSections();
       setShowCreateForm(false);
       setNewSubSection({ name: '', section_id: '', manager_id: '' });
       
@@ -435,8 +439,12 @@ const SubSectionsPage: React.FC<SubSectionsPageProps> = ({ onViewChange }) => {
                 <button
                   onClick={() => {
                     onViewChange('departments');
-                    if (selectedDepartment.company_id) {
-                      window.location.href = `/departments?company_id=${selectedDepartment.company_id}`;
+                    const list = Array.isArray(companiesData) ? companiesData : companiesData?.results || [];
+                    const cid = selectedDepartment?.company_id || list.find((c: any) => c.name === selectedDepartment?.company)?.company_id;
+                    if (cid) {
+                      navigate(`/departments?company_id=${cid}`);
+                    } else {
+                      navigate('/departments');
                     }
                   }}
                   className="text-gray-400 hover:text-gray-500"

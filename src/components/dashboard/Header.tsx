@@ -91,7 +91,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
                     if (!user?.api_role) return user?.role || '';
                     switch (user.api_role) {
                       case 'LM':
-                        return 'LM';
+                        return 'Line Manager';
                       case 'HOD':
                         return 'HoD';
                       case 'HR':

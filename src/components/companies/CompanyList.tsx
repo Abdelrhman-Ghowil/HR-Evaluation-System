@@ -11,10 +11,12 @@ import { apiService } from '@/services/api';
 import { ApiCompany, CreateCompanyRequest, UpdateCompanyRequest, ApiDepartment, CompanySize } from '@/types/api';
 import { useUpdateCompany, useDeleteCompany, useImportCompanies, useCompanies } from '@/hooks/useApi';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 const CompanyList = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
   const canImport = user?.role === 'admin' || user?.role === 'hr';
   const [companies, setCompanies] = useState<ApiCompany[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,6 +151,9 @@ const CompanyList = () => {
     if (!newCompany.name.trim()) {
       errors.name = 'Company name is required';
     }
+    if (!newCompany.address.trim()) {
+      errors.address = 'Address is required';
+    }
     
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -170,8 +175,7 @@ const CompanyList = () => {
       const createdCompany = await apiService.createCompany(newCompany);
       console.log('Company created successfully:', createdCompany);
       
-      // Add the new company to the list
-      setCompanies(prev => [...prev, createdCompany]);
+      await refetchCompanies();
       
       // Reset form and close modal
       setNewCompany({
@@ -185,11 +189,27 @@ const CompanyList = () => {
     } catch (error: any) {
       console.error('Error creating company:', error);
       
-      if (error.details) {
-        // Handle field-specific validation errors from API
-        setValidationErrors(error.details);
+      const details = (error && error.details) || (error && error.response && error.response.data && error.response.data.details);
+      if (details && typeof details === 'object') {
+        const apiErrors: { [key: string]: string } = {};
+        Object.keys(details).forEach((field) => {
+          const val = details[field];
+          if (Array.isArray(val)) {
+            apiErrors[field] = String(val[0]);
+          } else if (val && typeof val === 'object') {
+            const first = Object.values(val)[0] as any;
+            apiErrors[field] = Array.isArray(first) ? String(first[0]) : String(first);
+          } else {
+            apiErrors[field] = String(val);
+          }
+        });
+        setValidationErrors(apiErrors);
+        const generalMsg = apiErrors.general || apiErrors.non_field_errors || apiErrors.detail;
+        toast({ title: 'Error', description: generalMsg || 'Please fix the highlighted fields.', variant: 'destructive' });
       } else {
-        setValidationErrors({ general: error.message || 'Failed to create company. Please try again.' });
+        const message = (error && error.message) || (error && error.response && error.response.data && error.response.data.message) || 'Failed to create company. Please try again.';
+        setValidationErrors({ general: message });
+        toast({ title: 'Error', description: message, variant: 'destructive' });
       }
     } finally {
       setIsCreating(false);
@@ -526,7 +546,11 @@ const CompanyList = () => {
                     value={newCompany.industry}
                     onChange={(e) => setNewCompany(prev => ({ ...prev, industry: e.target.value }))}
                     placeholder="e.g., Technology, Healthcare"
+                    className={validationErrors.industry ? 'border-red-300 focus:border-red-500' : ''}
                   />
+                  {validationErrors.industry && (
+                    <p className="text-sm text-red-600">{validationErrors.industry}</p>
+                  )}
                 </div>
               </div>
               
@@ -538,7 +562,7 @@ const CompanyList = () => {
                     setNewCompany(prev => ({ ...prev, size: value }))
                   }
                 >
-                  <SelectTrigger id="company-size">
+                  <SelectTrigger id="company-size" className={validationErrors.size ? 'border-red-300 focus:border-red-500' : ''}>
                     <SelectValue placeholder="Select company size" />
                   </SelectTrigger>
                   <SelectContent>
@@ -547,16 +571,24 @@ const CompanyList = () => {
                     <SelectItem value="Large">Large (500+ employees)</SelectItem>
                   </SelectContent>
                 </Select>
+                {validationErrors.size && (
+                  <p className="text-sm text-red-600">{validationErrors.size}</p>
+                )}
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="address" className="text-sm font-medium">Address</Label>
+                <Label htmlFor="address" className="text-sm font-medium">Address *</Label>
                 <Input
                   id="address"
                   value={newCompany.address}
                   onChange={(e) => setNewCompany(prev => ({ ...prev, address: e.target.value }))}
                   placeholder="Company address"
+                  required
+                  className={validationErrors.address ? 'border-red-300 focus:border-red-500' : ''}
                 />
+                {validationErrors.address && (
+                  <p className="text-sm text-red-600">{validationErrors.address}</p>
+                )}
               </div>
               
               <div className="flex justify-end space-x-3 pt-4">

@@ -3,7 +3,7 @@ import { useOrganizational } from '../../contexts/OrganizationalContext';
 import { apiService } from '../../services/api';
 import { ApiSubDepartment, CreateSubDepartmentRequest, UpdateSubDepartmentRequest, SubDepartmentQueryParams, ApiEmployee } from '../../types/api';
 import { useToast } from '../../hooks/use-toast';
-import { useDepartments } from '../../hooks/useApi';
+import { useDepartments, useCompanies } from '../../hooks/useApi';
 import { useManagers } from '../../hooks/usemanagers';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -15,6 +15,7 @@ import { Search, Plus, Edit, Trash2, Users, Building2, UserCheck, Eye } from 'lu
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ConfirmationDialog } from '../ui/confirmation-dialog';
 import { useAuth } from '../../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 interface SubDepartmentsPageProps {
   className?: string;
@@ -56,10 +57,12 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
   const { selectedDepartment, setDepartment, setSubDepartment } = useOrganizational();
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const canManageSubDepartments = user?.role === 'admin' || user?.role === 'hr';
   
   // Fetch departments for dropdown
   const { data: departmentsData, isLoading: departmentsLoading, error: departmentsError } = useDepartments();
+  const { data: companiesData } = useCompanies();
   
   // State for selected company ID and department ID for manager filtering
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
@@ -200,7 +203,7 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
 
       const newSubDepartment = await apiService.createSubDepartment(createData);
       
-      setSubDepartments(prev => [...prev, newSubDepartment]);
+      await loadSubDepartments();
       setFormData({ name: '', department: '', manager: '' });
       setIsCreateModalOpen(false);
       
@@ -510,9 +513,12 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
                     onClick={() => {
                       setDepartment(null);
                       onViewChange?.('departments');
-                      // Navigate to the specific company's departments page
-                      if (selectedDepartment.company_id) {
-                        window.location.href = `/departments?company_id=${selectedDepartment.company_id}`;
+                      const list = Array.isArray(companiesData) ? companiesData : companiesData?.results || [];
+                      const cid = selectedDepartment?.company_id || list.find((c: any) => c.name === selectedDepartment?.company)?.company_id;
+                      if (cid) {
+                        navigate(`/departments?company_id=${cid}`);
+                      } else {
+                        navigate('/departments');
                       }
                     }}
                     className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
@@ -530,9 +536,12 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
                     onClick={() => {
                       setDepartment(null);
                       onViewChange?.('departments');
-                      // Navigate to the specific company's departments page
-                      if (selectedDepartment.company_id) {
-                        window.location.href = `/departments?company_id=${selectedDepartment.company_id}`;
+                      const list = Array.isArray(companiesData) ? companiesData : companiesData?.results || [];
+                      const cid = selectedDepartment?.company_id || list.find((c: any) => c.name === selectedDepartment?.company)?.company_id;
+                      if (cid) {
+                        navigate(`/departments?company_id=${cid}`);
+                      } else {
+                        navigate('/departments');
                       }
                     }}
                     className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
@@ -604,6 +613,11 @@ const SubDepartmentsPage: React.FC<SubDepartmentsPageProps> = ({ className, onVi
                         <SelectValue placeholder={selectedDepartment ? selectedDepartment.name : (departmentsLoading ? "Loading departments..." : "Select department")} />
                       </SelectTrigger>
                       <SelectContent>
+                        {selectedDepartment && (
+                          <SelectItem key={`selected-${selectedDepartment.department_id}`} value={selectedDepartment.department_id}>
+                            {selectedDepartment.name}
+                          </SelectItem>
+                        )}
                         {departments.map((dept) => (
                           <SelectItem key={dept.department_id} value={dept.department_id}>
                             {dept.name}

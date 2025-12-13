@@ -17,6 +17,7 @@ import { useEmployees } from '@/hooks/useApi';
 import { ApiEmployee, ApiDepartment, ApiCompany, CreateEmployeeRequest, ImportResponse, ApiError } from '@/types/api';
 import { parsePhoneNumber, formatDate } from '@/utils/dataTransformers';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface Employee {
@@ -51,6 +52,7 @@ interface Employee {
 const EmployeeList = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
   const canImport = user?.role === 'admin' || user?.role === 'hr';
   const canAddEmployee = user?.role === 'admin' || user?.role === 'hr';
   const [searchTerm, setSearchTerm] = useState('');
@@ -628,7 +630,9 @@ const EmployeeList = () => {
       setImportResults(result);
       
       if (result.status === 'imported' && (result.created > 0 || result.updated > 0)) {
-        await refetchEmployees(); // Refresh the employees list
+        await refetchEmployees();
+        handleImportModalClose();
+        toast({ title: 'Success', description: 'Employees imported successfully.' });
       }
     } catch (error: unknown) {
       console.error('Import failed:', error);
