@@ -72,6 +72,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   
   // Delete evaluation mutation
   const deleteEvaluationMutation = useDeleteEvaluation();
+  const [deletingEvaluationId, setDeletingEvaluationId] = useState<string | null>(null);
   
   // Fetch users for reviewer dropdown
   const { data: usersData, isLoading: usersLoading, error: usersError } = useUsers();
@@ -365,10 +366,13 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
 
   const handleDeleteEvaluation = async (evaluationId: string) => {
     try {
+      setDeletingEvaluationId(evaluationId);
       await deleteEvaluationMutation.mutateAsync(evaluationId);
       console.log('Successfully deleted evaluation:', evaluationId);
     } catch (error) {
       console.error('Error deleting evaluation:', error);
+    } finally {
+      setDeletingEvaluationId(null);
     }
   };
 
@@ -1070,8 +1074,18 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleEditEvaluation(evaluation); }} className="h-8 w-8 p-0">
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleDeleteEvaluation(evaluation.id); }} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
-                                  <Trash2 className="h-4 w-4" />
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteEvaluation(evaluation.id); }} 
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  disabled={deletingEvaluationId === evaluation.id}
+                                >
+                                  {deletingEvaluationId === evaluation.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
                                 </Button>
                               </div>
                             </div>
@@ -1127,8 +1141,18 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleEditEvaluation(evaluation); }} className="h-8 w-8 p-0">
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleDeleteEvaluation(evaluation.id); }} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
-                                  <Trash2 className="h-4 w-4" />
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteEvaluation(evaluation.id); }} 
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  disabled={deletingEvaluationId === evaluation.id}
+                                >
+                                  {deletingEvaluationId === evaluation.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
                                 </Button>
                               </div>
                             </div>
