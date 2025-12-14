@@ -272,7 +272,7 @@ export interface CreatePlacementRequest {
 
 // Evaluation Types
 export interface ApiEvaluation {
-  // id: string;
+  id: string;
   evaluation_id: string
   employee_id: string;
   type: EvaluationType;
@@ -476,6 +476,7 @@ export interface DepartmentQueryParams {
 
 export interface EvaluationQueryParams {
   employee_id?: string;
+  user_id?: string;
   type?: EvaluationType;
   status?: EvaluationStatus;
   period?: string;

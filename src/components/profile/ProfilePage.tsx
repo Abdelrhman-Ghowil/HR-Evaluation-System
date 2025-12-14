@@ -262,7 +262,7 @@ const ProfilePage: React.FC = () => {
     isLoading: evaluationsQueryLoading,
     error: evaluationsQueryError,
   } = useEvaluations(
-    { status: 'Approved' },
+    {  user_id: user?.user_id ,status: 'Approved' },
     {
       enabled: true,
       refetchOnMount: false,
@@ -340,7 +340,7 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     if (myProfileData) {
       const mappedData: ProfileData = {
-        employee_id: myProfileData.employee_code || '',
+        employee_id: myProfileData.employee_id || '',
         employee_code: myProfileData.employee_code || '',
         name: myProfileData.name || user?.name || '',
         username: myProfileData.username || user?.username || '',
