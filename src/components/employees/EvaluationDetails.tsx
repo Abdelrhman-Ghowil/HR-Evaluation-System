@@ -210,7 +210,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           target: objectiveForm.target!,
           achieved: objectiveForm.achieved!,
           status: objectiveForm.status!,
-          weight: Number(((objectiveForm.weight as number) / 100).toFixed(4)),
+          weight: Number(((objectiveForm.weight as number)).toFixed(4)),
           ...(objectiveForm.description !== undefined ? { description: objectiveForm.description } : {})
         };
          await updateObjectiveMutation.mutateAsync({
@@ -232,7 +232,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           target: objectiveForm.target!,
           achieved: objectiveForm.achieved!,
           status: objectiveForm.status!,
-          weight: Number(((objectiveForm.weight as number) / 100).toFixed(4))
+          weight: Number(((objectiveForm.weight as number)).toFixed(4))
         };
          await createObjectiveMutation.mutateAsync(createData);
          // Explicitly refetch objectives to ensure UI updates immediately
