@@ -209,7 +209,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           title: objectiveForm.title!,
           target: objectiveForm.target!,
           achieved: objectiveForm.achieved!,
-          status: objectiveForm.status!,
+          status: 'Completed',
           weight: Number(((objectiveForm.weight as number)).toFixed(4)),
           ...(objectiveForm.description !== undefined ? { description: objectiveForm.description } : {})
         };
@@ -231,7 +231,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           description: objectiveForm.description ?? '',
           target: objectiveForm.target!,
           achieved: objectiveForm.achieved!,
-          status: objectiveForm.status!,
+          status: 'Completed',
           weight: Number(((objectiveForm.weight as number)).toFixed(4))
         };
          await createObjectiveMutation.mutateAsync(createData);
@@ -1436,25 +1436,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 )}
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="status" className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                  Status
-                  <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={objectiveForm.status || 'Not started'}
-                  onValueChange={(value) => setObjectiveForm(prev => ({ ...prev, status: value as 'Completed' | 'In-progress' | 'Not started' }))}
-                >
-                  <SelectTrigger className="transition-all duration-200 focus:ring-green-500 focus:border-green-500">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Not started">Not Started</SelectItem>
-                    <SelectItem value="In-progress">In Progress</SelectItem>
-                    <SelectItem value="Completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
             </div>
             
             <DialogFooter className="pt-6 border-t border-gray-100">
