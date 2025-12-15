@@ -86,9 +86,14 @@ const ProfilePage: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const canViewPerformanceTabs = ['EMP', 'LM', 'HOD', 'HR'].includes((user?.api_role || '') as string);
   const [activeTab, setActiveTab] = useState<string>(() => {
     const params = new URLSearchParams(location.search);
-    return params.get('tab') || 'personal';
+    const tab = params.get('tab') || 'personal';
+    if (!canViewPerformanceTabs && (tab === 'performance' || tab === 'self-review')) {
+      return 'personal';
+    }
+    return tab;
   });
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -138,8 +143,12 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab') || 'personal';
+    if (!canViewPerformanceTabs && (tab === 'performance' || tab === 'self-review')) {
+      setActiveTab('personal');
+      return;
+    }
     setActiveTab(tab);
-  }, [location.search]);
+  }, [location.search, canViewPerformanceTabs]);
 
   // Validation functions
   const validateField = (field: string, value: string): string => {
@@ -904,7 +913,7 @@ const ProfilePage: React.FC = () => {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-white border shadow-sm">
+          <TabsList className={`grid w-full ${canViewPerformanceTabs ? 'grid-cols-5' : 'grid-cols-3'} bg-white border shadow-sm`}>
             <TabsTrigger value="personal" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               Personal
@@ -913,14 +922,18 @@ const ProfilePage: React.FC = () => {
               <Briefcase className="h-4 w-4" />
               Professional
             </TabsTrigger>
-            <TabsTrigger value="performance" className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Performance
-            </TabsTrigger>
-            <TabsTrigger value="self-review" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Self Review
-            </TabsTrigger>
+            {canViewPerformanceTabs && (
+              <TabsTrigger value="performance" className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Performance
+              </TabsTrigger>
+            )}
+            {canViewPerformanceTabs && (
+              <TabsTrigger value="self-review" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Self Review
+              </TabsTrigger>
+            )}
             <TabsTrigger value="security" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Security
@@ -1211,184 +1224,188 @@ const ProfilePage: React.FC = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="self-review" className="space-y-6">
-            <Card className="shadow-lg border-0">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-blue-600" />
-                  Self Evaluation
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex flex-wrap items-end gap-4 p-4 bg-gray-50 rounded-lg border">
-                  <div className="space-y-2">
-                    <Label>Period</Label>
-                    <Input value={newSelfPeriod} disabled placeholder="2025-Q1" className="w-40" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Input value={newSelfType} disabled className="w-40" />
-                  </div>
-                  <div className="ml-auto">
-                    <Button
-                      onClick={async () => {
-                        if (!newSelfPeriod || !newSelfType) return;
-                        setCreatingSelfEval(true);
-                        try {
-                          const created = await apiService.createSelfEvaluation({ period: newSelfPeriod, type: newSelfType });
-                          toast.success('Self evaluation created');
-                          const refreshed = await apiService.getSelfEvaluations();
-                          setSelfEvaluations(Array.isArray(refreshed) ? refreshed : []);
-                          setIsSelfEvalMode(true);
-                          setSelectedSelfEvaluation(created);
-                        } catch (err: any) {
-                          toast.error(err?.message || 'Failed to create self evaluation');
-                        } finally {
-                          setCreatingSelfEval(false);
-                        }
-                      }}
-                      className="bg-blue-600 hover:bg-blue-700"
-                      disabled={creatingSelfEval}
-                    >
-                      {creatingSelfEval ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Creating...
-                        </>
-                      ) : (
-                        'Create Self Evaluation'
-                      )}
-                    </Button>
-                  </div>
-                </div>
-                {selfEvaluationsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                    <span className="ml-2 text-gray-600">Loading self evaluations...</span>
-                  </div>
-                ) : selfEvaluationsError ? (
-                  <div className="text-center py-8">
-                    <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-                    <p className="text-red-600 font-medium">Error loading self evaluations</p>
-                    <p className="text-red-500 text-sm mt-2">{selfEvaluationsError}</p>
-                  </div>
-                ) : selfEvaluations.length === 0 ? (
-                  <div className="text-center py-8">
-                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">No self evaluations found</p>
-                    <p className="text-gray-500 text-sm mt-2">Your self evaluations will appear here when available.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {selfEvaluations.map((evaluation) => (
-                      <Card 
-                        key={evaluation.evaluation_id} 
-                        className="hover:shadow-md transition-all duration-200 border-l-4 border-l-blue-500 cursor-pointer"
-                        onClick={() => { setIsSelfEvalMode(true); handleEvaluationClick(evaluation); }}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4 flex-1">
-                              <div className="bg-blue-100 p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-blue-600" />
+          {canViewPerformanceTabs && (
+            <>
+              <TabsContent value="self-review" className="space-y-6">
+                <Card className="shadow-lg border-0">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                      Self Evaluation
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex flex-wrap items-end gap-4 p-4 bg-gray-50 rounded-lg border">
+                      <div className="space-y-2">
+                        <Label>Period</Label>
+                        <Input value={newSelfPeriod} disabled placeholder="2025-Q1" className="w-40" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Type</Label>
+                        <Input value={newSelfType} disabled className="w-40" />
+                      </div>
+                      <div className="ml-auto">
+                        <Button
+                          onClick={async () => {
+                            if (!newSelfPeriod || !newSelfType) return;
+                            setCreatingSelfEval(true);
+                            try {
+                              const created = await apiService.createSelfEvaluation({ period: newSelfPeriod, type: newSelfType });
+                              toast.success('Self evaluation created');
+                              const refreshed = await apiService.getSelfEvaluations();
+                              setSelfEvaluations(Array.isArray(refreshed) ? refreshed : []);
+                              setIsSelfEvalMode(true);
+                              setSelectedSelfEvaluation(created);
+                            } catch (err: any) {
+                              toast.error(err?.message || 'Failed to create self evaluation');
+                            } finally {
+                              setCreatingSelfEval(false);
+                            }
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700"
+                          disabled={creatingSelfEval}
+                        >
+                          {creatingSelfEval ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Creating...
+                            </>
+                          ) : (
+                            'Create Self Evaluation'
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    {selfEvaluationsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                        <span className="ml-2 text-gray-600">Loading self evaluations...</span>
+                      </div>
+                    ) : selfEvaluationsError ? (
+                      <div className="text-center py-8">
+                        <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+                        <p className="text-red-600 font-medium">Error loading self evaluations</p>
+                        <p className="text-red-500 text-sm mt-2">{selfEvaluationsError}</p>
+                      </div>
+                    ) : selfEvaluations.length === 0 ? (
+                      <div className="text-center py-8">
+                        <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600">No self evaluations found</p>
+                        <p className="text-gray-500 text-sm mt-2">Your self evaluations will appear here when available.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {selfEvaluations.map((evaluation) => (
+                          <Card 
+                            key={evaluation.evaluation_id} 
+                            className="hover:shadow-md transition-all duration-200 border-l-4 border-l-blue-500 cursor-pointer"
+                            onClick={() => { setIsSelfEvalMode(true); handleEvaluationClick(evaluation); }}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-4 flex-1">
+                                  <div className="bg-blue-100 p-3 rounded-lg">
+                                    <BarChart3 className="h-6 w-6 text-blue-600" />
+                                  </div>
+                                  <div>
+                                    <h3 className="font-semibold text-gray-900">{evaluation.type}</h3>
+                                    <p className="text-sm text-gray-600">{evaluation.period}</p>
+                                    {evaluation.reviewer && (
+                                      <p className="text-xs text-gray-500">Reviewer: {evaluation.reviewer}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                  <Badge className={getStatusBadgeClass(evaluation.status)}>
+                                    {evaluation.status}
+                                  </Badge>
+                                  {evaluation.score && (
+                                    <div className="text-right">
+                                      <p className="text-lg font-bold text-gray-900">{evaluation.score}</p>
+                                      <p className="text-xs text-gray-500">Score</p>
+                                    </div>
+                                  )}
+                                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                                    <Eye className="h-4 w-4" />
+                                    View
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => { e.stopPropagation(); setSelfEvalToDelete(evaluation); setConfirmSelfDeleteOpen(true); }}
+                                    className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    disabled={isDeletingSelfId === evaluation.evaluation_id}
+                                  >
+                                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="3 6 5 6 21 6" />
+                                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                      <path d="M10 11v6" />
+                                      <path d="M14 11v6" />
+                                      <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                                    </svg>
+                                    Delete
+                                  </Button>
+                                </div>
                               </div>
-                              <div>
-                                <h3 className="font-semibold text-gray-900">{evaluation.type}</h3>
-                                <p className="text-sm text-gray-600">{evaluation.period}</p>
-                                {evaluation.reviewer && (
-                                  <p className="text-xs text-gray-500">Reviewer: {evaluation.reviewer}</p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                              <Badge className={getStatusBadgeClass(evaluation.status)}>
-                                {evaluation.status}
-                              </Badge>
-                              {evaluation.score && (
-                                <div className="text-right">
-                                  <p className="text-lg font-bold text-gray-900">{evaluation.score}</p>
-                                  <p className="text-xs text-gray-500">Score</p>
+                              {evaluation.created_at && (
+                                <div className="mt-3 pt-3 border-t border-gray-100">
+                                  <div className="flex items-center text-xs text-gray-500">
+                                    <Calendar className="h-3 w-3 mr-1" />
+                                    {formatDate(evaluation.created_at)}
+                                  </div>
                                 </div>
                               )}
-                              <Button variant="outline" size="sm" className="flex items-center gap-2">
-                                <Eye className="h-4 w-4" />
-                                View
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => { e.stopPropagation(); setSelfEvalToDelete(evaluation); setConfirmSelfDeleteOpen(true); }}
-                                className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                disabled={isDeletingSelfId === evaluation.evaluation_id}
-                              >
-                                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="3 6 5 6 21 6" />
-                                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                                  <path d="M10 11v6" />
-                                  <path d="M14 11v6" />
-                                  <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-                                </svg>
-                                Delete
-                              </Button>
-                            </div>
-                          </div>
-                          {evaluation.created_at && (
-                            <div className="mt-3 pt-3 border-t border-gray-100">
-                              <div className="flex items-center text-xs text-gray-500">
-                                <Calendar className="h-3 w-3 mr-1" />
-                                {formatDate(evaluation.created_at)}
-                              </div>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-          <AlertDialog open={confirmSelfDeleteOpen} onOpenChange={setConfirmSelfDeleteOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Self Evaluation</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {selfEvalToDelete ? (
-                    <span>
-                      This action will permanently delete the self evaluation for {selfEvalToDelete.period} ({selfEvalToDelete.type}).
-                    </span>
-                  ) : (
-                    <span>Are you sure you want to delete this self evaluation?</span>
-                  )}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => { setSelfEvalToDelete(null); }}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={async () => {
-                    if (!selfEvalToDelete) return;
-                    try {
-                      setIsDeletingSelfId(selfEvalToDelete.evaluation_id);
-                      await apiService.deleteEvaluation(selfEvalToDelete.evaluation_id);
-                      toast.success('Self evaluation deleted');
-                      const refreshed = await apiService.getSelfEvaluations();
-                      setSelfEvaluations(Array.isArray(refreshed) ? refreshed : []);
-                    } catch (err: any) {
-                      toast.error(err?.message || 'Failed to delete self evaluation');
-                    } finally {
-                      setIsDeletingSelfId(null);
-                      setConfirmSelfDeleteOpen(false);
-                      setSelfEvalToDelete(null);
-                    }
-                  }}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+              <AlertDialog open={confirmSelfDeleteOpen} onOpenChange={setConfirmSelfDeleteOpen}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Self Evaluation</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {selfEvalToDelete ? (
+                        <span>
+                          This action will permanently delete the self evaluation for {selfEvalToDelete.period} ({selfEvalToDelete.type}).
+                        </span>
+                      ) : (
+                        <span>Are you sure you want to delete this self evaluation?</span>
+                      )}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => { setSelfEvalToDelete(null); }}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={async () => {
+                        if (!selfEvalToDelete) return;
+                        try {
+                          setIsDeletingSelfId(selfEvalToDelete.evaluation_id);
+                          await apiService.deleteEvaluation(selfEvalToDelete.evaluation_id);
+                          toast.success('Self evaluation deleted');
+                          const refreshed = await apiService.getSelfEvaluations();
+                          setSelfEvaluations(Array.isArray(refreshed) ? refreshed : []);
+                        } catch (err: any) {
+                          toast.error(err?.message || 'Failed to delete self evaluation');
+                        } finally {
+                          setIsDeletingSelfId(null);
+                          setConfirmSelfDeleteOpen(false);
+                          setSelfEvalToDelete(null);
+                        }
+                      }}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
 
           {/* Professional Tab */}
           <TabsContent value="professional" className="space-y-8">
@@ -1659,6 +1676,7 @@ const ProfilePage: React.FC = () => {
           </TabsContent>
 
           {/* Performance Tab */}
+          {canViewPerformanceTabs && (
           <TabsContent value="performance" className="space-y-6">
             {/* Performance Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1798,6 +1816,7 @@ const ProfilePage: React.FC = () => {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
           {/* Security Tab */}
           <TabsContent value="security" className="space-y-6">

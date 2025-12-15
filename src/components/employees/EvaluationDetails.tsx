@@ -683,7 +683,11 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   <BarChart3 className="h-5 w-5 text-blue-600 mr-2" />
                 </div>
                 <div className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  {evaluation.score || 'N/A'}
+                  {typeof evaluation.score === 'number'
+                    ? `${evaluation.score.toFixed(1)}%`
+                    : evaluation.score
+                    ? `${Number(evaluation.score).toFixed(1)}%`
+                    : 'N/A'}
                 </div>
                 <div className="text-xs lg:text-sm text-gray-600 font-medium">Overall Score</div>
               </div>
@@ -694,7 +698,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   <Target className="h-5 w-5 text-green-600 mr-2" />
                 </div>
                 <div className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                  {typeof evaluation.objectives_score === 'number' ? evaluation.objectives_score.toFixed(1) : getOverallObjectiveScore()}
+                  {`${typeof evaluation.objectives_score === 'number' ? evaluation.objectives_score.toFixed(1) : getOverallObjectiveScore()}%`}
                 </div>
                 <div className="text-xs lg:text-sm text-gray-600 font-medium">Objectives</div>
               </div>
@@ -705,7 +709,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   <Users className="h-5 w-5 text-purple-600 mr-2" />
                 </div>
                 <div className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
-                  {typeof evaluation.competencies_score === 'number' ? evaluation.competencies_score.toFixed(1) : getOverallCompetencyScore()}
+                  {`${typeof evaluation.competencies_score === 'number' ? evaluation.competencies_score.toFixed(1) : getOverallCompetencyScore()}%`}
                 </div>
                 <div className="text-xs lg:text-sm text-gray-600 font-medium">Competencies</div>
               </div>
@@ -755,7 +759,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="lg:col-span-2">
                   <div className="flex items-start justify-between gap-4">
                     {statusOrder.map((s, i) => {
@@ -784,16 +788,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                         </div>
                       );
                     })}
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="p-4 rounded-lg border bg-white">
-                    <div className="flex flex-wrap gap-2">
-                      <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 border border-blue-200">Draft → HoD → HR → Employee Review → Approved → Completed</span>
-                      <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 border border-yellow-200">HoD rejection → back to Draft</span>
-                      <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800 border border-orange-200">HR rejection → back to Pending HoD Approval</span>
-                      <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800 border border-gray-200">Employee Review stage only</span>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -895,12 +889,12 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                             </div>
                             
                             <div className="flex items-center gap-3 lg:flex-col lg:items-end">
-                              <div className="text-center lg:text-right">
-                                <div className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                                  {score.toFixed(1)}
-                                </div>
-                                <div className="text-xs text-gray-500 font-medium">Score</div>
+                            <div className="text-center lg:text-right">
+                              <div className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                                {`${score.toFixed(1)}%`}
                               </div>
+                              <div className="text-xs text-gray-500 font-medium">Score</div>
+                            </div>
                               
                               <div className="flex gap-2">
                                 <Button
@@ -990,7 +984,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 ) : (
                   <div className="space-y-4 sm:space-y-6">
                     {competencies.map((competency) => {
-                    const score = getCompetencyScore(competency);
                     return (
                       <div key={competency.id} className="bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl p-4 sm:p-6 hover:shadow-lg transition-all duration-200 group">
                         <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
@@ -1012,13 +1005,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                           </div>
                           
                           <div className="flex items-center gap-3 lg:flex-col lg:items-end">
-                            <div className="text-center lg:text-right">
-                              <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
-                                {score.toFixed(1)}
-                              </div>
-                              <div className="text-xs text-gray-500 font-medium">Score</div>
-                            </div>
-                            
                             <div className="flex gap-2">
                               <Button
                                 variant="outline"
@@ -1090,11 +1076,11 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 </div>
               )}
               <div className="flex items-center gap-3">
-                <Button onClick={() => { if (panelSubmitted) return; const notEnough = objectives.length < MIN_OBJECTIVES; setPanelAction('approve'); setPanelComment('HoD approved and forwarded to HR.'); setPanelError(notEnough ? 'At least 4 objectives are required to approve or reject.' : ''); }} className="bg-green-600 hover:bg-green-700" disabled={isSubmittingAction || panelSubmitted}>
+                <Button onClick={() => { if (panelSubmitted) return; const notEnough = objectives.length < MIN_OBJECTIVES; setPanelAction('approve'); setPanelComment(getActionPanelMessage('approve', currentStatus)); setPanelError(notEnough ? 'At least 4 objectives are required to approve or reject.' : ''); }} className="bg-green-600 hover:bg-green-700" disabled={isSubmittingAction || panelSubmitted}>
                   <Check className="h-4 w-4 mr-2" />
                   Approve
                 </Button>
-                <Button variant="destructive" onClick={() => { if (panelSubmitted) return; const notEnough = objectives.length < MIN_OBJECTIVES; setPanelAction('reject'); setPanelComment(''); setPanelError(notEnough ? 'At least 4 objectives are required to approve or reject.' : ''); }} className="bg-red-600 hover:bg-red-700" disabled={isSubmittingAction || panelSubmitted}>
+                <Button variant="destructive" onClick={() => { if (panelSubmitted) return; const notEnough = objectives.length < MIN_OBJECTIVES; setPanelAction('reject'); setPanelComment(getActionPanelMessage('reject', currentStatus)); setPanelError(notEnough ? 'At least 4 objectives are required to approve or reject.' : ''); }} className="bg-red-600 hover:bg-red-700" disabled={isSubmittingAction || panelSubmitted}>
                   <X className="h-4 w-4 mr-2" />
                   Reject
                 </Button>
@@ -1151,7 +1137,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 <DialogTitle>{panelAction === 'approve' ? 'Confirm Approve' : 'Confirm Reject'}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3">
-                <div className="text-sm text-gray-700">{panelAction === 'approve' ? 'This will forward to HR.' : 'This will mark as rejected.'}</div>
+                <div className="text-sm text-gray-700">{panelAction ? getActionPanelMessage(panelAction, currentStatus) : ''}</div>
                 <div className="rounded border p-3 text-sm text-gray-700">{panelComment || 'No comment'}</div>
               </div>
               <DialogFooter>
@@ -1280,9 +1266,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                                       }></span>
                                       <span className="ml-2 font-medium">Status:</span>
                                       <span className="ml-1">{entry.activitystatus}</span>
-                                    </Badge>
-                                    <Badge className={entry.is_rejection ? 'bg-red-100 text-red-800 border-red-200' : 'bg-green-100 text-green-800 border-green-200'}>
-                                      {entry.is_rejection ? 'Rejected' : 'Accepted'}
                                     </Badge>
                                   </div>
                                   <div className="text-sm text-gray-600">{new Date(entry.timestamp).toLocaleString()}</div>
@@ -1683,6 +1666,18 @@ const getPrevWorkflowStatus = (current: WorkflowStatus): WorkflowStatus => {
   const i = statusOrder.indexOf(current);
   if (i <= 0) return statusOrder[0];
   return statusOrder[i - 1];
+};
+
+const getActionPanelMessage = (action: 'approve' | 'reject', current: WorkflowStatus): string => {
+  const target = action === 'approve' ? getNextWorkflowStatus(current) : getPrevWorkflowStatus(current);
+  if (action === 'approve') {
+    return target === current
+      ? `Status will remain ${current}.`
+      : `Status will move from ${current} to ${target}.`;
+  }
+  return target === current
+    ? `Status will remain ${current}.`
+    : `Status will move from ${current} back to ${target}.`;
 };
 
 const statusLabelAr: Record<WorkflowStatus, string> = {
