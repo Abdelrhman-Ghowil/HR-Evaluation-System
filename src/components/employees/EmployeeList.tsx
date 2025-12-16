@@ -165,9 +165,8 @@ const EmployeeList = () => {
   // React Query: Employees caching
   const employeeQueryParams = React.useMemo(() => {
     const apiRole = user?.api_role;
-    if (apiRole === 'HOD' || apiRole === 'LM') {
-      return { role: 'EMP' };
-    }
+    if (apiRole === 'HOD') return { role: 'EMP,LM' };
+    if (apiRole === 'LM') return { role: 'EMP' };
     return undefined;
   }, [user?.api_role]);
   const {
