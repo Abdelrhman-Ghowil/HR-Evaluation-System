@@ -340,13 +340,13 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
     setIsUpdatingEvaluation(true);
 
     try {
-      const updateData = {
-        type: editingEvaluation.type,
-        period: editingEvaluation.period,
-        status: editingEvaluation.status, // Send status as-is without transformation
-        reviewer_id: editingEvaluation.reviewer_id || null
-        // Note: score field is intentionally excluded to make it non-editable
+      const updateData: { status?: Exclude<EvaluationInput['status'], 'Self Evaluation'>; reviewer_id?: string } = {
+        reviewer_id: editingEvaluation.reviewer_id || undefined
       };
+
+      if (editingEvaluation.status !== 'Self Evaluation') {
+        updateData.status = editingEvaluation.status;
+      }
       
       await updateEvaluationMutation.mutateAsync({
         evaluationId: editingEvaluation.id,
@@ -1206,10 +1206,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                 <Input
                   id="edit-period"
                   value={editingEvaluation.period}
-                  onChange={(e) => setEditingEvaluation({
-                    ...editingEvaluation,
-                    period: e.target.value
-                  })}
+                  disabled
                   className="col-span-3"
                 />
               </div>
