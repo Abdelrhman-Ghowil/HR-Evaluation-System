@@ -163,12 +163,19 @@ const EmployeeList = () => {
   }, [editValidationErrors, isEditModalOpen]);
 
   // React Query: Employees caching
+  const employeeQueryParams = React.useMemo(() => {
+    const apiRole = user?.api_role;
+    if (apiRole === 'HOD' || apiRole === 'LM') {
+      return { role: 'EMP' };
+    }
+    return undefined;
+  }, [user?.api_role]);
   const {
     data: employeesData,
     isLoading: employeesQueryLoading,
     error: employeesQueryError,
     refetch: refetchEmployees,
-  } = useEmployees();
+  } = useEmployees(employeeQueryParams);
 
   // Map query error to local error UI
   useEffect(() => {
