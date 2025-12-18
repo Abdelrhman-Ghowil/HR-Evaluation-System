@@ -106,6 +106,7 @@ export interface ApiEmployee {
   country_code: string;
   warnings: string[];
   warnings_count: number;
+  pending_evaluations_count?: number;
   avatar: string;
   role: string;
   position: string;

@@ -30,11 +30,12 @@ interface Employee {
   countryCode: string;
   warnings: string[];
   warningsCount: number;
+  pendingEvaluationsCount: number;
   avatar: string;
   department: string;
   position: string;
   role: 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP';
-  managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management' | 'Executive';
+  managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management'| 'Executive';
   status: 'Active' | 'Inactive';
   companyName: string;
   orgPath: string;
@@ -58,6 +59,7 @@ const EmployeeList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [selectedCompany, setSelectedCompany] = useState('all');
+  const [selectedEvaluationState, setSelectedEvaluationState] = useState<'all' | 'pending' | 'can-start'>('all');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<ApiDepartment[]>([]);
@@ -512,6 +514,10 @@ const EmployeeList = () => {
   // Transform API employee data to local Employee interface
   const transformApiEmployee = (apiEmployee: ApiEmployee): Employee => {
     const { countryCode, phone } = parsePhoneNumber(apiEmployee.phone);
+    const rawPending = (apiEmployee as unknown as { pending_evaluations_count?: number | string }).pending_evaluations_count;
+    const pendingEvaluationsCount = typeof rawPending === 'number'
+      ? rawPending
+      : (rawPending !== undefined && rawPending !== null && String(rawPending).trim() !== '' ? Number(rawPending) : 0);
     
     return {
       id: apiEmployee.employee_id,
@@ -523,6 +529,7 @@ const EmployeeList = () => {
       countryCode: normalizeCountryCodeValue(apiEmployee.country_code || countryCode),
       warnings: apiEmployee.warnings || [],
       warningsCount: apiEmployee.warnings_count || 0,
+      pendingEvaluationsCount: Number.isFinite(pendingEvaluationsCount) ? pendingEvaluationsCount : 0,
       avatar: apiEmployee.avatar || '/placeholder.svg',
       department: apiEmployee.department && apiEmployee.department.length > 0 ? (Array.isArray(apiEmployee.department) ? apiEmployee.department.join(', ') : apiEmployee.department) : '',
       position: apiEmployee.position,
@@ -1300,6 +1307,7 @@ const EmployeeList = () => {
     setSearchTerm('');
     setSelectedDepartment('all');
     setSelectedCompany('all');
+    setSelectedEvaluationState('all');
   };
 
 
@@ -1310,7 +1318,11 @@ const EmployeeList = () => {
                         employee.department.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDepartment = selectedDepartment === 'all' || employee.department === selectedDepartment;
     const matchesCompany = selectedCompany === 'all' || employee.companyName === selectedCompany;
-    return matchesSearch && matchesDepartment && matchesCompany;
+    const matchesEvaluationState =
+      selectedEvaluationState === 'all' ||
+      (selectedEvaluationState === 'pending' && employee.pendingEvaluationsCount > 0) ||
+      (selectedEvaluationState === 'can-start' && employee.pendingEvaluationsCount === 0);
+    return matchesSearch && matchesDepartment && matchesCompany && matchesEvaluationState;
   });
 
   const displayEmployees = React.useMemo(() => {
@@ -1894,6 +1906,19 @@ const EmployeeList = () => {
               ))}
             </SelectContent>
           </Select>
+          <Select
+            value={selectedEvaluationState}
+            onValueChange={(v) => setSelectedEvaluationState(v as 'all' | 'pending' | 'can-start')}
+          >
+            <SelectTrigger className="w-[220px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Evaluation States</SelectItem>
+              <SelectItem value="pending">Pending Evaluations</SelectItem>
+              <SelectItem value="can-start">Start Evaluation</SelectItem>
+            </SelectContent>
+          </Select>
           <Button variant="outline" onClick={clearFilters}>
             <X className="h-4 w-4 mr-2" />
             Clear
@@ -1958,6 +1983,16 @@ const EmployeeList = () => {
                     <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700">
                       {employee.managerialLevel}
                     </Badge>
+                    {employee.pendingEvaluationsCount > 0 ? (
+                      <Badge variant="secondary" className="text-xs bg-amber-50 text-amber-800">
+                        Pending evaluations ({employee.pendingEvaluationsCount})
+                      </Badge>
+                    ) 
+                    : (
+                      <Badge variant="secondary" className="text-xs bg-emerald-50 text-emerald-800">
+                         start evaluation
+                      </Badge>
+                    )}
                     {employee.warningsCount > 0 && (
                         <div className="relative group">
                           {/* Compact glow effect */}
