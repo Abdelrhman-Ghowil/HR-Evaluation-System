@@ -31,6 +31,8 @@ interface Employee {
   warnings: string[];
   warningsCount: number;
   pendingEvaluationsCount: number;
+  pending_evaluations_count_mid: string;
+  pending_evaluations_count_end: string;
   avatar: string;
   department: string;
   position: string;
@@ -59,7 +61,7 @@ const EmployeeList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [selectedCompany, setSelectedCompany] = useState('all');
-  const [selectedEvaluationState, setSelectedEvaluationState] = useState<'all' | 'pending' | 'can-start'>('all');
+  const [selectedEvaluationState, setSelectedEvaluationState] = useState<'all' | 'pending' | 'pending-mid' | 'pending-end' | 'can-start'>('all');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<ApiDepartment[]>([]);
@@ -514,10 +516,51 @@ const EmployeeList = () => {
   // Transform API employee data to local Employee interface
   const transformApiEmployee = (apiEmployee: ApiEmployee): Employee => {
     const { countryCode, phone } = parsePhoneNumber(apiEmployee.phone);
+    const toCount = (value: unknown): number => {
+      if (value === undefined || value === null) return 0;
+      if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+      const s = String(value).trim();
+      if (!s) return 0;
+      const n = Number(s);
+      if (Number.isFinite(n)) return n;
+      const m = s.match(/(\d+)/);
+      if (m) {
+        const d = Number(m[1]);
+        return Number.isFinite(d) ? d : 0;
+      }
+      return 0;
+    };
+
+    const toPendingLabel = (value: unknown, label: 'Mid' | 'End'): { count: number; formatted: string } => {
+      if (value === undefined || value === null) return { count: 0, formatted: `0-${label}` };
+      if (typeof value === 'number') {
+        const count = Number.isFinite(value) ? value : 0;
+        return { count, formatted: `${count}-${label}` };
+      }
+      const s = String(value).trim();
+      if (!s) return { count: 0, formatted: `0-${label}` };
+      const match = s.match(/^(\d+)\s*-\s*(Mid|End)\s*$/i);
+      if (match) {
+        const count = Number(match[1]);
+        return { count: Number.isFinite(count) ? count : 0, formatted: `${match[1]}-${label}` };
+      }
+      const count = toCount(s);
+      return { count, formatted: `${count}-${label}` };
+    };
+
     const rawPending = (apiEmployee as unknown as { pending_evaluations_count?: number | string }).pending_evaluations_count;
-    const pendingEvaluationsCount = typeof rawPending === 'number'
-      ? rawPending
-      : (rawPending !== undefined && rawPending !== null && String(rawPending).trim() !== '' ? Number(rawPending) : 0);
+    const rawPendingMid = (apiEmployee as unknown as { pending_evaluations_count_mid?: number | string }).pending_evaluations_count_mid;
+    const rawPendingEnd = (apiEmployee as unknown as { pending_evaluations_count_end?: number | string }).pending_evaluations_count_end;
+
+    const pendingMid = toPendingLabel(rawPendingMid, 'Mid');
+    const pendingEnd = toPendingLabel(rawPendingEnd, 'End');
+    const pendingMidCount = pendingMid.count;
+    const pendingEndCount = pendingEnd.count;
+    const hasTotalPending = rawPending !== undefined && rawPending !== null && String(rawPending).trim() !== '';
+    const pendingEvaluationsCount = hasTotalPending ? toCount(rawPending) : (pendingMidCount + pendingEndCount);
+
+    const pending_evaluations_count_mid = pendingMid.formatted;
+    const pending_evaluations_count_end = pendingEnd.formatted;
     
     return {
       id: apiEmployee.employee_id,
@@ -530,6 +573,8 @@ const EmployeeList = () => {
       warnings: apiEmployee.warnings || [],
       warningsCount: apiEmployee.warnings_count || 0,
       pendingEvaluationsCount: Number.isFinite(pendingEvaluationsCount) ? pendingEvaluationsCount : 0,
+      pending_evaluations_count_mid,
+      pending_evaluations_count_end,
       avatar: apiEmployee.avatar || '/placeholder.svg',
       department: apiEmployee.department && apiEmployee.department.length > 0 ? (Array.isArray(apiEmployee.department) ? apiEmployee.department.join(', ') : apiEmployee.department) : '',
       position: apiEmployee.position,
@@ -1318,9 +1363,20 @@ const EmployeeList = () => {
                         employee.department.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDepartment = selectedDepartment === 'all' || employee.department === selectedDepartment;
     const matchesCompany = selectedCompany === 'all' || employee.companyName === selectedCompany;
+    const pendingCountFromLabel = (labelValue: string | undefined): number => {
+      if (!labelValue) return 0;
+      const m = String(labelValue).match(/(\d+)/);
+      if (!m) return 0;
+      const n = Number(m[1]);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const midPendingCount = pendingCountFromLabel(employee.pending_evaluations_count_mid);
+    const endPendingCount = pendingCountFromLabel(employee.pending_evaluations_count_end);
     const matchesEvaluationState =
       selectedEvaluationState === 'all' ||
       (selectedEvaluationState === 'pending' && employee.pendingEvaluationsCount > 0) ||
+      (selectedEvaluationState === 'pending-mid' && midPendingCount > 0) ||
+      (selectedEvaluationState === 'pending-end' && endPendingCount > 0) ||
       (selectedEvaluationState === 'can-start' && employee.pendingEvaluationsCount === 0);
     return matchesSearch && matchesDepartment && matchesCompany && matchesEvaluationState;
   });
@@ -1908,7 +1964,7 @@ const EmployeeList = () => {
           </Select>
           <Select
             value={selectedEvaluationState}
-            onValueChange={(v) => setSelectedEvaluationState(v as 'all' | 'pending' | 'can-start')}
+            onValueChange={(v) => setSelectedEvaluationState(v as 'all' | 'pending' | 'pending-mid' | 'pending-end' | 'can-start')}
           >
             <SelectTrigger className="w-[220px]">
               <SelectValue />
@@ -1916,6 +1972,8 @@ const EmployeeList = () => {
             <SelectContent>
               <SelectItem value="all">All Evaluation States</SelectItem>
               <SelectItem value="pending">Pending Evaluations</SelectItem>
+              <SelectItem value="pending-mid">Mid Pending Evaluations</SelectItem>
+              <SelectItem value="pending-end">End Pending Evaluations</SelectItem>
               <SelectItem value="can-start">Start Evaluation</SelectItem>
             </SelectContent>
           </Select>
@@ -1992,6 +2050,20 @@ const EmployeeList = () => {
                       <Badge variant="secondary" className="text-xs bg-emerald-50 text-emerald-800">
                          start evaluation
                       </Badge>
+                    )}
+                    {employee.pendingEvaluationsCount > 0 && (
+                      <>
+                        {!employee.pending_evaluations_count_mid.startsWith('0-') && (
+                          <Badge variant="secondary" className="text-xs bg-sky-50 text-sky-800">
+                            {employee.pending_evaluations_count_mid}
+                          </Badge>
+                        )}
+                        {!employee.pending_evaluations_count_end.startsWith('0-') && (
+                          <Badge variant="secondary" className="text-xs bg-indigo-50 text-indigo-800">
+                            {employee.pending_evaluations_count_end}
+                          </Badge>
+                        )}
+                      </>
                     )}
                     {employee.warningsCount > 0 && (
                         <div className="relative group">
