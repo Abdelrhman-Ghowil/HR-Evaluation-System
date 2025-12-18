@@ -126,6 +126,12 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
       input.value = 'Password123';
     }
   };
+  const handleUseDefaultEditPassword = () => {
+    const input = document.getElementById('password') as HTMLInputElement | null;
+    if (input) {
+      input.value = 'Password123';
+    }
+  };
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -794,9 +800,18 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                          )}
                        </Button>
                      </div>
-                      {editValidationErrors.password && (
-                        <p className="text-sm text-red-500">{editValidationErrors.password}</p>
-                      )}
+                     {editValidationErrors.password && (
+                       <p className="text-sm text-red-500">{editValidationErrors.password}</p>
+                     )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={handleUseDefaultEditPassword}
+                      >
+                        Use Default Password
+                      </Button>
                    </div>
                   </div>
                 </div>

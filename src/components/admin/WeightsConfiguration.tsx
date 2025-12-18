@@ -18,7 +18,8 @@ interface WeightsConfigurationProps {
 const LEVEL_LABELS: Record<WeightsConfigurationLevel, string> = {
   IC: 'Individual Contributor',
   SUPERVISORY: 'Supervisory',
-  MIDDLE: 'Middle Management'
+  MIDDLE: 'Middle Management',
+  EXECUTIVE: 'Executive Level'
 };
 
 const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) => {

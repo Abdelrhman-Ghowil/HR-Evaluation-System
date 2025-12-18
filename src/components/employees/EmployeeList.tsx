@@ -34,7 +34,7 @@ interface Employee {
   department: string;
   position: string;
   role: 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP';
-  managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management';
+  managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management' | 'Executive';
   status: 'Active' | 'Inactive';
   companyName: string;
   orgPath: string;
@@ -527,7 +527,7 @@ const EmployeeList = () => {
       department: apiEmployee.department && apiEmployee.department.length > 0 ? (Array.isArray(apiEmployee.department) ? apiEmployee.department.join(', ') : apiEmployee.department) : '',
       position: apiEmployee.position,
       role: apiEmployee.role as 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP',
-      managerialLevel: apiEmployee.managerial_level as 'Individual Contributor' | 'Supervisory' | 'Middle Management',
+      managerialLevel: apiEmployee.managerial_level as 'Individual Contributor' | 'Supervisory' | 'Middle Management' | 'Executive',
       status: apiEmployee.status as 'Active' | 'Inactive',
       companyName: apiEmployee.company_name,
       orgPath: apiEmployee.org_path || '',
@@ -1650,6 +1650,7 @@ const EmployeeList = () => {
                       <SelectContent>
                         <SelectItem value="Supervisory">Supervisory</SelectItem>
                         <SelectItem value="Middle Management">Middle Management</SelectItem>
+                        <SelectItem value="Executive">Executive</SelectItem>
                         <SelectItem value="Individual Contributor">Individual Contributor</SelectItem>
                       </SelectContent>
                     </Select>
@@ -2210,13 +2211,14 @@ const EmployeeList = () => {
                     <Label htmlFor="edit-managerialLevel" className="text-sm font-medium">Managerial Level *</Label>
                     <Select 
                       value={editingEmployee.managerialLevel}
-                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, managerialLevel: value as 'Individual Contributor' | 'Supervisory' | 'Middle Management' } : null)}>
+                      onValueChange={(value) => setEditingEmployee(prev => prev ? { ...prev, managerialLevel: value as 'Individual Contributor' | 'Supervisory' | 'Middle Management' | 'Executive' } : null)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select managerial weight" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Supervisory">Supervisory</SelectItem>
                         <SelectItem value="Middle Management">Middle Management</SelectItem>
+                        <SelectItem value="Executive">Executive</SelectItem>
                         <SelectItem value="Individual Contributor">Individual Contributor</SelectItem>
                       </SelectContent>
                     </Select>

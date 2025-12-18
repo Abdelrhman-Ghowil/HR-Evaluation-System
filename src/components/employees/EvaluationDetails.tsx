@@ -132,7 +132,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
 
   const MIN_OBJECTIVES = 4;
   const MAX_OBJECTIVES = 6;
-  const objectiveWeightPresets = [10, 15, 20, 25, 30, 35, 40];
 
   const toPercent = (w: number): number => (w <= 1 ? w * 100 : w);
   const usedPercentExcludingCurrent = objectives.reduce((sum, obj) => {
@@ -1397,45 +1396,21 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   Weight (%) 10–40
                   <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={(() => {
-                    const maxSelectable = Math.max(10, allowedMaxWeightPercent);
-                    const raw = typeof objectiveForm.weight === 'number' ? objectiveForm.weight : Number(objectiveForm.weight);
-                    const safe = Number.isFinite(raw) ? raw : 10;
-                    const clamped = Math.max(10, Math.min(maxSelectable, safe));
-                    return String(clamped);
-                  })()}
-                  onValueChange={(value) => {
-                    const v = parseFloat(value);
-                    setObjectiveForm(prev => ({ ...prev, weight: Number.isFinite(v) ? v : 10 }));
+                <Input
+                  id="weight"
+                  type="number"
+                  min={10}
+                  max={Math.max(10, allowedMaxWeightPercent)}
+                  step={1}
+                  value={typeof objectiveForm.weight === 'number' ? objectiveForm.weight : (objectiveForm.weight ?? '')}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const v = raw === '' ? NaN : parseFloat(raw);
+                    setObjectiveForm(prev => ({ ...prev, weight: Number.isFinite(v) ? v : undefined }));
                   }}
                   disabled={allowedMaxWeightPercent < 10}
-                >
-                  <SelectTrigger
-                    id="weight"
-                    className={`transition-all duration-200 ${objectiveErrors.weight ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
-                  >
-                    <SelectValue placeholder="Select weight" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(() => {
-                      const maxSelectable = Math.max(10, allowedMaxWeightPercent);
-                      const base = objectiveWeightPresets.filter(w => w <= maxSelectable);
-                      const raw = typeof objectiveForm.weight === 'number' ? objectiveForm.weight : Number(objectiveForm.weight);
-                      const safe = Number.isFinite(raw) ? raw : 10;
-                      const clamped = Math.max(10, Math.min(maxSelectable, safe));
-
-                      const all = base.some(w => w === clamped) ? base : [clamped, ...base];
-                      const unique = Array.from(new Set(all.map(n => Number(n))));
-                      unique.sort((a, b) => a - b);
-                      return unique;
-                    })().map((w) => (
-                      <SelectItem key={String(w)} value={String(w)}>
-                        {String(w)}%
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  className={`transition-all duration-200 ${objectiveErrors.weight ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
+                />
                 <p className="text-xs text-gray-500">Remaining: {remainingPercent}% • Max allowed: {Math.max(10, allowedMaxWeightPercent)}%</p>
                 {objectiveErrors.weight && (
                   <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
