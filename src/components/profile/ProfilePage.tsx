@@ -481,16 +481,30 @@ const ProfilePage: React.FC = () => {
   // Handle evaluation card click
   const handleEvaluationClick = async (evaluation: ApiEvaluation) => {
     try {
+      const evaluationId = evaluation.evaluation_id || evaluation.id;
+
       // Set the selected evaluation for the panel
       setSelectedEvaluationForPanel(evaluation);
       setShowEvaluationPanel(true);
 
       console.log('evaluation:',evaluation);
 
+      try {
+        const detailed = await apiService.getEvaluation(evaluationId);
+        if (detailed) {
+          setSelectedEvaluationForPanel((prev) => {
+            if (!prev) return prev;
+            const prevId = (prev as unknown as { evaluation_id?: string; id?: string }).evaluation_id || (prev as unknown as { evaluation_id?: string; id?: string }).id;
+            if (String(prevId) !== String(evaluationId)) return prev;
+            return detailed;
+          });
+        }
+      } catch {}
+
       // Fetch objectives
       setIsLoadingObjectives(true);
       try {
-        const objectivesData = await apiService.getObjectives(evaluation.evaluation_id );
+        const objectivesData = await apiService.getObjectives(evaluationId);
         setObjectives(objectivesData || []);
       } catch (err) {
         console.error('Error fetching objectives:', err);
@@ -502,7 +516,7 @@ const ProfilePage: React.FC = () => {
       // Fetch competencies
       setIsLoadingCompetencies(true);
       try {
-        const competenciesData = await apiService.getCompetencies(evaluation.evaluation_id || evaluation.id);
+        const competenciesData = await apiService.getCompetencies(evaluationId);
         setCompetencies(competenciesData || []);
       } catch (err) {
         console.error('Error fetching competencies:', err);
@@ -566,6 +580,27 @@ const ProfilePage: React.FC = () => {
     }, 0);
     
     return weightedScore;
+  };
+
+  const parseScoreValue = (value: unknown): number | undefined => {
+    if (value === null || value === undefined) return undefined;
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n)) return undefined;
+    return n;
+  };
+
+  const getDisplayedObjectivesScore = (): number => {
+    const hasEdits = Object.keys(objectiveEdits).length > 0;
+    if (hasEdits) return getOverallObjectiveScore();
+    const fromResponse = parseScoreValue((selectedEvaluationForPanel as unknown as { objectives_score?: unknown } | null)?.objectives_score);
+    return fromResponse ?? getOverallObjectiveScore();
+  };
+
+  const getDisplayedCompetenciesScore = (): number => {
+    const hasEdits = Object.keys(competencyEdits).length > 0;
+    if (hasEdits) return getOverallCompetencyScore();
+    const fromResponse = parseScoreValue((selectedEvaluationForPanel as unknown as { competencies_score?: unknown } | null)?.competencies_score);
+    return fromResponse ?? getOverallCompetencyScore();
   };
 
   const getOverallObjectiveScoreForList = (list: ApiObjective[]): number => {
@@ -2082,11 +2117,11 @@ const ProfilePage: React.FC = () => {
                       <p className="text-sm text-gray-600">Period: {selectedEvaluationForPanel.period}</p>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{getOverallObjectiveScore().toFixed(1)}%</div>
+                      <div className="text-2xl font-bold text-blue-600">{getDisplayedObjectivesScore().toFixed(1)}%</div>
                       <div className="text-sm text-gray-600">Objectives Score</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{getOverallCompetencyScore().toFixed(1)}%</div>
+                      <div className="text-2xl font-bold text-green-600">{getDisplayedCompetenciesScore().toFixed(1)}%</div>
                       <div className="text-sm text-gray-600">Competencies Score</div>
                     </div>
                   </div>

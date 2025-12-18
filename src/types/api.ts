@@ -483,7 +483,7 @@ export interface EvaluationQueryParams {
 }
 
 // Weights Configuration Types
-export type WeightsConfigurationLevel = 'IC' | 'SUPERVISORY' | 'MIDDLE';
+export type WeightsConfigurationLevel = 'IC' | 'SUPERVISORY' | 'MIDDLE' | 'EXECUTIVE';
 
 export interface WeightsConfiguration {
   level_name: string;
