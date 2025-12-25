@@ -479,7 +479,7 @@ export interface EvaluationQueryParams {
   employee_id?: string;
   user_id?: string;
   type?: EvaluationType;
-  status?: EvaluationStatus;
+  status?: EvaluationStatus | EvaluationStatus[];
   period?: string;
 }
 

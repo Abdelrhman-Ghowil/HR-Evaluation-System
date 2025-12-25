@@ -34,6 +34,7 @@ import { useUsers, queryKeys } from '../../hooks/useApi';
 import { ApiUser, UserRole, CreateUserRequest, ApiError } from '../../types/api';
 import { apiService } from '../../services/api';
 import { useQueryClient } from '@tanstack/react-query';
+import { buildUsernameBaseFromName, generateUniqueUsernameFromName } from '@/utils/dataTransformers';
 
 interface User {
   id: string;
@@ -64,47 +65,6 @@ interface UserManagementProps {
 const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
   const lastGeneratedEditUsernameRef = useRef<string>('');
   const lastGeneratedCreateUsernameRef = useRef<string>('');
-  const generateUsername = (fullName: string) => {
-    const cleanName = fullName.trim().replace(/\s+/g, ' ');
-    if (!cleanName) return '';
-    const parts = cleanName.split(' ').filter(p => p.length > 0);
-    let username = '';
-    if (parts.length === 1) {
-      username = parts[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-    } else if (parts.length === 2) {
-      const firstInitial = parts[0].charAt(0).toLowerCase();
-      const cleanLast = parts[1].toLowerCase().replace(/[^a-z0-9]/g, '');
-      username = firstInitial + cleanLast;
-    } else {
-      const firstInitial = parts[0].charAt(0).toLowerCase();
-      const lastFirstWord = parts[1].toLowerCase().replace(/[^a-z0-9]/g, '');
-      username = firstInitial + lastFirstWord;
-    }
-    if (username.length < 2) {
-      username = parts[0].toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
-    }
-    return username.substring(0, 20);
-  };
-  const handleEditNameChange = (fullName: string) => {
-    const generated = generateUsername(fullName);
-    const input = document.getElementById('username') as HTMLInputElement | null;
-    if (input) {
-      if (input.value.trim() === '' || input.value === lastGeneratedEditUsernameRef.current) {
-        input.value = generated;
-        lastGeneratedEditUsernameRef.current = generated;
-      }
-    }
-  };
-  const handleCreateNameChange = (fullName: string) => {
-    const generated = generateUsername(fullName);
-    const input = document.getElementById('new-username') as HTMLInputElement | null;
-    if (input) {
-      if (input.value.trim() === '' || input.value === lastGeneratedCreateUsernameRef.current) {
-        input.value = generated;
-        lastGeneratedCreateUsernameRef.current = generated;
-      }
-    }
-  };
   const mapRoleInputToApiRole = (value: string): UserRole => {
     switch (value) {
       case 'Admin':
@@ -216,6 +176,51 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     return apiUsers.map(transformApiUserToUser);
   }, [apiUsers]);
 
+  const sanitizeUsername = (value: string): string => (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const getExistingUsernames = (excludeUsername?: string) => {
+    const existing = new Set(users.map((u) => sanitizeUsername(u.username)).filter(Boolean));
+    if (excludeUsername) existing.delete(sanitizeUsername(excludeUsername));
+    return existing;
+  };
+
+  const handleEditNameChange = (fullName: string) => {
+    const input = document.getElementById('username') as HTMLInputElement | null;
+    if (!input) return;
+
+    const trimmedName = fullName.trim();
+    if (!trimmedName) {
+      input.value = '';
+      lastGeneratedEditUsernameRef.current = '';
+      return;
+    }
+
+    const existing = getExistingUsernames(selectedUser?.username);
+    const suffix = sanitizeUsername(input.value).match(/(\d{2})$/)?.[1];
+    const preferred = suffix ? `${buildUsernameBaseFromName(fullName)}${suffix}` : undefined;
+    const generated = generateUniqueUsernameFromName(fullName, existing, preferred);
+    input.value = generated;
+    lastGeneratedEditUsernameRef.current = generated;
+  };
+
+  const handleCreateNameChange = (fullName: string) => {
+    const input = document.getElementById('new-username') as HTMLInputElement | null;
+    if (!input) return;
+
+    const trimmedName = fullName.trim();
+    if (!trimmedName) {
+      input.value = '';
+      lastGeneratedCreateUsernameRef.current = '';
+      return;
+    }
+
+    const existing = getExistingUsernames();
+    const suffix = sanitizeUsername(input.value).match(/(\d{2})$/)?.[1];
+    const preferred = suffix ? `${buildUsernameBaseFromName(fullName)}${suffix}` : undefined;
+    const generated = generateUniqueUsernameFromName(fullName, existing, preferred);
+    input.value = generated;
+    lastGeneratedCreateUsernameRef.current = generated;
+  };
+
   const permissions: Permission[] = [
     { id: 'user_management', name: 'User Management', description: 'Create, edit, and delete users', category: 'users' },
     { id: 'system_settings', name: 'System Settings', description: 'Access system configuration', category: 'settings' },
@@ -286,6 +291,15 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
       const phoneInput = document.getElementById('phone') as HTMLInputElement;
       const positionInput = document.getElementById('position') as HTMLInputElement;
       const passwordInput = document.getElementById('password') as HTMLInputElement;
+
+      const nameValue = nameInput?.value || user.name;
+      const existing = getExistingUsernames(user.username);
+      const normalizedUsername = nameValue.trim()
+        ? generateUniqueUsernameFromName(nameValue, existing, sanitizeUsername(usernameInput?.value || user.username))
+        : '';
+      if (usernameInput) usernameInput.value = normalizedUsername;
+      lastGeneratedEditUsernameRef.current = normalizedUsername;
+
       // PATCH request with form data - matching API payload structure
       const updateData: {
         username?: string;
@@ -297,14 +311,18 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
         title?: string;
         avatar?: string;
       } = {
-        username: usernameInput?.value || user.username,
+        username: user.username,
         email: emailInput?.value || user.email,
-        name: nameInput?.value || user.name,
+        name: nameValue,
         phone: phoneInput?.value || user.phone,
         role: selectedRole as UserRole || user.role,
         title: positionInput?.value || user.position,
         avatar: user.avatar || ""
       };
+
+      if (normalizedUsername && normalizedUsername !== sanitizeUsername(user.username)) {
+        updateData.username = normalizedUsername;
+      }
       
       // Only include password if it's provided
       if (passwordInput?.value && passwordInput.value.trim() !== '') {
@@ -421,6 +439,15 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
         alert('Please fill in all required fields (Name, Username, Email, Password)');
         return;
       }
+
+      const existing = getExistingUsernames();
+      const normalizedUsername = generateUniqueUsernameFromName(
+        nameInput.value,
+        existing,
+        sanitizeUsername(usernameInput.value)
+      );
+      usernameInput.value = normalizedUsername;
+      lastGeneratedCreateUsernameRef.current = normalizedUsername;
       
       // Derive first and last name from full name
       const cleanName = nameInput.value.trim().replace(/\s+/g, ' ');
@@ -430,7 +457,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
 
       // Create user data payload matching API structure
       const createData: CreateUserRequest = {
-        username: usernameInput.value,
+        username: normalizedUsername,
         email: emailInput.value,
         password: passwordInput.value,
         first_name,

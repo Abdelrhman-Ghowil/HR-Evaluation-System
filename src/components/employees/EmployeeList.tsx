@@ -15,7 +15,7 @@ import EmployeeDetails from './EmployeeDetails';
 import { apiService } from '@/services/api';
 import { useEmployees } from '@/hooks/useApi';
 import { ApiEmployee, ApiDepartment, ApiCompany, CreateEmployeeRequest, ImportResponse, ApiError } from '@/types/api';
-import { parsePhoneNumber, formatDate } from '@/utils/dataTransformers';
+import { buildUsernameBaseFromName, generateUniqueUsernameFromName, parsePhoneNumber, formatDate } from '@/utils/dataTransformers';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,6 +25,7 @@ interface Employee {
   employee_id: string;
   employeeCode: string;
   name: string;
+  username: string;
   email: string;
   phone: string;
   countryCode: string;
@@ -56,6 +57,7 @@ const EmployeeList = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const lastGeneratedCreateUsernameRef = React.useRef<string>('');
   const canImport = user?.role === 'admin' || user?.role === 'hr';
   const canAddEmployee = user?.role === 'admin' || user?.role === 'hr';
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,6 +68,7 @@ const EmployeeList = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<ApiDepartment[]>([]);
   const [companies, setCompanies] = useState<ApiCompany[]>([]);
+  const [isFetchingCompanies, setIsFetchingCompanies] = useState(false);
   const [loading, setLoading] = useState(true);
   const [autoRefreshing, setAutoRefreshing] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -105,11 +108,12 @@ const EmployeeList = () => {
     location: '',
     branch: 'Office',
     gender: '',
-    username: '',
-    password: 'Password123',
-    firstName: '',
-    lastName: ''
-  });
+          username: '',
+          password: 'Password123',
+          firstName: '',
+          lastName: ''
+        });
+        lastGeneratedCreateUsernameRef.current = '';
 
   // Import functionality state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -433,6 +437,7 @@ const EmployeeList = () => {
       firstName: '',
       lastName: ''
     });
+    lastGeneratedCreateUsernameRef.current = '';
     setValidationErrors({});
   };
 
@@ -442,7 +447,7 @@ const EmployeeList = () => {
     const cleanName = fullName.trim().replace(/\s+/g, ' ');
     
     if (!cleanName) {
-      return { firstName: '', lastName: '', username: '' };
+      return { firstName: '', lastName: '' };
     }
 
     // Split the name into parts
@@ -450,55 +455,51 @@ const EmployeeList = () => {
     
     let firstName = '';
     let lastName = '';
-    let username = '';
 
     if (nameParts.length === 1) {
       // Single word name - use as first name
       firstName = nameParts[0];
       lastName = '';
-      // Generate username from first name only
-      username = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
     } else if (nameParts.length === 2) {
       // Two words - first and last name
       firstName = nameParts[0];
       lastName = nameParts[1];
-      // Generate username: first initial + last name
-      const firstInitial = firstName.charAt(0).toLowerCase();
-      const cleanLastName = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      username = firstInitial + cleanLastName;
     } else {
       // Multiple words - first word as first name, rest as last name
       firstName = nameParts[0];
       lastName = nameParts.slice(1).join(' ');
-      // Generate username: first initial + first word of last name
-      const firstInitial = firstName.charAt(0).toLowerCase();
-      const lastNameFirstWord = nameParts[1].toLowerCase().replace(/[^a-z0-9]/g, '');
-      username = firstInitial + lastNameFirstWord;
     }
-
-    // Ensure username is not empty and has reasonable length
-    if (username.length < 2) {
-      username = firstName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8);
-    }
-    
-    // Limit username length to 20 characters
-    username = username.substring(0, 20);
-
-    return { firstName, lastName, username };
+    return { firstName, lastName };
   };
 
   // Handle name input change with auto-population
   const handleNameChange = (fullName: string) => {
-    const { firstName, lastName, username } = processFullName(fullName);
-    
-    setNewEmployee(prev => ({
-      ...prev,
-      name: fullName,
-      // Only auto-populate if fields are empty or were previously auto-populated
-      firstName: prev.firstName === '' || prev.firstName === processFullName(prev.name).firstName ? firstName : prev.firstName,
-      lastName: prev.lastName === '' || prev.lastName === processFullName(prev.name).lastName ? lastName : prev.lastName,
-      username: prev.username === '' || prev.username === processFullName(prev.name).username ? username : prev.username
-    }));
+    const { firstName, lastName } = processFullName(fullName);
+
+    setNewEmployee((prev) => {
+      const existingUsernames = new Set(
+        employees.map((e) => (e.username || '').toLowerCase()).filter(Boolean)
+      );
+
+      const trimmedName = fullName.trim();
+      const prevSuffix = (prev.username || '').toLowerCase().match(/(\d{2})$/)?.[1];
+      const preferredUsername = trimmedName && prevSuffix
+        ? `${buildUsernameBaseFromName(fullName)}${prevSuffix}`
+        : undefined;
+      const generatedUsername = trimmedName
+        ? generateUniqueUsernameFromName(fullName, existingUsernames, preferredUsername)
+        : '';
+
+      lastGeneratedCreateUsernameRef.current = generatedUsername;
+
+      return {
+        ...prev,
+        name: fullName,
+        firstName,
+        lastName,
+        username: generatedUsername
+      };
+    });
   };
 
 
@@ -511,6 +512,19 @@ const EmployeeList = () => {
     const val = String(code).trim();
     if (val === '966.0'||val === '966') return '+966';
     return val;
+  };
+
+  const normalizeEmployeeCodeValue = (value: unknown): string => {
+    const s = String(value ?? '').trim();
+    if (!s) return '';
+    if (/^\d+\.$/.test(s)) return s.slice(0, -1);
+    if (/^\d+\.0+$/.test(s)) return s.split('.')[0];
+    if (/^\d+(\.0+)?$/.test(s)) return s.split('.')[0];
+    if (/^\d+(\.\d+)?e[+-]?\d+$/i.test(s)) {
+      const n = Number(s);
+      if (Number.isFinite(n) && Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+    }
+    return s;
   };
 
   // Transform API employee data to local Employee interface
@@ -565,8 +579,9 @@ const EmployeeList = () => {
     return {
       id: apiEmployee.employee_id,
       employee_id: apiEmployee.employee_id,
-      employeeCode: apiEmployee.employee_code,
+      employeeCode: normalizeEmployeeCodeValue(apiEmployee.employee_code),
       name: apiEmployee.name,
+      username: apiEmployee.username,
       email: apiEmployee.email,
       phone: phone,
       countryCode: normalizeCountryCodeValue(apiEmployee.country_code || countryCode),
@@ -775,7 +790,9 @@ const EmployeeList = () => {
 
   // Fetch companies from API
   const fetchCompanies = async () => {
+    if (isFetchingCompanies) return;
     try {
+      setIsFetchingCompanies(true);
       console.log('Fetching companies from API...');
       const response = await apiService.getCompanies();
       console.log('Companies API Response:', response);
@@ -788,6 +805,8 @@ const EmployeeList = () => {
       }
     } catch (error) {
       console.error('Error fetching companies:', error);
+    } finally {
+      setIsFetchingCompanies(false);
     }
   };
 
@@ -978,11 +997,6 @@ const EmployeeList = () => {
           userDataChanges.email = editingEmployee.email;
         }
         
-        // Only include username if email has changed (generate from new email)
-        if (editingEmployee.email !== originalEmployee.email) {
-          userDataChanges.username = editingEmployee.email.split('@')[0];
-        }
-        
         // Check other user_data fields
         if (editingEmployee.role !== originalEmployee.role) {
           userDataChanges.role = editingEmployee.role;
@@ -994,6 +1008,18 @@ const EmployeeList = () => {
           const nameParts = editingEmployee.name.split(' ');
           userDataChanges.first_name = nameParts[0] || '';
           userDataChanges.last_name = nameParts.slice(1).join(' ') || '';
+
+          const existingUsernames = new Set(
+            employees.map((e) => (e.username || '').toLowerCase()).filter(Boolean)
+          );
+          if (originalEmployee.username) {
+            existingUsernames.delete(originalEmployee.username.toLowerCase());
+          }
+          userDataChanges.username = generateUniqueUsernameFromName(
+            editingEmployee.name,
+            existingUsernames,
+            originalEmployee.username
+          );
         }
         
         
@@ -1052,7 +1078,7 @@ const EmployeeList = () => {
         
         // Check new employee fields
         if (editingEmployee.employeeCode !== originalEmployee.employeeCode) {
-          updateData.employee_code = editingEmployee.employeeCode;
+          updateData.employee_code = normalizeEmployeeCodeValue(editingEmployee.employeeCode);
         }
         
         if (editingEmployee.directManager !== originalEmployee.directManager) {
@@ -1209,8 +1235,11 @@ const EmployeeList = () => {
       try {
         setCreateError(null);
         setIsCreating(true);
-        // Generate username from name if not provided
-        const username = newEmployee.username || newEmployee.name.toLowerCase().replace(/\s+/g, '');
+        const existingUsernames = new Set(
+          employees.map((e) => (e.username || '').toLowerCase()).filter(Boolean)
+        );
+        const username = generateUniqueUsernameFromName(newEmployee.name, existingUsernames, newEmployee.username);
+        lastGeneratedCreateUsernameRef.current = username;
         
         // Split name into first and last name if not provided
         const nameParts = newEmployee.name.split(' ');
@@ -1238,7 +1267,7 @@ const EmployeeList = () => {
           managerial_level: newEmployee.managerialLevel,
           status: newEmployee.status,
           join_date: newEmployee.joinDate,
-          employee_code: newEmployee.employeeCode,
+          employee_code: normalizeEmployeeCodeValue(newEmployee.employeeCode),
           country_code: newEmployee.countryCode,
           warnings: newEmployee.warnings,
           warnings_count: newEmployee.warnings_count,
@@ -1586,7 +1615,8 @@ const EmployeeList = () => {
                       <Input
                         id="phone"
                         value={newEmployee.phone || ''}
-                        onChange={(e) => setNewEmployee(prev => ({ ...prev, phone: e.target.value }))}
+                        maxLength={15}
+                        onChange={(e) => setNewEmployee(prev => ({ ...prev, phone: e.target.value.slice(0, 15) }))}
                         placeholder="123-456-7890"
                         className={`flex-1 ${validationErrors.phone ? 'border-red-500' : ''}`}
                       />
@@ -1618,6 +1648,9 @@ const EmployeeList = () => {
                           department: ''
                         }));
                       }}
+                      onOpenChange={(open) => {
+                        if (open && companies.length === 0) void fetchCompanies();
+                      }}
                     >
                       <SelectTrigger id="companyName" className={`w-full ${validationErrors.companyName ? 'border-red-500' : ''}`}>
                         <SelectValue placeholder="Select company" />
@@ -1638,6 +1671,7 @@ const EmployeeList = () => {
                     <Label htmlFor="department" className="text-sm font-medium">Department *</Label>
                     <Select 
                       value={newEmployee.departmentId} 
+                      disabled={!newEmployee.companyId}
                       onValueChange={(value) => {
                         const selectedDept = departments.find(dept => dept.department_id === value);
                         setNewEmployee(prev => ({ 
@@ -1647,11 +1681,19 @@ const EmployeeList = () => {
                         }));
                       }}
                     >
-                      <SelectTrigger id="department" className={`w-full ${validationErrors.department ? 'border-red-500' : ''}`}>
-                        <SelectValue placeholder="Select department" />
+                      <SelectTrigger
+                        id="department"
+                        className={`w-full ${validationErrors.department ? 'border-red-500' : ''}`}
+                        disabled={!newEmployee.companyId}
+                      >
+                        <SelectValue placeholder={newEmployee.companyId ? 'Select department' : 'Select company first'} />
                       </SelectTrigger>
                       <SelectContent>
-                        {departments.length > 0 ? (
+                        {!newEmployee.companyId ? (
+                          <SelectItem value="no-company" disabled>
+                            Select a company first
+                          </SelectItem>
+                        ) : departments.length > 0 ? (
                           departments.map((dept) => (
                             <SelectItem key={dept.department_id} value={dept.department_id}>
                               {dept.name}
@@ -1752,7 +1794,7 @@ const EmployeeList = () => {
                     <Input
                       id="employeeCode"
                       value={newEmployee.employeeCode || ''}
-                      onChange={(e) => setNewEmployee(prev => ({ ...prev, employeeCode: e.target.value }))}
+                      onChange={(e) => setNewEmployee(prev => ({ ...prev, employeeCode: normalizeEmployeeCodeValue(e.target.value) }))}
                       placeholder="Employee ID/Code"
                       className={`w-full ${validationErrors.employeeCode ? 'border-red-500' : ''}`}
                       required
@@ -1949,7 +1991,13 @@ const EmployeeList = () => {
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+          <Select
+            value={selectedCompany}
+            onValueChange={setSelectedCompany}
+            onOpenChange={(open) => {
+              if (open && companies.length === 0) void fetchCompanies();
+            }}
+          >
             <SelectTrigger className="w-[180px]">
               <SelectValue />
             </SelectTrigger>
@@ -2211,7 +2259,8 @@ const EmployeeList = () => {
                       <Input
                         id="edit-phone"
                         value={editingEmployee.phone || ''}
-                        onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, phone: e.target.value } : null)}
+                        maxLength={15}
+                        onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, phone: e.target.value.slice(0, 15) } : null)}
                         placeholder="123-456-7890"
                         className={`flex-1 ${editValidationErrors.phone ? 'border-red-500' : ''}`}
                       />
@@ -2252,6 +2301,9 @@ const EmployeeList = () => {
                           company_id: value,
                           companyName: selectedCompany?.name || ''
                         } : null);
+                      }}
+                      onOpenChange={(open) => {
+                        if (open && companies.length === 0) void fetchCompanies();
                       }}
                     >
                       <SelectTrigger id="edit-companyName" className={`w-full ${editValidationErrors.companyName ? 'border-red-500' : ''}`}>
@@ -2368,7 +2420,7 @@ const EmployeeList = () => {
                     <Input
                       id="edit-employeeCode"
                       value={editingEmployee.employeeCode || ''}
-                      onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, employeeCode: e.target.value } : null)}
+                      onChange={(e) => setEditingEmployee(prev => prev ? { ...prev, employeeCode: normalizeEmployeeCodeValue(e.target.value) } : null)}
                       placeholder="Enter unique employee code"
                       className={`w-full ${editValidationErrors.employeeCode ? 'border-red-500' : ''}`}
                       required
