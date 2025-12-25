@@ -16,6 +16,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { ApiObjective, ApiCompetency } from '../../types/api';
 import { apiService } from '../../services/api';
 import { useObjectives, useCreateObjective, useUpdateObjective, useDeleteObjective, useCompetencies, useCreateCompetency, useUpdateCompetency, useDeleteCompetency, useActivityLog, useCreateActivityLog, useUpdateEvaluation } from '../../hooks/useApi';
+import { formatPercent } from '@/utils/dataTransformers';
 
 interface Employee {
   id: string;
@@ -684,9 +685,9 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 </div>
                 <div className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                   {typeof evaluation.score === 'number'
-                    ? `${evaluation.score.toFixed(1)}%`
+                    ? formatPercent(evaluation.score)
                     : evaluation.score
-                    ? `${Number(evaluation.score).toFixed(1)}%`
+                    ? formatPercent(Number(evaluation.score))
                     : 'N/A'}
                 </div>
                 <div className="text-xs lg:text-sm text-gray-600 font-medium">Overall Score</div>
@@ -698,7 +699,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   <Target className="h-5 w-5 text-green-600 mr-2" />
                 </div>
                 <div className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                  {`${typeof evaluation.objectives_score === 'number' ? evaluation.objectives_score.toFixed(1) : getOverallObjectiveScore()}%`}
+                  {formatPercent(typeof evaluation.objectives_score === 'number' ? evaluation.objectives_score : Number(getOverallObjectiveScore()))}
                 </div>
                 <div className="text-xs lg:text-sm text-gray-600 font-medium">Objectives</div>
               </div>
@@ -709,7 +710,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   <Users className="h-5 w-5 text-purple-600 mr-2" />
                 </div>
                 <div className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
-                  {`${typeof evaluation.competencies_score === 'number' ? evaluation.competencies_score.toFixed(1) : getOverallCompetencyScore()}%`}
+                  {formatPercent(typeof evaluation.competencies_score === 'number' ? evaluation.competencies_score : Number(getOverallCompetencyScore()))}
                 </div>
                 <div className="text-xs lg:text-sm text-gray-600 font-medium">Competencies</div>
               </div>
@@ -891,7 +892,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                             <div className="flex items-center gap-3 lg:flex-col lg:items-end">
                             <div className="text-center lg:text-right">
                               <div className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                                {`${score.toFixed(1)}%`}
+                                {formatPercent(score)}
                               </div>
                               <div className="text-xs text-gray-500 font-medium">Score</div>
                             </div>

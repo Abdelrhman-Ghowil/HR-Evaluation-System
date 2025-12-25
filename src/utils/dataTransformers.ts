@@ -213,3 +213,15 @@ export const generateWhatsAppUrl = (phone: string, countryCode?: string): string
   const code = (countryCode || '+20').replace('+', '');
   return `https://wa.me/${code}${cleanPhone}`;
 };
+
+export const formatPercent = (value: unknown, maxDecimals: number = 1): string => {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return '0%';
+
+  const rounded = Number(n.toFixed(maxDecimals));
+  const isInt = Math.abs(rounded - Math.round(rounded)) < 1e-9;
+  const normalized = isInt ? Math.round(rounded) : rounded;
+
+  const s = isInt ? String(normalized) : normalized.toFixed(maxDecimals).replace(/\.?0+$/, '');
+  return `${s}%`;
+};

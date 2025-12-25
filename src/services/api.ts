@@ -660,9 +660,30 @@ class ApiService {
 
   // Evaluation methods
   async getEvaluations(params?: EvaluationQueryParams): Promise<PaginatedResponse<ApiEvaluation>> {
-    const response: AxiosResponse<PaginatedResponse<ApiEvaluation>> = await this.api.get('/api/evaluations/', {
-      params,
-    });
+    const hasArrayParam = !!params && Object.values(params).some((v) => Array.isArray(v));
+    if (params && hasArrayParam) {
+      const sp = new URLSearchParams();
+      Object.entries(params as Record<string, unknown>).forEach(([k, v]) => {
+        if (v === undefined || v === null) return;
+        if (Array.isArray(v)) {
+          v.forEach((item) => {
+            if (item === undefined || item === null) return;
+            sp.append(k, String(item));
+          });
+          return;
+        }
+        const s = String(v);
+        if (!s) return;
+        sp.append(k, s);
+      });
+      const qs = sp.toString();
+      const response: AxiosResponse<PaginatedResponse<ApiEvaluation>> = await this.api.get(
+        qs ? `/api/evaluations/?${qs}` : '/api/evaluations/'
+      );
+      return response.data;
+    }
+
+    const response: AxiosResponse<PaginatedResponse<ApiEvaluation>> = await this.api.get('/api/evaluations/', { params });
     return response.data;
   }
 

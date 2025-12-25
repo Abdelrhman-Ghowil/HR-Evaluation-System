@@ -50,7 +50,8 @@ import EvaluationDetails from '../employees/EvaluationDetails';
 import { 
   transformEmployeeForEvaluation, 
   transformEvaluationForDetails, 
-  safeTransformData 
+  safeTransformData,
+  formatPercent
 } from '../../utils/dataTransformers';
 import { EvaluationInput } from '../../types/shared';
 
@@ -271,7 +272,7 @@ const ProfilePage: React.FC = () => {
     isLoading: evaluationsQueryLoading,
     error: evaluationsQueryError,
   } = useEvaluations(
-    {  user_id: user?.user_id ,status: 'Approved' },
+    { user_id: user?.user_id, status: ['Approved', 'Completed'] },
     {
       enabled: true,
       refetchOnMount: false,
@@ -2117,11 +2118,11 @@ const ProfilePage: React.FC = () => {
                       <p className="text-sm text-gray-600">Period: {selectedEvaluationForPanel.period}</p>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{getDisplayedObjectivesScore().toFixed(1)}%</div>
+                      <div className="text-2xl font-bold text-blue-600">{formatPercent(getDisplayedObjectivesScore())}</div>
                       <div className="text-sm text-gray-600">Objectives Score</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{getDisplayedCompetenciesScore().toFixed(1)}%</div>
+                      <div className="text-2xl font-bold text-green-600">{formatPercent(getDisplayedCompetenciesScore())}</div>
                       <div className="text-sm text-gray-600">Competencies Score</div>
                     </div>
                   </div>
@@ -2300,7 +2301,7 @@ const ProfilePage: React.FC = () => {
                                     </div>
                                   </div>
                                   <div className="text-right space-y-2">
-                                    <div className="text-lg font-bold text-blue-600">{score.toFixed(1)}%</div>
+                                    <div className="text-lg font-bold text-blue-600">{formatPercent(score)}</div>
                                     <Badge 
                                       variant={objective.status === 'Completed' ? 'default' : 'secondary'}
                                       className={
@@ -2575,16 +2576,10 @@ const ProfilePage: React.FC = () => {
                                         <span className="text-gray-500">Actual:</span>
                                         <span className="font-medium ml-1">{competency.actual_level}/10</span>
                                       </div>
-                                      {!isSelfEvalMode && (
-                                        <div className="text-sm">
-                                          <span className="text-gray-500">Weight:</span>
-                                          <span className="font-medium ml-1">{competency.weight}%</span>
-                                        </div>
-                                      )}
                                     </div>
                                   </div>
                                   <div className="text-right">
-                                    <div className="text-lg font-bold text-green-600">{score.toFixed(1)}%</div>
+                                    <div className="text-lg font-bold text-green-600">{formatPercent(score)}</div>
                                     <div className="text-xs text-gray-500 mt-1">
                                       {competency.actual_level >= competency.required_level ? 'Meets Requirement' : 'Below Requirement'}
                                     </div>
