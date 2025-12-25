@@ -225,3 +225,78 @@ export const formatPercent = (value: unknown, maxDecimals: number = 1): string =
   const s = isInt ? String(normalized) : normalized.toFixed(maxDecimals).replace(/\.?0+$/, '');
   return `${s}%`;
 };
+
+export const toUsernameSlug = (value: string): string => {
+  return (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+};
+
+export const buildUsernameBaseFromName = (fullName: string): string => {
+  const cleanName = (fullName || '').trim().replace(/\s+/g, ' ');
+  if (!cleanName) return '';
+
+  const parts = cleanName.split(' ').filter(Boolean);
+  const firstName = parts[0] || '';
+  const lastName = parts.length > 1 ? parts[parts.length - 1] : '';
+
+  const firstInitial = toUsernameSlug(firstName).charAt(0);
+  const cleanLastName = toUsernameSlug(lastName);
+
+  const base = parts.length > 1 ? `${firstInitial}${cleanLastName}` : toUsernameSlug(firstName);
+  const normalized = base.length >= 2 ? base : toUsernameSlug(firstName).slice(0, 8);
+  return normalized.slice(0, 18) || 'user';
+};
+
+export const generateUniqueUsernameFromName = (
+  fullName: string,
+  existingUsernames: Iterable<string>,
+  preferredUsername?: string
+): string => {
+  const existing = new Set(
+    Array.from(existingUsernames || []).map((u) => toUsernameSlug(String(u))).filter(Boolean)
+  );
+
+  const preferred = preferredUsername ? toUsernameSlug(preferredUsername) : '';
+  const preferredSuffixMatch = preferred.match(/(\d{2})$/);
+  const preferredSuffix = preferredSuffixMatch ? preferredSuffixMatch[1] : undefined;
+  const preferredBase = preferred ? preferred.replace(/\d{2}$/, '') : '';
+
+  const cleanName = (fullName || '').trim().replace(/\s+/g, ' ');
+  const parts = cleanName ? cleanName.split(' ').filter(Boolean) : [];
+  const first = parts[0] || '';
+  const last = parts.length > 1 ? parts[parts.length - 1] : '';
+  const firstSlug = toUsernameSlug(first);
+  const lastSlug = toUsernameSlug(last);
+
+  const baseCandidates = [
+    preferredBase,
+    buildUsernameBaseFromName(fullName),
+    parts.length > 1 ? `${firstSlug.slice(0, 2)}${lastSlug}` : '',
+    parts.length > 1 ? `${firstSlug}${lastSlug}` : '',
+    firstSlug
+  ]
+    .map((b) => (b ? toUsernameSlug(b).slice(0, 18) : ''))
+    .filter(Boolean);
+
+  const suffixes = Array.from({ length: 100 }, (_, i) => String(i).padStart(2, '0'));
+  for (let i = suffixes.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [suffixes[i], suffixes[j]] = [suffixes[j], suffixes[i]];
+  }
+  if (preferredSuffix) {
+    const idx = suffixes.indexOf(preferredSuffix);
+    if (idx > 0) {
+      suffixes.splice(idx, 1);
+      suffixes.unshift(preferredSuffix);
+    }
+  }
+
+  for (const base of baseCandidates) {
+    for (const suffix of suffixes) {
+      const candidate = `${base}${suffix}`;
+      if (!existing.has(candidate)) return candidate;
+    }
+  }
+
+  const fallbackBase = baseCandidates[0] || buildUsernameBaseFromName(fullName) || 'user';
+  return `${fallbackBase}${suffixes[0] || '00'}`;
+};

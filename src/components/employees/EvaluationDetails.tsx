@@ -285,6 +285,8 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   };
 
   const handleSaveCompetency = async () => {
+    const isPending = editingCompetency ? updateCompetencyMutation.isPending : createCompetencyMutation.isPending;
+    if (isPending) return;
     const errors = validateCompetency(competencyForm);
     if (Object.keys(errors).length > 0) {
       setCompetencyErrors(errors);
@@ -1595,6 +1597,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 <Button 
                   variant="outline" 
                   onClick={() => setIsCompetencyModalOpen(false)}
+                  disabled={createCompetencyMutation.isPending || updateCompetencyMutation.isPending}
                   className="w-full sm:w-auto hover:bg-gray-50 transition-all duration-200"
                 >
                   <X className="h-4 w-4 mr-2" />
@@ -1602,10 +1605,17 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 </Button>
                 <Button 
                   onClick={handleSaveCompetency}
+                  disabled={createCompetencyMutation.isPending || updateCompetencyMutation.isPending}
                   className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 shadow-lg hover:shadow-xl transition-all duration-200"
                 >
-                  <Save className="h-4 w-4 mr-2" />
-                  {editingCompetency ? 'Update' : 'Create'} Competency
+                  {createCompetencyMutation.isPending || updateCompetencyMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  {createCompetencyMutation.isPending || updateCompetencyMutation.isPending
+                    ? 'Saving...'
+                    : `${editingCompetency ? 'Update' : 'Create'} Competency`}
                 </Button>
               </div>
             </DialogFooter>
