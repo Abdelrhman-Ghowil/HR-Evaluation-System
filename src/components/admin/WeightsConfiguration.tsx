@@ -4,12 +4,13 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { AlertCircle, Save, RotateCcw, ArrowLeft, Pencil, X } from 'lucide-react';
+import { AlertCircle, HelpCircle, Save, RotateCcw, ArrowLeft, Pencil, X } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/alert';
 import { toast } from 'sonner';
 import { apiService } from '../../services/api';
 import { WeightsConfigurationLevel } from '../../types/api';
 import { ConfirmationDialog } from '../ui/confirmation-dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 
 interface WeightsConfigurationProps {
   onBack?: () => void;
@@ -242,7 +243,17 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
         <CardContent>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="level">Level</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="level">Level</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-gray-400 hover:text-gray-700" aria-label="Level help">
+                      <HelpCircle className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Select the role level you want to configure.</TooltipContent>
+                </Tooltip>
+              </div>
               <Select value={selectedLevel} onValueChange={(value: WeightsConfigurationLevel) => setSelectedLevel(value)}>
                 <SelectTrigger id="level">
                   <SelectValue placeholder="Select a level" />
@@ -255,6 +266,9 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                This changes which evaluation rules you are editing.
+              </p>
             </div>
           </div>
         </CardContent>
@@ -278,7 +292,19 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="competency">Competency Weight (%)</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="competency">Competency Weight (%)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-gray-400 hover:text-gray-700" aria-label="Competency weight help">
+                      <HelpCircle className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Portion of the total score based on competencies. Objective auto-adjusts to keep 100%.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <Input
                 id="competency"
                 type="number"
@@ -288,9 +314,22 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
                 onChange={(e) => handleWeightChange('competency', parseInt(e.target.value) || 0)}
                 disabled={loading || !isEditing}
               />
+              {!isEditing && <p className="text-xs text-muted-foreground">Click “Edit Configuration” to make changes.</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="objective">Objective Weight (%)</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="objective">Objective Weight (%)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-gray-400 hover:text-gray-700" aria-label="Objective weight help">
+                      <HelpCircle className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Portion of the total score based on objectives. Competency auto-adjusts to keep 100%.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <Input
                 id="objective"
                 type="number"
@@ -300,6 +339,7 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
                 onChange={(e) => handleWeightChange('objective', parseInt(e.target.value) || 0)}
                 disabled={loading || !isEditing}
               />
+              {!isEditing && <p className="text-xs text-muted-foreground">Click “Edit Configuration” to make changes.</p>}
             </div>
           </div>
         </CardContent>
@@ -314,7 +354,17 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="core">Core Weight (%)</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="core">Core Weight (%)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-gray-400 hover:text-gray-700" aria-label="Core weight help">
+                      <HelpCircle className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Part of competency weight. Enter any two fields; the third fills automatically.</TooltipContent>
+                </Tooltip>
+              </div>
               <Input
                 id="core"
                 type="number"
@@ -326,7 +376,17 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="leadership">Leadership Weight (%)</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="leadership">Leadership Weight (%)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-gray-400 hover:text-gray-700" aria-label="Leadership weight help">
+                      <HelpCircle className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Part of competency weight. Total must equal 100% across the three fields.</TooltipContent>
+                </Tooltip>
+              </div>
               <Input
                 id="leadership"
                 type="number"
@@ -338,7 +398,17 @@ const WeightsConfiguration: React.FC<WeightsConfigurationProps> = ({ onBack }) =
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="functional">Functional Weight (%)</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="functional">Functional Weight (%)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-gray-400 hover:text-gray-700" aria-label="Functional weight help">
+                      <HelpCircle className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Part of competency weight. Total must equal 100% across the three fields.</TooltipContent>
+                </Tooltip>
+              </div>
               <Input
                 id="functional"
                 type="number"
