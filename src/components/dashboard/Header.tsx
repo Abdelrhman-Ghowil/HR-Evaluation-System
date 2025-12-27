@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -12,15 +12,20 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Bell, LogOut, Menu, Settings, User } from 'lucide-react';
+import { Bell, HelpCircle, LogOut, Menu, Settings, User } from 'lucide-react';
+import HelpDrawer from '@/components/help/HelpDrawer';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
+  activeView: string;
+  onOpenKeyboardShortcuts: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
+const Header: React.FC<HeaderProps> = ({ onToggleSidebar, activeView, onOpenKeyboardShortcuts }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [helpOpen, setHelpOpen] = useState(false);
 
   return (
     <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 shadow-sm">
@@ -59,6 +64,22 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
       </div>
 
       <div className="flex items-center space-x-4">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="sm" onClick={() => setHelpOpen(true)} aria-label="Open help">
+              <HelpCircle className="h-5 w-5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Help</TooltipContent>
+        </Tooltip>
+
+        <HelpDrawer
+          open={helpOpen}
+          onOpenChange={setHelpOpen}
+          activeView={activeView}
+          onOpenKeyboardShortcuts={onOpenKeyboardShortcuts}
+        />
+
         {/* Notifications */}
         <Button variant="ghost" size="sm" className="relative">
           <Bell className="h-5 w-5" />
