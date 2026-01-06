@@ -20,10 +20,12 @@ import { OrganizationalProvider } from '../../contexts/OrganizationalContext';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
 import HelpCenter from '@/components/help/HelpCenter';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { X } from 'lucide-react';
+import { ApiRole, LocalRole, helpArticles, isArticleVisibleToUser } from '@/components/help/HelpCenter';
 
 type ActiveView =
   | 'dashboard'
@@ -68,6 +70,7 @@ const Dashboard = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { user } = useAuth();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [guideIndex, setGuideIndex] = useState(0);
   const [dismissedAnnouncementIds, setDismissedAnnouncementIds] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(DISMISSED_ANNOUNCEMENTS_KEY);
@@ -117,6 +120,51 @@ const Dashboard = () => {
   };
 
   const activeView = getActiveViewFromPath(location.pathname);
+
+  const guideId = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const value = params.get('guide');
+    return value && value.trim().length > 0 ? value : null;
+  }, [location.search]);
+
+  const guideArticle = useMemo(() => {
+    if (!guideId) return null;
+    const found = helpArticles.find((a) => a.id === guideId) || null;
+    if (!found) return null;
+    const isVisible = isArticleVisibleToUser(found, user as unknown as { role?: LocalRole; api_role?: ApiRole });
+    return isVisible ? found : null;
+  }, [guideId, user]);
+
+  useEffect(() => {
+    setGuideIndex(0);
+  }, [guideArticle?.id]);
+
+  useEffect(() => {
+    if (!guideArticle) return;
+    setGuideIndex((prev) => Math.max(0, Math.min(prev, Math.max(0, guideArticle.content.length - 1))));
+  }, [guideArticle]);
+
+  const closeWalkthrough = () => {
+    const params = new URLSearchParams(location.search);
+    if (!params.has('guide')) return;
+    params.delete('guide');
+    const search = params.toString();
+    navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true });
+  };
+
+  const navigateWithGuide = (to: string) => {
+    if (!guideId) {
+      navigate(to);
+      return;
+    }
+    try {
+      const url = new URL(to, window.location.origin);
+      url.searchParams.set('guide', guideId);
+      navigate({ pathname: url.pathname, search: url.search });
+    } catch {
+      navigate(to);
+    }
+  };
 
   // Role-based access control per view
   const viewAccess: Record<ActiveView, Array<'admin' | 'hr' | 'manager' | 'employee'>> = {
@@ -340,6 +388,78 @@ const Dashboard = () => {
               <Button onClick={() => setShortcutsOpen(false)}>Close</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(guideArticle)}
+        onOpenChange={(open) => {
+          if (!open) closeWalkthrough();
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between gap-3">
+              <span className="truncate">{guideArticle?.title ?? ''}</span>
+              {guideArticle && guideArticle.content.length > 0 && (
+                <Badge variant="outline">
+                  {guideIndex + 1}/{guideArticle.content.length}
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {guideArticle ? (
+            <div className="space-y-4">
+              <Progress
+                value={
+                  guideArticle.content.length > 0 ? Math.round(((guideIndex + 1) / guideArticle.content.length) * 100) : 0
+                }
+              />
+              <div className="rounded-lg border bg-white p-4">
+                <div className="text-sm font-semibold text-gray-900">
+                  Step {guideArticle.content.length > 0 ? guideIndex + 1 : 0}
+                </div>
+                <div className="mt-2 text-sm text-gray-700">{guideArticle.content[guideIndex] ?? 'No steps available.'}</div>
+              </div>
+
+              {guideArticle.defaultRoute && (
+                <div className="rounded-lg border bg-gray-50 p-4">
+                  <div className="text-sm font-semibold text-gray-900">Open the screen</div>
+                  <div className="mt-1 text-sm text-gray-700">Jump to the related page while keeping the walkthrough open.</div>
+                  <div className="mt-3">
+                    <Button variant="outline" onClick={() => navigateWithGuide(guideArticle.defaultRoute!)}>
+                      Open Page
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <div className="flex w-full items-center justify-between gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setGuideIndex((i) => Math.max(0, i - 1))}
+                disabled={!guideArticle || guideIndex <= 0}
+              >
+                Back
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={closeWalkthrough} disabled={!guideArticle}>
+                  Close
+                </Button>
+                {guideArticle && guideIndex < guideArticle.content.length - 1 ? (
+                  <Button onClick={() => setGuideIndex((i) => Math.min(guideArticle.content.length - 1, i + 1))}>Next</Button>
+                ) : (
+                  <Button onClick={closeWalkthrough} disabled={!guideArticle}>
+                    Finish
+                  </Button>
+                )}
+              </div>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </OrganizationalProvider>

@@ -110,7 +110,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
     name: apiComp.name,
     category: apiComp.category as 'Core' | 'Leadership' | 'Functional',
     required_level: apiComp.required_level,
-    actual_level: apiComp.actual_level,
+    actual_level: Math.max(1, apiComp.actual_level ?? 1),
     weight: apiComp.weight,
     description: apiComp.description
   })) || [];
@@ -147,7 +147,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
     const errors: Record<string, string> = {};
     if (!obj.title?.trim()) errors.title = 'Title is required';
     if (!obj.target || obj.target < 1 || obj.target > 10) errors.target = 'Target must be between 1-10';
-    if (!obj.achieved || obj.achieved < 1 || obj.achieved > 10) errors.achieved = 'Achieved must be between 1-10';
+    if (obj.achieved === undefined || obj.achieved < 0 || obj.achieved > 10) errors.achieved = 'Achieved must be between 0-10';
     if (obj.weight === undefined || obj.weight < 10 || obj.weight > 40) errors.weight = 'Weight must be between 10-40%';
     if (remainingPercent < 10) errors.weight = `Only ${remainingPercent}% remaining. Minimum weight is 10%`;
     if (obj.weight !== undefined) {
@@ -161,8 +161,12 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const validateCompetency = (comp: Partial<Competency>): Record<string, string> => {
     const errors: Record<string, string> = {};
     if (!comp.name?.trim()) errors.name = 'Name is required';
-    if (!comp.required_level || comp.required_level > 4) errors.required_level = 'Required level must be between 1-4';
-    if (comp.actual_level > 4 ) errors.actual_level = 'Actual level must be between 0-4';
+    if (comp.required_level === undefined || comp.required_level < 1 || comp.required_level > 4) {
+      errors.required_level = 'Required level must be between 1-4';
+    }
+    if (comp.actual_level === undefined || comp.actual_level < 1 || comp.actual_level > 4) {
+      errors.actual_level = 'Actual level must be between 1-4';
+    }
     return errors;
   };
 
@@ -179,7 +183,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       title: '',
       description: '',
       target: 10,
-      achieved: 1,
+      achieved: 0,
       weight: 10,
       status: 'Not started'
     });
@@ -270,7 +274,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       name: '',
       category: 'Core',
       required_level: 4,
-      actual_level: 0,
+      actual_level: 1,
       description: ''
     });
     setCompetencyErrors({});
@@ -279,7 +283,11 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
 
   const handleEditCompetency = (competency: Competency) => {
     setEditingCompetency(competency);
-    setCompetencyForm(competency);
+    setCompetencyForm({
+      ...competency,
+      required_level: Math.max(1, competency.required_level),
+      actual_level: Math.max(1, competency.actual_level),
+    });
     setCompetencyErrors({});
     setIsCompetencyModalOpen(true);
   };
@@ -636,6 +644,38 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const updateEvaluationMutation = useUpdateEvaluation();
   const isSelfEvaluation = evaluation.type === 'Self Evaluation' || evaluation.status === 'Self Evaluation';
 
+  const [overallScoreDisplay, setOverallScoreDisplay] = useState<'percent' | 'out_of_5'>(() => {
+    if (typeof window === 'undefined') return 'percent';
+    const saved = window.localStorage.getItem('overall_score_display');
+    return saved === 'out_of_5' ? 'out_of_5' : 'percent';
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('overall_score_display', overallScoreDisplay);
+  }, [overallScoreDisplay]);
+
+  const parsePercentNumber = (value: unknown): number | null => {
+    const n = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const formatOutOfFive = (percent: number, maxDecimals: number = 1): string => {
+    const raw = (percent / 100) * 5;
+    const rounded = Number(raw.toFixed(maxDecimals));
+    const isInt = Math.abs(rounded - Math.round(rounded)) < 1e-9;
+    return isInt ? String(Math.round(rounded)) : rounded.toFixed(maxDecimals).replace(/\.?0+$/, '');
+  };
+
+  const overallPercent = parsePercentNumber(evaluation.score);
+  const overallOutOfFive = overallPercent === null ? null : formatOutOfFive(overallPercent);
+  const overallDisplayValue =
+    overallPercent === null
+      ? 'N/A'
+      : overallScoreDisplay === 'out_of_5'
+        ? `${overallOutOfFive} / 5`
+        : formatPercent(overallPercent);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
@@ -682,15 +722,26 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
               {/* Overall Score */}
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 lg:p-6 text-center border border-blue-100">
+                <div className="flex justify-end mb-2">
+                  <Select
+                    value={overallScoreDisplay}
+                    onValueChange={(value) => setOverallScoreDisplay(value as 'percent' | 'out_of_5')}
+                    disabled={overallPercent === null}
+                  >
+                    <SelectTrigger className="h-8 w-[140px] bg-white/80">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percent">Percentage</SelectItem>
+                      <SelectItem value="out_of_5">Out of 5</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="flex items-center justify-center mb-2">
                   <BarChart3 className="h-5 w-5 text-blue-600 mr-2" />
                 </div>
                 <div className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  {typeof evaluation.score === 'number'
-                    ? formatPercent(evaluation.score)
-                    : evaluation.score
-                    ? formatPercent(Number(evaluation.score))
-                    : 'N/A'}
+                  {overallDisplayValue}
                 </div>
                 <div className="text-xs lg:text-sm text-gray-600 font-medium">Overall Score</div>
               </div>
@@ -1373,16 +1424,16 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 
                 <div className="space-y-2">
                   <Label htmlFor="achieved" className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    Achieved (1-10)
+                    Achieved (0-10)
                     <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="achieved"
                     type="number"
-                    min="1"
+                    min="0"
                     max="10"
-                    value={objectiveForm.achieved || 1}
-                    onChange={(e) => setObjectiveForm(prev => ({ ...prev, achieved: parseInt(e.target.value) || 1 }))}
+                    value={objectiveForm.achieved ?? 0}
+                    onChange={(e) => setObjectiveForm(prev => ({ ...prev, achieved: parseInt(e.target.value) || 0 }))}
                     className={`transition-all duration-200 ${objectiveErrors.achieved ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
                   />
                   {objectiveErrors.achieved && (
@@ -1550,16 +1601,16 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 
                 <div className="space-y-2">
                   <Label htmlFor="actual_level" className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    Actual Level (0-4)
+                    Actual Level (1-4)
                     <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="actual_level"
                     type="number"
-                    min="0"
+                    min="1"
                     max="4"
-                    value={competencyForm.actual_level || 0}
-                    onChange={(e) => setCompetencyForm(prev => ({ ...prev, actual_level: parseInt(e.target.value) || 0 }))}
+                    value={Math.max(1, competencyForm.actual_level ?? 1)}
+                    onChange={(e) => setCompetencyForm(prev => ({ ...prev, actual_level: parseInt(e.target.value) || 1 }))}
                     className={`transition-all duration-200 ${competencyErrors.actual_level ? 'border-red-500 focus:ring-red-500' : 'focus:ring-purple-500 focus:border-purple-500'}`}
                   />
                   {competencyErrors.actual_level && (

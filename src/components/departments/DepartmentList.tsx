@@ -245,19 +245,56 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
     } catch (err: unknown) {
       console.error('Error creating department:', err);
       
-      // Handle specific API errors
-      if ((err as { details: unknown }).details && typeof (err as { details: unknown }).details === 'object') {
-        const apiErrors: {[key: string]: string} = {};
-        Object.keys((err as { details: unknown }).details).forEach(field => {
-          if (Array.isArray((err as { details: unknown }).details[field])) {
-            apiErrors[field] = (err as { details: unknown }).details[field][0];
+      const errAny = err as any;
+      const rawDetails: unknown = errAny?.details;
+      let detailsForFields: unknown = rawDetails;
+      if (detailsForFields && typeof detailsForFields === 'object') {
+        const nestedDetails = (detailsForFields as any)?.details;
+        const nestedErrors = (detailsForFields as any)?.errors;
+        if (nestedDetails && typeof nestedDetails === 'object') detailsForFields = nestedDetails;
+        else if (nestedErrors && typeof nestedErrors === 'object') detailsForFields = nestedErrors;
+      }
+
+      if (detailsForFields && typeof detailsForFields === 'object' && !Array.isArray(detailsForFields)) {
+        const apiErrors: { [key: string]: string } = {};
+
+        const setError = (key: string, message: string) => {
+          if (!message) return;
+          if (apiErrors[key]) apiErrors[key] = `${apiErrors[key]} ${message}`.trim();
+          else apiErrors[key] = message;
+        };
+
+        for (const field of Object.keys(detailsForFields as Record<string, unknown>)) {
+          const rawValue = (detailsForFields as any)[field];
+          const message = Array.isArray(rawValue)
+            ? String(rawValue[0] ?? '')
+            : typeof rawValue === 'string'
+              ? rawValue
+              : rawValue == null
+                ? ''
+                : JSON.stringify(rawValue);
+
+          const normalizedKey =
+            field === 'company_id' ? 'company'
+            : field === 'manager_id' ? 'manager'
+            : field === 'detail' || field === 'non_field_errors' || field === '__all__' ? 'general'
+            : field;
+
+          if (normalizedKey === 'name' || normalizedKey === 'company' || normalizedKey === 'manager' || normalizedKey === 'general') {
+            setError(normalizedKey, message);
           } else {
-            apiErrors[field] = (err as { details: unknown }).details[field];
+            setError('general', `${field}: ${message}`.trim());
           }
-        });
-        setValidationErrors(apiErrors);
+        }
+
+        if (Object.keys(apiErrors).length > 0) {
+          setValidationErrors(apiErrors);
+        } else {
+          const errorMessage = errAny?.message || 'Failed to create department. Please try again.';
+          setValidationErrors({ general: errorMessage });
+        }
       } else {
-        const errorMessage = (err as { message: string }).message || 'Failed to create department. Please try again.';
+        const errorMessage = errAny?.message || 'Failed to create department. Please try again.';
         setValidationErrors({ general: errorMessage });
       }
     } finally {
