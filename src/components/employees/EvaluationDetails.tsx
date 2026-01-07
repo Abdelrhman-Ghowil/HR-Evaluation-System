@@ -125,6 +125,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   // Form states
   const [objectiveForm, setObjectiveForm] = useState<Partial<Objective>>({});
   const [competencyForm, setCompetencyForm] = useState<Partial<Competency>>({});
+  const [competencyActualHiddenById, setCompetencyActualHiddenById] = useState<Record<string, boolean>>({});
 
   // Error states
   const [objectiveErrors, setObjectiveErrors] = useState<Record<string, string>>({});
@@ -143,11 +144,13 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const allowedMaxWeightPercent = Math.min(40, remainingPercent);
 
   // Validation functions
-  const validateObjective = (obj: Partial<Objective>): Record<string, string> => {
+  const validateObjective = (obj: Partial<Objective>, requireAchieved: boolean): Record<string, string> => {
     const errors: Record<string, string> = {};
     if (!obj.title?.trim()) errors.title = 'Title is required';
     if (!obj.target || obj.target < 1 || obj.target > 10) errors.target = 'Target must be between 1-10';
-    if (obj.achieved === undefined || obj.achieved < 0 || obj.achieved > 10) errors.achieved = 'Achieved must be between 0-10';
+    if (requireAchieved && (obj.achieved === undefined || obj.achieved < 0 || obj.achieved > 10)) {
+      errors.achieved = 'Achieved must be between 0-10';
+    }
     if (obj.weight === undefined || obj.weight < 10 || obj.weight > 40) errors.weight = 'Weight must be between 10-40%';
     if (remainingPercent < 10) errors.weight = `Only ${remainingPercent}% remaining. Minimum weight is 10%`;
     if (obj.weight !== undefined) {
@@ -158,13 +161,13 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
     return errors;
   };
 
-  const validateCompetency = (comp: Partial<Competency>): Record<string, string> => {
+  const validateCompetency = (comp: Partial<Competency>, requireActualLevel: boolean): Record<string, string> => {
     const errors: Record<string, string> = {};
     if (!comp.name?.trim()) errors.name = 'Name is required';
     if (comp.required_level === undefined || comp.required_level < 1 || comp.required_level > 4) {
       errors.required_level = 'Required level must be between 1-4';
     }
-    if (comp.actual_level === undefined || comp.actual_level < 1 || comp.actual_level > 4) {
+    if (requireActualLevel && (comp.actual_level === undefined || comp.actual_level < 1 || comp.actual_level > 4)) {
       errors.actual_level = 'Actual level must be between 1-4';
     }
     return errors;
@@ -183,7 +186,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       title: '',
       description: '',
       target: 10,
-      achieved: 0,
       weight: 10,
       status: 'Not started'
     });
@@ -201,7 +203,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const handleSaveObjective = async () => {
     const isPending = editingObjective ? updateObjectiveMutation.isPending : createObjectiveMutation.isPending;
     if (isPending) return;
-    const errors = validateObjective(objectiveForm);
+    const errors = validateObjective(objectiveForm, Boolean(editingObjective));
     if (Object.keys(errors).length > 0) {
       setObjectiveErrors(errors);
       return;
@@ -235,8 +237,8 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           title: objectiveForm.title!,
           description: objectiveForm.description ?? '',
           target: objectiveForm.target!,
-          achieved: objectiveForm.achieved!,
-          status: 'Completed',
+          achieved: objectiveForm.achieved ?? 0,
+          status: 'Not started',
           weight: Number(((objectiveForm.weight as number)).toFixed(4))
         };
          await createObjectiveMutation.mutateAsync(createData);
@@ -274,7 +276,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       name: '',
       category: 'Core',
       required_level: 4,
-      actual_level: 1,
+      weight: 10,
       description: ''
     });
     setCompetencyErrors({});
@@ -295,7 +297,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const handleSaveCompetency = async () => {
     const isPending = editingCompetency ? updateCompetencyMutation.isPending : createCompetencyMutation.isPending;
     if (isPending) return;
-    const errors = validateCompetency(competencyForm);
+    const errors = validateCompetency(competencyForm, Boolean(editingCompetency));
     if (Object.keys(errors).length > 0) {
       setCompetencyErrors(errors);
       return;
@@ -311,20 +313,32 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
             category: competencyForm.category!,
             required_level: competencyForm.required_level!,
             actual_level: competencyForm.actual_level!,
+            weight: competencyForm.weight ?? editingCompetency.weight,
             description: competencyForm.description!
           }
         });
+        setCompetencyActualHiddenById(prev => {
+          if (!prev[editingCompetency.id]) return prev;
+          const next = { ...prev };
+          delete next[editingCompetency.id];
+          return next;
+        });
       } else {
         // Create new competency
-        await createCompetencyMutation.mutateAsync({
+        const created = await createCompetencyMutation.mutateAsync({
           employee_id: employee.id,
           evaluation_id: evaluation.id,
           name: competencyForm.name!,
           category: competencyForm.category!,
           required_level: competencyForm.required_level!,
-          actual_level: competencyForm.actual_level!,
+          actual_level: competencyForm.actual_level ?? 1,
+          weight: competencyForm.weight ?? 10,
           description: competencyForm.description!
         });
+        const createdId = (created as any)?.competence_id;
+        if (createdId) {
+          setCompetencyActualHiddenById(prev => ({ ...prev, [String(createdId)]: true }));
+        }
       }
 
       setIsCompetencyModalOpen(false);
@@ -510,7 +524,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           const newUiStatus = statusMap[payload.activitystatus] || 'Draft';
           setCurrentStatus(newUiStatus);
           try {
-            await updateEvaluationMutation.mutateAsync({ evaluationId: evaluation.id, evaluationData: { status: newUiStatus } });
+            await updateEvaluationMutation.mutateAsync({
+              evaluationId: evaluation.id,
+              evaluationData: { status: (newUiStatus === 'Self Evaluation' ? 'Draft' : newUiStatus) as Evaluation['status'] }
+            });
           } catch {}
         }
       });
@@ -642,7 +659,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const createActivityLogMutation = useCreateActivityLog();
   const isSubmittingAction = createActivityLogMutation.isPending;
   const updateEvaluationMutation = useUpdateEvaluation();
-  const isSelfEvaluation = evaluation.type === 'Self Evaluation' || evaluation.status === 'Self Evaluation';
+  const isSelfEvaluation = evaluation.type === 'Self Evaluation';
 
   const [overallScoreDisplay, setOverallScoreDisplay] = useState<'percent' | 'out_of_5'>(() => {
     if (typeof window === 'undefined') return 'percent';
@@ -921,6 +938,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                     </div>
                   ) : objectives.length > 0 ? (
                     objectives.map((objective) => {
+                      const showAchieved = objective.status !== 'Not started';
                       const score = getObjectiveScore(objective);
                       return (
                         <div key={objective.id} className="bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl p-4 sm:p-6 hover:shadow-lg transition-all duration-200 group">
@@ -944,10 +962,14 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                             
                             <div className="flex items-center gap-3 lg:flex-col lg:items-end">
                             <div className="text-center lg:text-right">
-                              <div className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                                {formatPercent(score)}
-                              </div>
-                              <div className="text-xs text-gray-500 font-medium">Score</div>
+                              {showAchieved && (
+                                <>
+                                  <div className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                                    {formatPercent(score)}
+                                  </div>
+                                  <div className="text-xs text-gray-500 font-medium">Score</div>
+                                </>
+                              )}
                             </div>
                               
                               <div className="flex gap-2">
@@ -971,15 +993,17 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-100">
+                          <div className={`grid ${showAchieved ? 'grid-cols-3' : 'grid-cols-2'} gap-4 mt-4 pt-4 border-t border-gray-100`}>
                             <div className="bg-blue-50 rounded-lg p-3">
                               <p className="text-xs font-medium text-blue-700 mb-1">Target</p>
                               <p className="text-lg font-bold text-blue-900">{objective.target}<span className="text-sm text-blue-600">/10</span></p>
                             </div>
-                            <div className="bg-green-50 rounded-lg p-3">
-                              <p className="text-xs font-medium text-green-700 mb-1">Achieved</p>
-                              <p className="text-lg font-bold text-green-900">{objective.achieved}<span className="text-sm text-green-600">/10</span></p>
-                            </div>
+                            {showAchieved && (
+                              <div className="bg-green-50 rounded-lg p-3">
+                                <p className="text-xs font-medium text-green-700 mb-1">Achieved</p>
+                                <p className="text-lg font-bold text-green-900">{objective.achieved}<span className="text-sm text-green-600">/10</span></p>
+                              </div>
+                            )}
                             <div className="bg-purple-50 rounded-lg p-3">
                               <p className="text-xs font-medium text-purple-700 mb-1">Weight</p>
                               <p className="text-lg font-bold text-purple-900">{(toPercent(objective.weight)).toFixed(0)}<span className="text-sm text-purple-600">%</span></p>
@@ -1038,6 +1062,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 ) : (
                   <div className="space-y-4 sm:space-y-6">
                     {competencies.map((competency) => {
+                    const showActualLevel = !competencyActualHiddenById[competency.id];
                     return (
                       <div key={competency.id} className="bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl p-4 sm:p-6 hover:shadow-lg transition-all duration-200 group">
                         <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
@@ -1080,15 +1105,17 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100">
+                        <div className={`grid ${showActualLevel ? 'grid-cols-2' : 'grid-cols-1'} gap-4 mt-4 pt-4 border-t border-gray-100`}>
                           <div className="bg-amber-50 rounded-lg p-3">
                             <p className="text-xs font-medium text-amber-700 mb-1">Required Level</p>
                             <p className="text-lg font-bold text-amber-900">{competency.required_level}<span className="text-sm text-amber-600">/4</span></p>
                           </div>
-                          <div className="bg-emerald-50 rounded-lg p-3">
-                            <p className="text-xs font-medium text-emerald-700 mb-1">Actual Level</p>
-                            <p className="text-lg font-bold text-emerald-900">{competency.actual_level}<span className="text-sm text-emerald-600">/4</span></p>
-                          </div>
+                          {showActualLevel && (
+                            <div className="bg-emerald-50 rounded-lg p-3">
+                              <p className="text-xs font-medium text-emerald-700 mb-1">Actual Level</p>
+                              <p className="text-lg font-bold text-emerald-900">{competency.actual_level}<span className="text-sm text-emerald-600">/4</span></p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -1422,27 +1449,29 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   )}
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="achieved" className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    Achieved (0-10)
-                    <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="achieved"
-                    type="number"
-                    min="0"
-                    max="10"
-                    value={objectiveForm.achieved ?? 0}
-                    onChange={(e) => setObjectiveForm(prev => ({ ...prev, achieved: parseInt(e.target.value) || 0 }))}
-                    className={`transition-all duration-200 ${objectiveErrors.achieved ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
-                  />
-                  {objectiveErrors.achieved && (
-                    <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
-                      <span className="w-1 h-1 bg-red-500 rounded-full"></span>
-                      {objectiveErrors.achieved}
-                    </p>
-                  )}
-                </div>
+                {editingObjective && (
+                  <div className="space-y-2">
+                    <Label htmlFor="achieved" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                      Achieved (0-10)
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="achieved"
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={objectiveForm.achieved ?? 0}
+                      onChange={(e) => setObjectiveForm(prev => ({ ...prev, achieved: parseInt(e.target.value) || 0 }))}
+                      className={`transition-all duration-200 ${objectiveErrors.achieved ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
+                    />
+                    {objectiveErrors.achieved && (
+                      <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
+                        <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                        {objectiveErrors.achieved}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               
               <div className="space-y-2">
@@ -1599,27 +1628,29 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   )}
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="actual_level" className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                    Actual Level (1-4)
-                    <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="actual_level"
-                    type="number"
-                    min="1"
-                    max="4"
-                    value={Math.max(1, competencyForm.actual_level ?? 1)}
-                    onChange={(e) => setCompetencyForm(prev => ({ ...prev, actual_level: parseInt(e.target.value) || 1 }))}
-                    className={`transition-all duration-200 ${competencyErrors.actual_level ? 'border-red-500 focus:ring-red-500' : 'focus:ring-purple-500 focus:border-purple-500'}`}
-                  />
-                  {competencyErrors.actual_level && (
-                    <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
-                      <span className="w-1 h-1 bg-red-500 rounded-full"></span>
-                      {competencyErrors.actual_level}
-                    </p>
-                  )}
-                </div>
+                {editingCompetency && (
+                  <div className="space-y-2">
+                    <Label htmlFor="actual_level" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                      Actual Level (1-4)
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="actual_level"
+                      type="number"
+                      min="1"
+                      max="4"
+                      value={Math.max(1, competencyForm.actual_level ?? 1)}
+                      onChange={(e) => setCompetencyForm(prev => ({ ...prev, actual_level: parseInt(e.target.value) || 1 }))}
+                      className={`transition-all duration-200 ${competencyErrors.actual_level ? 'border-red-500 focus:ring-red-500' : 'focus:ring-purple-500 focus:border-purple-500'}`}
+                    />
+                    {competencyErrors.actual_level && (
+                      <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
+                        <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                        {competencyErrors.actual_level}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               
               <div className="space-y-2">
