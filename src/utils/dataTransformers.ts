@@ -43,7 +43,8 @@ export const transformEmployeeForEvaluation = (employeeInput: EmployeeInput): Em
       email: employeeInput.email,
       phone: employeeInput.phone,
       hire_date: employeeInput.joinDate,
-      status: employeeInput.status
+      status: employeeInput.status,
+      managerialLevel: employeeInput.managerialLevel
     };
   } catch (error) {
     console.error('Error transforming employee data:', error);

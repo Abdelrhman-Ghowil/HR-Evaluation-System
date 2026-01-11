@@ -27,6 +27,7 @@ interface Employee {
   phone: string;
   hire_date: string;
   status: 'Active' | 'Inactive';
+  managerialLevel?: 'Individual Contributor' | 'Supervisory' | 'Middle Management' | 'Executive';
 }
 
 interface Evaluation {
@@ -124,13 +125,25 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
 
   // Form states
   const [objectiveForm, setObjectiveForm] = useState<Partial<Objective>>({});
+  const [objectiveTitles, setObjectiveTitles] = useState<string[]>(['']);
   const [competencyForm, setCompetencyForm] = useState<Partial<Competency>>({});
+  const [competencyNames, setCompetencyNames] = useState<string[]>(['']);
   const [competencyActualHiddenById, setCompetencyActualHiddenById] = useState<Record<string, boolean>>({});
 
   // Error states
   const [objectiveErrors, setObjectiveErrors] = useState<Record<string, string>>({});
   const [competencyErrors, setCompetencyErrors] = useState<Record<string, string>>({});
   const [objectivesUiError, setObjectivesUiError] = useState('');
+
+  const PREDEFINED_COMPETENCIES_BY_CATEGORY = useMemo(
+    () => ({
+      Core: ['Communication', 'Customer Focus', 'Ownership', 'Teamwork', 'Problem Solving'],
+      Leadership: ['Decision Making', 'Empowering Others', 'Planning & Organizing', 'Strategic Thinking', 'Social Intelligence']
+    }),
+    []
+  );
+
+  const isIndividualContributor = employee.managerialLevel === 'Individual Contributor';
 
   const MIN_OBJECTIVES = 4;
   const MAX_OBJECTIVES = 6;
@@ -141,10 +154,13 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
     return sum + toPercent(obj.weight);
   }, 0);
   const remainingPercent = Math.max(0, 100 - usedPercentExcludingCurrent);
-  const allowedMaxWeightPercent = Math.min(40, remainingPercent);
+  const objectiveTitlesTrimmed = objectiveTitles.map(t => t.trim()).filter(Boolean);
+  const objectiveTitlesUniqueCount = new Set(objectiveTitlesTrimmed).size;
+  const objectivesToCreateCountForWeight = editingObjective ? 1 : (objectiveTitlesUniqueCount || 1);
+  const allowedMaxWeightPercent = Math.min(40, remainingPercent / objectivesToCreateCountForWeight);
 
   // Validation functions
-  const validateObjective = (obj: Partial<Objective>, requireAchieved: boolean): Record<string, string> => {
+  const validateObjective = (obj: Partial<Objective>, requireAchieved: boolean, objectivesToCreateCount: number): Record<string, string> => {
     const errors: Record<string, string> = {};
     if (!obj.title?.trim()) errors.title = 'Title is required';
     if (!obj.target || obj.target < 1 || obj.target > 10) errors.target = 'Target must be between 1-10';
@@ -152,13 +168,22 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       errors.achieved = 'Achieved must be between 0-10';
     }
     if (obj.weight === undefined || obj.weight < 10 || obj.weight > 40) errors.weight = 'Weight must be between 10-40%';
-    if (remainingPercent < 10) errors.weight = `Only ${remainingPercent}% remaining. Minimum weight is 10%`;
+    if (remainingPercent < 10 * objectivesToCreateCount) {
+      errors.weight = `Only ${remainingPercent}% remaining. Minimum total is ${10 * objectivesToCreateCount}%`;
+    }
     if (obj.weight !== undefined) {
-      const totalIfApplied = usedPercentExcludingCurrent + obj.weight;
+      const totalIfApplied = usedPercentExcludingCurrent + (obj.weight * objectivesToCreateCount);
       if (totalIfApplied > 100) errors.weight = `Total weight exceeds 100% (remaining ${remainingPercent}%)`;
-      if (obj.weight > allowedMaxWeightPercent) errors.weight = `Weight cannot exceed ${allowedMaxWeightPercent}% for this objective`;
+      const maxWeight = Math.min(40, remainingPercent / objectivesToCreateCount);
+      if (obj.weight > maxWeight) errors.weight = `Weight cannot exceed ${maxWeight}% for this objective`;
     }
     return errors;
+  };
+
+  const getObjectiveTitlesForCreate = (): string[] => {
+    const trimmed = objectiveTitles.map(t => t.trim());
+    const nonEmpty = trimmed.filter(Boolean);
+    return Array.from(new Set(nonEmpty));
   };
 
   const validateCompetency = (comp: Partial<Competency>, requireActualLevel: boolean): Record<string, string> => {
@@ -172,6 +197,42 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
     }
     return errors;
   };
+
+  const normalizeCompetencyName = (name: string): string => name.trim().toLowerCase();
+
+  const getCompetencyNamesForCreate = (): string[] => {
+    const trimmed = competencyNames.map(n => n.trim());
+    const nonEmpty = trimmed.filter(Boolean);
+    return Array.from(new Set(nonEmpty));
+  };
+
+  const getMissingPredefinedCompetencyNames = (
+    category: 'Core' | 'Leadership' | 'Functional',
+    alreadyIncluded: string[]
+  ): string[] => {
+    const existingByCategory = new Set(
+      competencies
+        .filter(c => c.category === category)
+        .map(c => normalizeCompetencyName(c.name))
+    );
+    const included = new Set(alreadyIncluded.map(normalizeCompetencyName));
+    const predefined = PREDEFINED_COMPETENCIES_BY_CATEGORY[category] ?? [];
+    return predefined.filter(
+      n => !existingByCategory.has(normalizeCompetencyName(n)) && !included.has(normalizeCompetencyName(n))
+    );
+  };
+
+  useEffect(() => {
+    if (!isCompetencyModalOpen) return;
+    if (editingCompetency) return;
+    if (isIndividualContributor && competencyForm.category === 'Leadership') {
+      setCompetencyForm(prev => ({ ...prev, category: 'Core' }));
+      return;
+    }
+    const category = (competencyForm.category || 'Core') as 'Core' | 'Leadership' | 'Functional';
+    const missing = getMissingPredefinedCompetencyNames(category, []);
+    setCompetencyNames(missing.length > 0 ? missing : ['']);
+  }, [PREDEFINED_COMPETENCIES_BY_CATEGORY, competencies, competencyForm.category, editingCompetency, isCompetencyModalOpen, isIndividualContributor]);
 
   // Handlers for objectives
   const handleAddObjective = () => {
@@ -189,6 +250,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       weight: 10,
       status: 'Not started'
     });
+    setObjectiveTitles(['']);
     setObjectiveErrors({});
     setIsObjectiveModalOpen(true);
   };
@@ -196,6 +258,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const handleEditObjective = (objective: Objective) => {
     setEditingObjective(objective);
     setObjectiveForm({ ...objective, weight: toPercent(objective.weight) });
+    setObjectiveTitles([objective.title]);
     setObjectiveErrors({});
     setIsObjectiveModalOpen(true);
   };
@@ -203,7 +266,18 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const handleSaveObjective = async () => {
     const isPending = editingObjective ? updateObjectiveMutation.isPending : createObjectiveMutation.isPending;
     if (isPending) return;
-    const errors = validateObjective(objectiveForm, Boolean(editingObjective));
+    const titlesForCreate = editingObjective ? [] : getObjectiveTitlesForCreate();
+    const objectivesToCreateCount = editingObjective ? 1 : (titlesForCreate.length || 1);
+    const errors = editingObjective
+      ? validateObjective(objectiveForm, true, 1)
+      : validateObjective({ ...objectiveForm, title: titlesForCreate[0] ?? '' }, false, objectivesToCreateCount);
+
+    if (!editingObjective && titlesForCreate.length === 0) {
+      errors.title = 'At least one title is required';
+    }
+    if (!editingObjective && titlesForCreate.length > 0 && (objectives.length + titlesForCreate.length > MAX_OBJECTIVES)) {
+      errors.general = `Maximum of ${MAX_OBJECTIVES} objectives allowed.`;
+    }
     if (Object.keys(errors).length > 0) {
       setObjectiveErrors(errors);
       return;
@@ -227,27 +301,25 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
          });
          // Explicitly refetch objectives to ensure UI updates immediately
          await refetchObjectives();
-       } else {
-        if (objectives.length >= MAX_OBJECTIVES) {
-          setObjectiveErrors({ general: 'Maximum of 6 objectives allowed.' });
-          return;
+      } else {
+        for (const title of titlesForCreate) {
+          const createData = {
+            evaluation_id: evaluation.id,
+            title,
+            description: objectiveForm.description ?? '',
+            target: objectiveForm.target!,
+            achieved: objectiveForm.achieved ?? 0,
+            status: 'Not started',
+            weight: Number(((objectiveForm.weight as number)).toFixed(4))
+          };
+          await createObjectiveMutation.mutateAsync(createData);
         }
-        const createData = {
-          evaluation_id: evaluation.id,
-          title: objectiveForm.title!,
-          description: objectiveForm.description ?? '',
-          target: objectiveForm.target!,
-          achieved: objectiveForm.achieved ?? 0,
-          status: 'Not started',
-          weight: Number(((objectiveForm.weight as number)).toFixed(4))
-        };
-         await createObjectiveMutation.mutateAsync(createData);
-         // Explicitly refetch objectives to ensure UI updates immediately
-         await refetchObjectives();
+        await refetchObjectives();
       }
 
       setIsObjectiveModalOpen(false);
       setObjectiveForm({});
+      setObjectiveTitles(['']);
       setObjectiveErrors({});
     } catch (err) {
       console.error('Error saving objective:', err);
@@ -279,6 +351,8 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       weight: 10,
       description: ''
     });
+    const missing = getMissingPredefinedCompetencyNames('Core', []);
+    setCompetencyNames(missing.length > 0 ? missing : ['']);
     setCompetencyErrors({});
     setIsCompetencyModalOpen(true);
   };
@@ -290,6 +364,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       required_level: Math.max(1, competency.required_level),
       actual_level: Math.max(1, competency.actual_level),
     });
+    setCompetencyNames([competency.name]);
     setCompetencyErrors({});
     setIsCompetencyModalOpen(true);
   };
@@ -297,7 +372,14 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const handleSaveCompetency = async () => {
     const isPending = editingCompetency ? updateCompetencyMutation.isPending : createCompetencyMutation.isPending;
     if (isPending) return;
-    const errors = validateCompetency(competencyForm, Boolean(editingCompetency));
+    const namesForCreate = editingCompetency ? [] : getCompetencyNamesForCreate();
+    const errors = editingCompetency
+      ? validateCompetency(competencyForm, true)
+      : validateCompetency({ ...competencyForm, name: namesForCreate[0] ?? '' }, false);
+
+    if (!editingCompetency && namesForCreate.length === 0) {
+      errors.name = 'At least one name is required';
+    }
     if (Object.keys(errors).length > 0) {
       setCompetencyErrors(errors);
       return;
@@ -324,25 +406,27 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           return next;
         });
       } else {
-        // Create new competency
-        const created = await createCompetencyMutation.mutateAsync({
-          employee_id: employee.id,
-          evaluation_id: evaluation.id,
-          name: competencyForm.name!,
-          category: competencyForm.category!,
-          required_level: competencyForm.required_level!,
-          actual_level: competencyForm.actual_level ?? 1,
-          weight: competencyForm.weight ?? 10,
-          description: competencyForm.description!
-        });
-        const createdId = (created as any)?.competence_id;
-        if (createdId) {
-          setCompetencyActualHiddenById(prev => ({ ...prev, [String(createdId)]: true }));
+        for (const name of namesForCreate) {
+          const created = await createCompetencyMutation.mutateAsync({
+            employee_id: employee.id,
+            evaluation_id: evaluation.id,
+            name,
+            category: competencyForm.category!,
+            required_level: competencyForm.required_level!,
+            actual_level: competencyForm.actual_level ?? 1,
+            weight: competencyForm.weight ?? 10,
+            description: competencyForm.description!
+          });
+          const createdId = (created as any)?.competence_id;
+          if (createdId) {
+            setCompetencyActualHiddenById(prev => ({ ...prev, [String(createdId)]: true }));
+          }
         }
       }
 
       setIsCompetencyModalOpen(false);
       setCompetencyForm({});
+      setCompetencyNames(['']);
       setCompetencyErrors({});
     } catch (err) {
       console.error('Error saving competency:', err);
@@ -1397,13 +1481,53 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   Title
                   <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="title"
-                  value={objectiveForm.title || ''}
-                  onChange={(e) => setObjectiveForm(prev => ({ ...prev, title: e.target.value }))}
-                  className={`transition-all duration-200 ${objectiveErrors.title ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
-                  placeholder="Enter objective title"
-                />
+                {editingObjective ? (
+                  <Input
+                    id="title"
+                    value={objectiveForm.title || ''}
+                    onChange={(e) => setObjectiveForm(prev => ({ ...prev, title: e.target.value }))}
+                    className={`transition-all duration-200 ${objectiveErrors.title ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
+                    placeholder="Enter objective title"
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {objectiveTitles.map((title, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <Input
+                          id={`title-${idx}`}
+                          value={title}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setObjectiveTitles(prev => prev.map((t, i) => (i === idx ? v : t)));
+                          }}
+                          className={`transition-all duration-200 ${objectiveErrors.title ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
+                          placeholder={`Objective title ${idx + 1}`}
+                        />
+                        {objectiveTitles.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setObjectiveTitles(prev => prev.filter((_, i) => i !== idx))}
+                            className="px-3 hover:bg-gray-50 transition-all duration-200"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setObjectiveTitles(prev => [...prev, ''])}
+                      className="w-full sm:w-auto hover:bg-gray-50 transition-all duration-200"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add another
+                    </Button>
+                  </div>
+                )}
                 {objectiveErrors.title && (
                   <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
                     <span className="w-1 h-1 bg-red-500 rounded-full"></span>
@@ -1494,7 +1618,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   disabled={allowedMaxWeightPercent < 10}
                   className={`transition-all duration-200 ${objectiveErrors.weight ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
                 />
-                <p className="text-xs text-gray-500">Remaining: {remainingPercent}% • Max allowed: {Math.max(10, allowedMaxWeightPercent)}%</p>
+                <p className="text-xs text-gray-500">Remaining: {remainingPercent}% • Max per objective: {Math.max(10, allowedMaxWeightPercent)}%</p>
                 {objectiveErrors.weight && (
                   <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
                     <span className="w-1 h-1 bg-red-500 rounded-full"></span>
@@ -1537,12 +1661,12 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                     createObjectiveMutation.isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Creating Objective
+                        Creating {objectivesToCreateCountForWeight > 1 ? 'Objectives' : 'Objective'}
                       </>
                     ) : (
                       <>
                         <Save className="h-4 w-4 mr-2" />
-                        Create Objective
+                        Create {objectivesToCreateCountForWeight > 1 ? 'Objectives' : 'Objective'}
                       </>
                     )
                   )}
@@ -1570,13 +1694,53 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   Name
                   <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="name"
-                  value={competencyForm.name || ''}
-                  onChange={(e) => setCompetencyForm(prev => ({ ...prev, name: e.target.value }))}
-                  className={`transition-all duration-200 ${competencyErrors.name ? 'border-red-500 focus:ring-red-500' : 'focus:ring-purple-500 focus:border-purple-500'}`}
-                  placeholder="Enter competency name"
-                />
+                {editingCompetency ? (
+                  <Input
+                    id="name"
+                    value={competencyForm.name || ''}
+                    onChange={(e) => setCompetencyForm(prev => ({ ...prev, name: e.target.value }))}
+                    className={`transition-all duration-200 ${competencyErrors.name ? 'border-red-500 focus:ring-red-500' : 'focus:ring-purple-500 focus:border-purple-500'}`}
+                    placeholder="Enter competency name"
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {competencyNames.map((name, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <Input
+                          id={`name-${idx}`}
+                          value={name}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setCompetencyNames(prev => prev.map((n, i) => (i === idx ? v : n)));
+                          }}
+                          className={`transition-all duration-200 ${competencyErrors.name ? 'border-red-500 focus:ring-red-500' : 'focus:ring-purple-500 focus:border-purple-500'}`}
+                          placeholder={`Competency name ${idx + 1}`}
+                        />
+                        {competencyNames.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCompetencyNames(prev => prev.filter((_, i) => i !== idx))}
+                            className="px-3 hover:bg-gray-50 transition-all duration-200"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCompetencyNames(prev => [...prev, ''])}
+                      className="w-full sm:w-auto hover:bg-gray-50 transition-all duration-200"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add another
+                    </Button>
+                  </div>
+                )}
                 {competencyErrors.name && (
                   <p className="text-sm text-red-600 flex items-center gap-1 animate-in slide-in-from-left-2 duration-200">
                     <span className="w-1 h-1 bg-red-500 rounded-full"></span>
@@ -1592,14 +1756,22 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 </Label>
                 <Select
                   value={competencyForm.category || 'Core'}
-                  onValueChange={(value) => setCompetencyForm(prev => ({ ...prev, category: value as 'Core' | 'Leadership' | 'Functional' }))}
+                  onValueChange={(value) => {
+                    if (!editingCompetency && isIndividualContributor && value === 'Leadership') {
+                      setCompetencyForm(prev => ({ ...prev, category: 'Core' }));
+                      return;
+                    }
+                    setCompetencyForm(prev => ({ ...prev, category: value as 'Core' | 'Leadership' | 'Functional' }));
+                  }}
                 >
                   <SelectTrigger className="transition-all duration-200 focus:ring-purple-500 focus:border-purple-500">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Core">Core</SelectItem>
-                    <SelectItem value="Leadership">Leadership</SelectItem>
+                    {(!isIndividualContributor || editingCompetency) && (
+                      <SelectItem value="Leadership">Leadership</SelectItem>
+                    )}
                     <SelectItem value="Functional">Functional</SelectItem>
                   </SelectContent>
                 </Select>
