@@ -128,6 +128,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const [objectiveTitles, setObjectiveTitles] = useState<string[]>(['']);
   const [competencyForm, setCompetencyForm] = useState<Partial<Competency>>({});
   const [competencyNames, setCompetencyNames] = useState<string[]>(['']);
+  const [competencyNamesTouched, setCompetencyNamesTouched] = useState(false);
   const [competencyActualHiddenById, setCompetencyActualHiddenById] = useState<Record<string, boolean>>({});
 
   // Error states
@@ -144,9 +145,16 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   );
 
   const isIndividualContributor = employee.managerialLevel === 'Individual Contributor';
+  const isExecutive = employee.managerialLevel === 'Executive';
 
   const MIN_OBJECTIVES = 4;
   const MAX_OBJECTIVES = 6;
+  const MIN_FUNCTIONAL_COMPETENCIES = 5;
+
+  const functionalCompetenciesCount = competencies.filter(c => c.category === 'Functional').length;
+  const functionalCompetenciesRequired = !isExecutive;
+  const hasMinFunctionalCompetencies =
+    !functionalCompetenciesRequired || functionalCompetenciesCount >= MIN_FUNCTIONAL_COMPETENCIES;
 
   const toPercent = (w: number): number => (w <= 1 ? w * 100 : w);
   const usedPercentExcludingCurrent = objectives.reduce((sum, obj) => {
@@ -225,14 +233,19 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   useEffect(() => {
     if (!isCompetencyModalOpen) return;
     if (editingCompetency) return;
+    if (competencyNamesTouched) return;
     if (isIndividualContributor && competencyForm.category === 'Leadership') {
+      setCompetencyForm(prev => ({ ...prev, category: 'Core' }));
+      return;
+    }
+    if (isExecutive && competencyForm.category === 'Functional') {
       setCompetencyForm(prev => ({ ...prev, category: 'Core' }));
       return;
     }
     const category = (competencyForm.category || 'Core') as 'Core' | 'Leadership' | 'Functional';
     const missing = getMissingPredefinedCompetencyNames(category, []);
     setCompetencyNames(missing.length > 0 ? missing : ['']);
-  }, [PREDEFINED_COMPETENCIES_BY_CATEGORY, competencies, competencyForm.category, editingCompetency, isCompetencyModalOpen, isIndividualContributor]);
+  }, [PREDEFINED_COMPETENCIES_BY_CATEGORY, competencies, competencyForm.category, editingCompetency, isCompetencyModalOpen, isIndividualContributor, competencyNamesTouched, isExecutive]);
 
   // Handlers for objectives
   const handleAddObjective = () => {
@@ -351,6 +364,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       weight: 10,
       description: ''
     });
+    setCompetencyNamesTouched(false);
     const missing = getMissingPredefinedCompetencyNames('Core', []);
     setCompetencyNames(missing.length > 0 ? missing : ['']);
     setCompetencyErrors({});
@@ -364,6 +378,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       required_level: Math.max(1, competency.required_level),
       actual_level: Math.max(1, competency.actual_level),
     });
+    setCompetencyNamesTouched(false);
     setCompetencyNames([competency.name]);
     setCompetencyErrors({});
     setIsCompetencyModalOpen(true);
@@ -662,6 +677,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
 
   const approve = () => {
     setActionError('');
+    if (!hasMinFunctionalCompetencies) {
+      setActionError('At least 5 Functional competencies are required to approve or reject.');
+      return;
+    }
     if (objectives.length < MIN_OBJECTIVES) {
       setActionError('At least 4 objectives are required to approve or reject.');
       return;
@@ -705,6 +724,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   };
 
   const reject = () => {
+    if (!hasMinFunctionalCompetencies) {
+      setActionError('At least 5 Functional competencies are required to approve or reject.');
+      return;
+    }
     if (objectives.length < MIN_OBJECTIVES) {
       setActionError('At least 4 objectives are required to approve or reject.');
       return;
@@ -1240,12 +1263,18 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                   <span>At least 4 objectives are required to approve or reject.</span>
                 </div>
               )}
+              {!hasMinFunctionalCompetencies && (
+                <div className="text-red-600 text-xs sm:text-sm flex items-center gap-2">
+                  <XCircle className="h-4 w-4" />
+                  <span>At least 5 Functional competencies are required to approve or reject.</span>
+                </div>
+              )}
               <div className="flex items-center gap-3">
-                <Button onClick={() => { if (panelSubmitted) return; const notEnough = objectives.length < MIN_OBJECTIVES; setPanelAction('approve'); setPanelComment(getActionPanelMessage('approve', currentStatus)); setPanelError(notEnough ? 'At least 4 objectives are required to approve or reject.' : ''); }} className="bg-green-600 hover:bg-green-700" disabled={isSubmittingAction || panelSubmitted}>
+                <Button onClick={() => { if (panelSubmitted) return; const notEnoughObj = objectives.length < MIN_OBJECTIVES; const notEnoughFunc = !hasMinFunctionalCompetencies; setPanelAction('approve'); setPanelComment(getActionPanelMessage('approve', currentStatus)); setPanelError(notEnoughObj ? 'At least 4 objectives are required to approve or reject.' : (notEnoughFunc ? 'At least 5 Functional competencies are required to approve or reject.' : '')); }} className="bg-green-600 hover:bg-green-700" disabled={isSubmittingAction || panelSubmitted}>
                   <Check className="h-4 w-4 mr-2" />
                   Approve
                 </Button>
-                <Button variant="destructive" onClick={() => { if (panelSubmitted) return; const notEnough = objectives.length < MIN_OBJECTIVES; setPanelAction('reject'); setPanelComment(getActionPanelMessage('reject', currentStatus)); setPanelError(notEnough ? 'At least 4 objectives are required to approve or reject.' : ''); }} className="bg-red-600 hover:bg-red-700" disabled={isSubmittingAction || panelSubmitted}>
+                <Button variant="destructive" onClick={() => { if (panelSubmitted) return; const notEnoughObj = objectives.length < MIN_OBJECTIVES; const notEnoughFunc = !hasMinFunctionalCompetencies; setPanelAction('reject'); setPanelComment(getActionPanelMessage('reject', currentStatus)); setPanelError(notEnoughObj ? 'At least 4 objectives are required to approve or reject.' : (notEnoughFunc ? 'At least 5 Functional competencies are required to approve or reject.' : '')); }} className="bg-red-600 hover:bg-red-700" disabled={isSubmittingAction || panelSubmitted}>
                   <X className="h-4 w-4 mr-2" />
                   Reject
                 </Button>
@@ -1264,7 +1293,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button onClick={() => { if (panelAction === 'reject' && !panelComment.trim()) { setPanelError('Comment is required'); return; } if (objectives.length < MIN_OBJECTIVES) { setPanelError('At least 4 objectives are required to approve or reject.'); return; } setIsConfirmOpen(true); }} className="bg-blue-600 hover:bg-blue-700" disabled={isSubmittingAction}>
+                    <Button onClick={() => { if (panelAction === 'reject' && !panelComment.trim()) { setPanelError('Comment is required'); return; } if (!hasMinFunctionalCompetencies) { setPanelError('At least 5 Functional competencies are required to approve or reject.'); return; } if (objectives.length < MIN_OBJECTIVES) { setPanelError('At least 4 objectives are required to approve or reject.'); return; } setIsConfirmOpen(true); }} className="bg-blue-600 hover:bg-blue-700" disabled={isSubmittingAction}>
                       Submit
                     </Button>
                     <Button variant="outline" onClick={() => { setPanelAction(null); setPanelComment(''); setPanelError(''); }} disabled={isSubmittingAction}>
@@ -1309,6 +1338,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={isSubmittingAction}>Cancel</Button>
                 <Button onClick={async () => {
                   if (!panelAction) return;
+                  if (!hasMinFunctionalCompetencies) { setPanelError('At least 5 Functional competencies are required to approve or reject.'); setIsConfirmOpen(false); return; }
                   if (objectives.length < MIN_OBJECTIVES) { setPanelError('At least 4 objectives are required to approve or reject.'); setIsConfirmOpen(false); return; }
                   const nextUiStatus = panelAction === 'approve' ? getNextWorkflowStatus(currentStatus) : getPrevWorkflowStatus(currentStatus);
                   const nextActivityKey = statusKeyMap[nextUiStatus] || 'DRAFT';
@@ -1499,6 +1529,15 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                           onChange={(e) => {
                             const v = e.target.value;
                             setObjectiveTitles(prev => prev.map((t, i) => (i === idx ? v : t)));
+                            if (objectiveErrors.title || objectiveErrors.general) {
+                              setObjectiveErrors(prev => {
+                                if (!prev.title && !prev.general) return prev;
+                                const next = { ...prev };
+                                delete next.title;
+                                delete next.general;
+                                return next;
+                              });
+                            }
                           }}
                           className={`transition-all duration-200 ${objectiveErrors.title ? 'border-red-500 focus:ring-red-500' : 'focus:ring-green-500 focus:border-green-500'}`}
                           placeholder={`Objective title ${idx + 1}`}
@@ -1712,6 +1751,16 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                           onChange={(e) => {
                             const v = e.target.value;
                             setCompetencyNames(prev => prev.map((n, i) => (i === idx ? v : n)));
+                            if (!competencyNamesTouched) setCompetencyNamesTouched(true);
+                            if (competencyErrors.name || competencyErrors.general) {
+                              setCompetencyErrors(prev => {
+                                if (!prev.name && !prev.general) return prev;
+                                const next = { ...prev };
+                                delete next.name;
+                                delete next.general;
+                                return next;
+                              });
+                            }
                           }}
                           className={`transition-all duration-200 ${competencyErrors.name ? 'border-red-500 focus:ring-red-500' : 'focus:ring-purple-500 focus:border-purple-500'}`}
                           placeholder={`Competency name ${idx + 1}`}
@@ -1721,7 +1770,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => setCompetencyNames(prev => prev.filter((_, i) => i !== idx))}
+                            onClick={() => {
+                              setCompetencyNamesTouched(true);
+                              setCompetencyNames(prev => prev.filter((_, i) => i !== idx));
+                            }}
                             className="px-3 hover:bg-gray-50 transition-all duration-200"
                           >
                             <X className="h-4 w-4" />
@@ -1733,7 +1785,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setCompetencyNames(prev => [...prev, ''])}
+                      onClick={() => {
+                        setCompetencyNamesTouched(true);
+                        setCompetencyNames(prev => [...prev, '']);
+                      }}
                       className="w-full sm:w-auto hover:bg-gray-50 transition-all duration-200"
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -1761,6 +1816,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                       setCompetencyForm(prev => ({ ...prev, category: 'Core' }));
                       return;
                     }
+                    if (!editingCompetency && isExecutive && value === 'Functional') {
+                      setCompetencyForm(prev => ({ ...prev, category: 'Core' }));
+                      return;
+                    }
                     setCompetencyForm(prev => ({ ...prev, category: value as 'Core' | 'Leadership' | 'Functional' }));
                   }}
                 >
@@ -1772,7 +1831,9 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                     {(!isIndividualContributor || editingCompetency) && (
                       <SelectItem value="Leadership">Leadership</SelectItem>
                     )}
-                    <SelectItem value="Functional">Functional</SelectItem>
+                    {(!isExecutive || editingCompetency) && (
+                      <SelectItem value="Functional">Functional</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

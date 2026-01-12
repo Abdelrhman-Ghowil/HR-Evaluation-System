@@ -29,7 +29,7 @@ export interface EmployeeInput {
   department: string;
   position: string;
   role: 'ADMIN' | 'HR' | 'HOD' | 'LM' | 'EMP';
-  managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management';
+  managerialLevel: 'Individual Contributor' | 'Supervisory' | 'Middle Management' | 'Executive';
   status: 'Active' | 'Inactive';
   companyName: string;
   orgPath: string;
