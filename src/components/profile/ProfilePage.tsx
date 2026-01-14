@@ -43,7 +43,7 @@ import {
 import { Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/api';
-import { ApiEmployee, ApiEvaluation, ApiObjective, ApiCompetency, ApiMyProfile, ApiError } from '../../types/api';
+import { ApiEmployee, ApiEvaluation, ApiObjective, ApiCompetency, ApiMyProfile, ApiError, ObjectiveStatus, CompetencyCategory, CreateObjectiveRequest, CreateCompetencyRequest, UpdateObjectiveRequest, UpdateCompetencyRequest } from '../../types/api';
 import { useEvaluations, useUpdateObjective, useUpdateCompetency, useUpdateEvaluation, useCreateObjective, useDeleteObjective, useCreateCompetency, useDeleteCompetency } from '../../hooks/useApi';
 import { toast } from 'sonner';
 import EvaluationDetails from '../employees/EvaluationDetails';
@@ -163,14 +163,18 @@ const ProfilePage: React.FC = () => {
         if (value.trim().length < 2) return 'Username must be at least 2 characters';
         if (!/^[a-zA-Z0-9_]+$/.test(value)) return 'Username can only contain letters, numbers, and underscores';
         return '';
-      case 'email':
+      case 'email': {
         if (!value.trim()) return 'Email is required';
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(value)) return 'Please enter a valid email address';
-          return '';
+        return '';
+      }
       case 'phone':
-        if (value && !/^[\+]?[1-9][\d]{0,15}$/.test(value.replace(/[\s\-\(\)]/g, ''))) {
+        if (value) {
+          const digits = value.replace(/[\s\-()]/g, '');
+          if (!/^\+?[1-9]\d{0,15}$/.test(digits)) {
           return 'Please enter a valid phone number';
+          }
         }
         return '';
       default:
@@ -196,6 +200,40 @@ const ProfilePage: React.FC = () => {
     const isValid = Object.keys(errors).length === 0;
     setIsFormValid(isValid);
     return isValid;
+  };
+
+  const hasMessage = (value: unknown): value is { message: string } => {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'message' in value &&
+      typeof (value as Record<string, unknown>).message === 'string'
+    );
+  };
+
+  const getErrorMessage = (err: unknown, fallback: string): string => {
+    if (err instanceof Error && err.message) return err.message;
+    if (typeof err === 'string') return err;
+    if (hasMessage(err)) return err.message;
+    return fallback;
+  };
+
+  const isObjectiveStatus = (value: string): value is ObjectiveStatus => {
+    return value === 'Not started' || value === 'In-progress' || value === 'Completed';
+  };
+
+  const normalizeObjectiveStatus = (value: string | undefined): ObjectiveStatus => {
+    if (!value) return 'Not started';
+    return isObjectiveStatus(value) ? value : 'Not started';
+  };
+
+  const isCompetencyCategory = (value: string): value is CompetencyCategory => {
+    return value === 'Core' || value === 'Leadership' || value === 'Functional';
+  };
+
+  const normalizeCompetencyCategory = (value: string | undefined): CompetencyCategory => {
+    if (!value) return 'Core';
+    return isCompetencyCategory(value) ? value : 'Core';
   };
 
   const handleFieldChange = (field: string, value: string) => {
@@ -272,14 +310,17 @@ const ProfilePage: React.FC = () => {
     isLoading: evaluationsQueryLoading,
     error: evaluationsQueryError,
   } = useEvaluations(
-    { user_id: user?.user_id, status: ['Approved', 'Completed'] },
+    { user_id: user?.user_id },
     {
       enabled: true,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
-      select: (data: any) => {
-        if (Array.isArray(data)) return data;
-        if (data?.results && Array.isArray(data.results)) return data.results;
+      select: (data: unknown) => {
+        if (Array.isArray(data)) return data as ApiEvaluation[];
+        if (typeof data === 'object' && data !== null && 'results' in data) {
+          const results = (data as Record<string, unknown>).results;
+          if (Array.isArray(results)) return results as ApiEvaluation[];
+        }
         return [];
       },
     }
@@ -307,8 +348,8 @@ const ProfilePage: React.FC = () => {
       try {
         const data = await apiService.getSelfEvaluations();
         setSelfEvaluations(Array.isArray(data) ? data : []);
-      } catch (err: any) {
-        const msg = err?.message || 'Error fetching self evaluations';
+      } catch (err: unknown) {
+        const msg = getErrorMessage(err, 'Error fetching self evaluations');
         setSelfEvaluationsError(msg);
         setSelfEvaluations([]);
       } finally {
@@ -490,17 +531,17 @@ const ProfilePage: React.FC = () => {
 
       console.log('evaluation:',evaluation);
 
-      try {
-        const detailed = await apiService.getEvaluation(evaluationId);
-        if (detailed) {
-          setSelectedEvaluationForPanel((prev) => {
-            if (!prev) return prev;
-            const prevId = (prev as unknown as { evaluation_id?: string; id?: string }).evaluation_id || (prev as unknown as { evaluation_id?: string; id?: string }).id;
-            if (String(prevId) !== String(evaluationId)) return prev;
-            return detailed;
-          });
-        }
-      } catch {}
+      const detailed = await apiService.getEvaluation(evaluationId).catch(() => null);
+      if (detailed) {
+        setSelectedEvaluationForPanel((prev) => {
+          if (!prev) return prev;
+          const prevId =
+            (prev as unknown as { evaluation_id?: string; id?: string }).evaluation_id ||
+            (prev as unknown as { evaluation_id?: string; id?: string }).id;
+          if (String(prevId) !== String(evaluationId)) return prev;
+          return detailed;
+        });
+      }
 
       // Fetch objectives
       setIsLoadingObjectives(true);
@@ -729,6 +770,13 @@ const ProfilePage: React.FC = () => {
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  const canShowWeightsResultsScores = (status?: string) =>
+    status === 'Employee Review' || status === 'Approved' || status === 'Completed';
+
+  const showAchievedAndActualFields =
+    !!selectedEvaluationForPanel &&
+    (isSelfEvalMode || canShowWeightsResultsScores(selectedEvaluationForPanel.status));
 
   // Password validation functions
   const validatePasswordStrength = (password: string): string | null => {
@@ -1292,8 +1340,8 @@ const ProfilePage: React.FC = () => {
                               setSelfEvaluations(Array.isArray(refreshed) ? refreshed : []);
                               setIsSelfEvalMode(true);
                               setSelectedSelfEvaluation(created);
-                            } catch (err: any) {
-                              toast.error(err?.message || 'Failed to create self evaluation');
+                            } catch (err: unknown) {
+                              toast.error(getErrorMessage(err, 'Failed to create self evaluation'));
                             } finally {
                               setCreatingSelfEval(false);
                             }
@@ -1425,8 +1473,8 @@ const ProfilePage: React.FC = () => {
                           toast.success('Self evaluation deleted');
                           const refreshed = await apiService.getSelfEvaluations();
                           setSelfEvaluations(Array.isArray(refreshed) ? refreshed : []);
-                        } catch (err: any) {
-                          toast.error(err?.message || 'Failed to delete self evaluation');
+                        } catch (err: unknown) {
+                          toast.error(getErrorMessage(err, 'Failed to delete self evaluation'));
                         } finally {
                           setIsDeletingSelfId(null);
                           setConfirmSelfDeleteOpen(false);
@@ -1818,7 +1866,7 @@ const ProfilePage: React.FC = () => {
                                 {evaluation.status}
                               </Badge>
                               
-                              {evaluation.score && (
+                              {evaluation.score && canShowWeightsResultsScores(evaluation.status) && (
                                 <div className="text-right">
                                   <p className="text-lg font-bold text-gray-900">{evaluation.score}</p>
                                   <p className="text-xs text-gray-500">Score</p>
@@ -2117,14 +2165,18 @@ const ProfilePage: React.FC = () => {
                       <h4 className="font-semibold text-gray-900">{selectedEvaluationForPanel.type}</h4>
                       <p className="text-sm text-gray-600">Period: {selectedEvaluationForPanel.period}</p>
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{formatPercent(getDisplayedObjectivesScore())}</div>
-                      <div className="text-sm text-gray-600">Objectives Score</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{formatPercent(getDisplayedCompetenciesScore())}</div>
-                      <div className="text-sm text-gray-600">Competencies Score</div>
-                    </div>
+                    {showAchievedAndActualFields && (
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">{formatPercent(getDisplayedObjectivesScore())}</div>
+                        <div className="text-sm text-gray-600">Objectives Score</div>
+                      </div>
+                    )}
+                    {showAchievedAndActualFields && (
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">{formatPercent(getDisplayedCompetenciesScore())}</div>
+                        <div className="text-sm text-gray-600">Competencies Score</div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2175,17 +2227,29 @@ const ProfilePage: React.FC = () => {
                                       <Label>Target</Label>
                                       <Input type="number" min={0} max={10} value={newObjective?.target ?? 0} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }), target: Math.min(parseFloat(e.target.value) || 0, 10) }))} />
                                     </div>
-                                    <div className="space-y-1">
-                                      <Label>Achieved</Label>
-                                      <Input type="number" min={0} max={10} value={newObjective?.achieved ?? 0} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }), achieved: Math.min(parseFloat(e.target.value) || 0, 10) }))} />
-                                    </div>
-                                    <div className="space-y-1">
-                                      <Label>Weight (%)</Label>
-                                      <Input type="number" min={10} max={40} value={newObjective?.weight ?? 10} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }), weight: Math.max(10, Math.min(parseFloat(e.target.value) || 10, 40)) }))} />
-                                    </div>
+                                    {showAchievedAndActualFields && (
+                                      <div className="space-y-1">
+                                        <Label>Achieved</Label>
+                                        <Input type="number" min={0} max={10} value={newObjective?.achieved ?? 0} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }), achieved: Math.min(parseFloat(e.target.value) || 0, 10) }))} />
+                                      </div>
+                                    )}
+                                    {showAchievedAndActualFields && (
+                                      <div className="space-y-1">
+                                        <Label>Weight (%)</Label>
+                                        <Input type="number" min={10} max={40} value={newObjective?.weight ?? 10} onChange={(e) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }), weight: Math.max(10, Math.min(parseFloat(e.target.value) || 10, 40)) }))} />
+                                      </div>
+                                    )}
                                     <div className="space-y-1">
                                       <Label>Status</Label>
-                                      <Select value={newObjective?.status ?? 'Not started'} onValueChange={(v) => setNewObjective(prev => ({ ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }), status: v as any }))}>
+                                      <Select
+                                        value={newObjective?.status ?? 'Not started'}
+                                        onValueChange={(v) =>
+                                          setNewObjective((prev) => ({
+                                            ...(prev || { title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' }),
+                                            status: isObjectiveStatus(v) ? v : 'Not started',
+                                          }))
+                                        }
+                                      >
                                         <SelectTrigger className="w-40">
                                           <SelectValue placeholder="Select status" />
                                         </SelectTrigger>
@@ -2212,19 +2276,23 @@ const ProfilePage: React.FC = () => {
                                           <div className="text-xs text-gray-500">Target</div>
                                           <div className="text-lg font-semibold text-gray-900">{newObjective?.target ?? 0}</div>
                                         </div>
-                                        <div>
-                                          <div className="text-xs text-gray-500">Achieved</div>
-                                          <div className="text-lg font-semibold text-gray-900">{newObjective?.achieved ?? 0}</div>
-                                        </div>
-                                        <div className="flex-1">
-                                          <div className="text-xs text-gray-500 mb-1">Progress</div>
-                                          <div className="w-full h-2 bg-gray-200 rounded">
-                                            <div
-                                              className="h-2 rounded bg-gradient-to-r from-blue-600 to-indigo-600"
-                                              style={{ width: `${Math.min(((newObjective?.achieved ?? 0) / Math.max(newObjective?.target ?? 1, 1)) * 100, 100)}%` }}
-                                            />
-                                          </div>
-                                        </div>
+                                        {showAchievedAndActualFields && (
+                                          <>
+                                            <div>
+                                              <div className="text-xs text-gray-500">Achieved</div>
+                                              <div className="text-lg font-semibold text-gray-900">{newObjective?.achieved ?? 0}</div>
+                                            </div>
+                                            <div className="flex-1">
+                                              <div className="text-xs text-gray-500 mb-1">Progress</div>
+                                              <div className="w-full h-2 bg-gray-200 rounded">
+                                                <div
+                                                  className="h-2 rounded bg-gradient-to-r from-blue-600 to-indigo-600"
+                                                  style={{ width: `${Math.min(((newObjective?.achieved ?? 0) / Math.max(newObjective?.target ?? 1, 1)) * 100, 100)}%` }}
+                                                />
+                                              </div>
+                                            </div>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -2233,7 +2301,7 @@ const ProfilePage: React.FC = () => {
                                       onClick={async () => {
                                         if (!selectedEvaluationForPanel || !newObjective || !newObjective.title) { toast.error('Provide title'); return; }
                                         try {
-                                          const payload = {
+                                          const payload: CreateObjectiveRequest = {
                                             evaluation_id: selectedEvaluationForPanel.evaluation_id,
                                             title: newObjective.title,
                                             description: newObjective.description,
@@ -2242,12 +2310,12 @@ const ProfilePage: React.FC = () => {
                                             weight: newObjective.weight,
                                             status: newObjective.status,
                                           };
-                                          const created = await createObjectiveMutation.mutateAsync(payload as any);
+                                          const created = await createObjectiveMutation.mutateAsync(payload);
                                           setObjectives(prev => [created, ...prev]);
                                           setNewObjective({ title: '', description: '', target: 0, achieved: 0, weight: 10, status: 'Not started' });
                                           toast.success('Objective added');
-                                        } catch (err: any) {
-                                          toast.error(err?.message || 'Failed to add objective');
+                                        } catch (err: unknown) {
+                                          toast.error(getErrorMessage(err, 'Failed to add objective'));
                                         }
                                       }}
                                       className="bg-blue-600 hover:bg-blue-700"
@@ -2291,17 +2359,25 @@ const ProfilePage: React.FC = () => {
                                         <span className="font-medium ml-1">{objective.target}</span>
                                       </div>
                                       <div className="text-sm">
-                                        <span className="text-gray-500">Achieved:</span>
-                                        <span className="font-medium ml-1">{objective.achieved}</span>
+                                        {showAchievedAndActualFields && (
+                                          <>
+                                            <span className="text-gray-500">Achieved:</span>
+                                            <span className="font-medium ml-1">{objective.achieved}</span>
+                                          </>
+                                        )}
                                       </div>
-                                      <div className="text-sm">
-                                        <span className="text-gray-500">Weight:</span>
-                                        <span className="font-medium ml-1">{objective.weight}%</span>
-                                      </div>
+                                      {showAchievedAndActualFields && (
+                                        <div className="text-sm">
+                                          <span className="text-gray-500">Weight:</span>
+                                          <span className="font-medium ml-1">{objective.weight}%</span>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="text-right space-y-2">
-                                    <div className="text-lg font-bold text-blue-600">{formatPercent(score)}</div>
+                                    {showAchievedAndActualFields && (
+                                      <div className="text-lg font-bold text-blue-600">{formatPercent(score)}</div>
+                                    )}
                                     <Badge 
                                       variant={objective.status === 'Completed' ? 'default' : 'secondary'}
                                       className={
@@ -2320,7 +2396,7 @@ const ProfilePage: React.FC = () => {
                                               try {
                                                 const data = objectiveFieldEdits[objective.objective_id] || {};
                                                 const achievedChanged = objectiveEdits[objective.objective_id];
-                                                const updateData: any = { ...data };
+                                                const updateData: UpdateObjectiveRequest = { ...data };
                                                 if (achievedChanged !== undefined) updateData.achieved = achievedChanged;
                                                 if (Object.keys(updateData).length === 0) { setEditingObjectiveId(null); return; }
                                                 const updated = await updateObjectiveMutation.mutateAsync({ objectiveId: objective.objective_id, evaluationId: objective.evaluation_id, objectiveData: updateData });
@@ -2328,8 +2404,8 @@ const ProfilePage: React.FC = () => {
                                                 setEditingObjectiveId(null);
                                                 setObjectiveFieldEdits(prev => ({ ...prev, [objective.objective_id]: {} }));
                                                 toast.success('Objective updated');
-                                              } catch (err: any) {
-                                                toast.error(err?.message || 'Failed to update objective');
+                                              } catch (err: unknown) {
+                                                toast.error(getErrorMessage(err, 'Failed to update objective'));
                                               }
                                             }}
                                             className="bg-green-600 hover:bg-green-700"
@@ -2350,8 +2426,8 @@ const ProfilePage: React.FC = () => {
                                               await deleteObjectiveMutation.mutateAsync({ objectiveId: objective.objective_id, evaluationId: objective.evaluation_id });
                                               setObjectives(prev => prev.filter(o => o.objective_id !== objective.objective_id));
                                               toast.success('Objective deleted');
-                                            } catch (err: any) {
-                                              toast.error(err?.message || 'Failed to delete objective');
+                                            } catch (err: unknown) {
+                                              toast.error(getErrorMessage(err, 'Failed to delete objective'));
                                             }
                                           }}
                                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -2373,10 +2449,12 @@ const ProfilePage: React.FC = () => {
                                       <Label>Target</Label>
                                       <Input type="number" min={0} max={10} defaultValue={objective.target} onChange={(e) => setObjectiveFieldEdits(prev => ({ ...prev, [objective.objective_id]: { ...prev[objective.objective_id], target: Math.min(parseFloat(e.target.value) || 0, 10) } }))} />
                                     </div>
-                                    <div className="space-y-1">
-                                      <Label>Weight (%)</Label>
-                                      <Input type="number" min={10} max={40} defaultValue={objective.weight} onChange={(e) => setObjectiveFieldEdits(prev => ({ ...prev, [objective.objective_id]: { ...prev[objective.objective_id], weight: Math.max(10, Math.min(parseFloat(e.target.value) || 10, 40)) } }))} />
-                                    </div>
+                                    {showAchievedAndActualFields && (
+                                      <div className="space-y-1">
+                                        <Label>Weight (%)</Label>
+                                        <Input type="number" min={10} max={40} defaultValue={objective.weight} onChange={(e) => setObjectiveFieldEdits(prev => ({ ...prev, [objective.objective_id]: { ...prev[objective.objective_id], weight: Math.max(10, Math.min(parseFloat(e.target.value) || 10, 40)) } }))} />
+                                      </div>
+                                    )}
                                     
                                     <div className="md:col-span-3 space-y-1">
                                       <Label>Description</Label>
@@ -2384,7 +2462,17 @@ const ProfilePage: React.FC = () => {
                                     </div>
                                     <div className="space-y-1">
                                       <Label>Status</Label>
-                                      <Select value={(objective.status as any) ?? 'Not started'} onValueChange={(v) => setObjectiveFieldEdits(prev => ({ ...prev, [objective.objective_id]: { ...prev[objective.objective_id], status: v } }))}>
+                                      <Select
+                                        value={normalizeObjectiveStatus(
+                                          String(objectiveFieldEdits[objective.objective_id]?.status ?? objective.status)
+                                        )}
+                                        onValueChange={(v) =>
+                                          setObjectiveFieldEdits((prev) => ({
+                                            ...prev,
+                                            [objective.objective_id]: { ...prev[objective.objective_id], status: v },
+                                          }))
+                                        }
+                                      >
                                         <SelectTrigger className="w-40">
                                           <SelectValue placeholder="Select status" />
                                         </SelectTrigger>
@@ -2436,7 +2524,15 @@ const ProfilePage: React.FC = () => {
                                     </div>
                                     <div className="space-y-1">
                                       <Label>Category</Label>
-                                      <Select value={newCompetency?.category ?? 'Core'} onValueChange={(v) => setNewCompetency(prev => ({ ...(prev || { name: '', category: 'Core', required_level: 5, actual_level: 0, weight: 10, description: '' }), category: v as any }))}>
+                                      <Select
+                                        value={newCompetency?.category ?? 'Core'}
+                                        onValueChange={(v) =>
+                                          setNewCompetency((prev) => ({
+                                            ...(prev || { name: '', category: 'Core', required_level: 5, actual_level: 0, weight: 10, description: '' }),
+                                            category: isCompetencyCategory(v) ? v : 'Core',
+                                          }))
+                                        }
+                                      >
                                         <SelectTrigger className="w-40">
                                           <SelectValue placeholder="Select category" />
                                         </SelectTrigger>
@@ -2450,13 +2546,15 @@ const ProfilePage: React.FC = () => {
                                     <div className="space-y-1">
                                       <Label>Required Level</Label>
                                       <Input type="range" min={0} max={10} value={newCompetency?.required_level ?? 5} onChange={(e) => setNewCompetency(prev => ({ ...(prev || { name: '', category: 'Core', required_level: 5, actual_level: 0, weight: 10, description: '' }), required_level: parseFloat(e.target.value) || 0 }))} />
-                                      <div className="text-xs text-gray-600">{newCompetency?.required_level ?? 5}/10</div>
+                                      <div className="text-xs text-gray-600">{newCompetency?.required_level ?? 5}</div>
                                     </div>
-                                    <div className="space-y-1">
-                                      <Label>Actual Level</Label>
-                                      <Input type="range" min={0} max={10} value={newCompetency?.actual_level ?? 0} onChange={(e) => setNewCompetency(prev => ({ ...(prev || { name: '', category: 'Core', required_level: 5, actual_level: 0, weight: 10, description: '' }), actual_level: parseFloat(e.target.value) || 0 }))} />
-                                      <div className="text-xs text-gray-600">{newCompetency?.actual_level ?? 0}/10</div>
-                                    </div>
+                                    {showAchievedAndActualFields && (
+                                      <div className="space-y-1">
+                                        <Label>Actual Level</Label>
+                                        <Input type="range" min={0} max={10} value={newCompetency?.actual_level ?? 0} onChange={(e) => setNewCompetency(prev => ({ ...(prev || { name: '', category: 'Core', required_level: 5, actual_level: 0, weight: 10, description: '' }), actual_level: parseFloat(e.target.value) || 0 }))} />
+                                        <div className="text-xs text-gray-600">{newCompetency?.actual_level ?? 0}</div>
+                                      </div>
+                                    )}
                                     <div className="space-y-1 md:col-span-2">
                                       <Label>Description</Label>
                                       <Textarea rows={2} value={newCompetency?.description ?? ''} onChange={(e) => setNewCompetency(prev => ({ ...(prev || { name: '', category: 'Core', required_level: 5, actual_level: 0, description: '' }), description: e.target.value }))} />
@@ -2480,21 +2578,25 @@ const ProfilePage: React.FC = () => {
                                       <div className="mt-2 flex items-center gap-6">
                                         <div>
                                           <div className="text-xs text-gray-500">Required</div>
-                                          <div className="text-lg font-semibold text-gray-900">{newCompetency?.required_level ?? 0}/10</div>
+                                          <div className="text-lg font-semibold text-gray-900">{newCompetency?.required_level ?? 0}</div>
                                         </div>
-                                        <div>
-                                          <div className="text-xs text-gray-500">Actual</div>
-                                          <div className="text-lg font-semibold text-gray-900">{newCompetency?.actual_level ?? 0}/10</div>
-                                        </div>
-                                        <div className="flex-1">
-                                          <div className="text-xs text-gray-500 mb-1">Progress</div>
-                                          <div className="w-full h-2 bg-gray-200 rounded">
-                                            <div
-                                              className="h-2 rounded bg-gradient-to-r from-green-600 to-emerald-600"
-                                              style={{ width: `${Math.min(((newCompetency?.actual_level ?? 0) / Math.max(newCompetency?.required_level ?? 1, 1)) * 100, 100)}%` }}
-                                            />
-                                          </div>
-                                        </div>
+                                        {showAchievedAndActualFields && (
+                                          <>
+                                            <div>
+                                              <div className="text-xs text-gray-500">Actual</div>
+                                              <div className="text-lg font-semibold text-gray-900">{newCompetency?.actual_level ?? 0}</div>
+                                            </div>
+                                            <div className="flex-1">
+                                              <div className="text-xs text-gray-500 mb-1">Progress</div>
+                                              <div className="w-full h-2 bg-gray-200 rounded">
+                                                <div
+                                                  className="h-2 rounded bg-gradient-to-r from-green-600 to-emerald-600"
+                                                  style={{ width: `${Math.min(((newCompetency?.actual_level ?? 0) / Math.max(newCompetency?.required_level ?? 1, 1)) * 100, 100)}%` }}
+                                                />
+                                              </div>
+                                            </div>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -2503,7 +2605,7 @@ const ProfilePage: React.FC = () => {
                                       onClick={async () => {
                                         if (!selectedEvaluationForPanel || !newCompetency || !newCompetency.name) { toast.error('Provide name'); return; }
                                         try {
-                                          const payload = {
+                                          const payload: CreateCompetencyRequest = {
                                             evaluation_id: selectedEvaluationForPanel.evaluation_id,
                                             employee_id: profileData.employee_id,
                                             name: newCompetency.name,
@@ -2513,12 +2615,12 @@ const ProfilePage: React.FC = () => {
                                             weight: 0,
                                             description: newCompetency.description,
                                           };
-                                          const created = await createCompetencyMutation.mutateAsync(payload as any);
+                                          const created = await createCompetencyMutation.mutateAsync(payload);
                                           setCompetencies(prev => [created, ...prev]);
                                           setNewCompetency({ name: '', category: 'Core', required_level: 5, actual_level: 0, description: '' });
                                           toast.success('Competency added');
-                                        } catch (err: any) {
-                                          toast.error(err?.message || 'Failed to add competency');
+                                        } catch (err: unknown) {
+                                          toast.error(getErrorMessage(err, 'Failed to add competency'));
                                         }
                                       }}
                                       className="bg-green-600 hover:bg-green-700"
@@ -2570,33 +2672,41 @@ const ProfilePage: React.FC = () => {
                                     <div className="flex items-center space-x-4 mt-2">
                                       <div className="text-sm">
                                         <span className="text-gray-500">Required:</span>
-                                        <span className="font-medium ml-1">{competency.required_level}/10</span>
+                                        <span className="font-medium ml-1">{competency.required_level}</span>
                                       </div>
                                       <div className="text-sm">
-                                        <span className="text-gray-500">Actual:</span>
-                                        <span className="font-medium ml-1">{competency.actual_level}/10</span>
+                                        {showAchievedAndActualFields && (
+                                          <>
+                                            <span className="text-gray-500">Actual:</span>
+                                            <span className="font-medium ml-1">{competency.actual_level}</span>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
                                   <div className="text-right">
-                                    <div className="text-lg font-bold text-green-600">{formatPercent(score)}</div>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      {competency.actual_level >= competency.required_level ? 'Meets Requirement' : 'Below Requirement'}
-                                    </div>
+                                    {showAchievedAndActualFields && (
+                                      <div className="text-lg font-bold text-green-600">{formatPercent(score)}</div>
+                                    )}
+                                    {showAchievedAndActualFields && (
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        {competency.actual_level >= competency.required_level ? 'Meets Requirement' : 'Below Requirement'}
+                                      </div>
+                                    )}
                                     {canSelfCrud && (
                                       <div className="flex items-center gap-2 justify-end mt-2">
                                         {editingCompetencyId === competency.competence_id ? (
                                           <Button
                                             onClick={async () => {
                                               try {
-                                                const data = competencyFieldEdits[competency.competence_id] || {};
+                                                const data: UpdateCompetencyRequest = competencyFieldEdits[competency.competence_id] || {};
                                                 const updated = await updateCompetencyMutation.mutateAsync({ competencyId: competency.competence_id, competencyData: data });
                                                 setCompetencies(prev => prev.map(c => c.competence_id === competency.competence_id ? { ...c, ...updated } : c));
                                                 setEditingCompetencyId(null);
                                                 setCompetencyFieldEdits(prev => ({ ...prev, [competency.competence_id]: {} }));
                                                 toast.success('Competency updated');
-                                              } catch (err: any) {
-                                                toast.error(err?.message || 'Failed to update competency');
+                                              } catch (err: unknown) {
+                                                toast.error(getErrorMessage(err, 'Failed to update competency'));
                                               }
                                             }}
                                             className="bg-green-600 hover:bg-green-700"
@@ -2617,8 +2727,8 @@ const ProfilePage: React.FC = () => {
                                               await deleteCompetencyMutation.mutateAsync({ competencyId: competency.competence_id, evaluationId: selectedEvaluationForPanel?.evaluation_id || '' });
                                               setCompetencies(prev => prev.filter(c => c.competence_id !== competency.competence_id));
                                               toast.success('Competency deleted');
-                                            } catch (err: any) {
-                                              toast.error(err?.message || 'Failed to delete competency');
+                                            } catch (err: unknown) {
+                                              toast.error(getErrorMessage(err, 'Failed to delete competency'));
                                             }
                                           }}
                                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -2638,7 +2748,17 @@ const ProfilePage: React.FC = () => {
                                     </div>
                                     <div className="space-y-1">
                                       <Label>Category</Label>
-                                      <Select value={(competency.category as any) ?? 'Core'} onValueChange={(v) => setCompetencyFieldEdits(prev => ({ ...prev, [competency.competence_id]: { ...prev[competency.competence_id], category: v } }))}>
+                                      <Select
+                                        value={normalizeCompetencyCategory(
+                                          String(competencyFieldEdits[competency.competence_id]?.category ?? competency.category)
+                                        )}
+                                        onValueChange={(v) =>
+                                          setCompetencyFieldEdits((prev) => ({
+                                            ...prev,
+                                            [competency.competence_id]: { ...prev[competency.competence_id], category: v },
+                                          }))
+                                        }
+                                      >
                                         <SelectTrigger className="w-40">
                                           <SelectValue placeholder="Select category" />
                                         </SelectTrigger>
@@ -2654,8 +2774,12 @@ const ProfilePage: React.FC = () => {
                                       <Input type="number" min={0} max={10} defaultValue={competency.required_level} onChange={(e) => setCompetencyFieldEdits(prev => ({ ...prev, [competency.competence_id]: { ...prev[competency.competence_id], required_level: Math.min(parseFloat(e.target.value) || 0, 10) } }))} />
                                     </div>
                                     <div className="space-y-1">
-                                      <Label>Actual</Label>
-                                      <Input type="number" min={0} max={10} defaultValue={competency.actual_level} onChange={(e) => setCompetencyFieldEdits(prev => ({ ...prev, [competency.competence_id]: { ...prev[competency.competence_id], actual_level: Math.min(parseFloat(e.target.value) || 0, 10) } }))} />
+                                      {showAchievedAndActualFields && (
+                                        <>
+                                          <Label>Actual</Label>
+                                          <Input type="number" min={0} max={10} defaultValue={competency.actual_level} onChange={(e) => setCompetencyFieldEdits(prev => ({ ...prev, [competency.competence_id]: { ...prev[competency.competence_id], actual_level: Math.min(parseFloat(e.target.value) || 0, 10) } }))} />
+                                        </>
+                                      )}
                                     </div>
                                     
                                     <div className="md:col-span-3 space-y-1">

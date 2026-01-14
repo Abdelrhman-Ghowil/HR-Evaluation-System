@@ -187,6 +187,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     const input = document.getElementById('username') as HTMLInputElement | null;
     if (!input) return;
 
+    if (sanitizeUsername(input.value)) return;
+
     const trimmedName = fullName.trim();
     if (!trimmedName) {
       input.value = '';
@@ -293,12 +295,14 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
       const passwordInput = document.getElementById('password') as HTMLInputElement;
 
       const nameValue = nameInput?.value || user.name;
+      const usernameValueRaw = usernameInput?.value ?? user.username;
+      const usernameValue = sanitizeUsername(usernameValueRaw) || sanitizeUsername(user.username);
+
       const existing = getExistingUsernames(user.username);
-      const normalizedUsername = nameValue.trim()
-        ? generateUniqueUsernameFromName(nameValue, existing, sanitizeUsername(usernameInput?.value || user.username))
-        : '';
-      if (usernameInput) usernameInput.value = normalizedUsername;
-      lastGeneratedEditUsernameRef.current = normalizedUsername;
+      if (usernameValue && existing.has(usernameValue)) {
+        setEditValidationErrors(prev => ({ ...prev, username: 'Username already exists' }));
+        return;
+      }
 
       // PATCH request with form data - matching API payload structure
       const updateData: {
@@ -320,9 +324,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
         avatar: user.avatar || ""
       };
 
-      if (normalizedUsername && normalizedUsername !== sanitizeUsername(user.username)) {
-        updateData.username = normalizedUsername;
-      }
+      if (usernameValue && usernameValue !== sanitizeUsername(user.username)) updateData.username = usernameValue;
       
       // Only include password if it's provided
       if (passwordInput?.value && passwordInput.value.trim() !== '') {
@@ -758,7 +760,19 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                   </div>
                   <div>
                     <Label htmlFor="username">Username</Label>
-                    <Input id="username" defaultValue={selectedUser.username} />
+                    <Input
+                      id="username"
+                      defaultValue={selectedUser.username}
+                      onChange={() => {
+                        if (!editValidationErrors.username) return;
+                        setEditValidationErrors(prev => {
+                          if (!prev.username) return prev;
+                          const next = { ...prev };
+                          delete next.username;
+                          return next;
+                        });
+                      }}
+                    />
                     {editValidationErrors.username && (
                       <p className="text-sm text-red-500">{editValidationErrors.username}</p>
                     )}
