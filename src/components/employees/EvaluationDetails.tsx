@@ -148,8 +148,9 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const isExecutive = employee.managerialLevel === 'Executive';
 
   const MIN_OBJECTIVES = 4;
-  const MAX_OBJECTIVES = 6;
+  const MAX_OBJECTIVES = 4;
   const MIN_FUNCTIONAL_COMPETENCIES = 5;
+  const MAX_FUNCTIONAL_COMPETENCIES = 5;
 
   const functionalCompetenciesCount = competencies.filter(c => c.category === 'Functional').length;
   const functionalCompetenciesRequired = !isExecutive;
@@ -242,15 +243,18 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       setCompetencyForm(prev => ({ ...prev, category: 'Core' }));
       return;
     }
+    if (competencyForm.category === 'Functional' && functionalCompetenciesCount >= MAX_FUNCTIONAL_COMPETENCIES) {
+      setCompetencyForm(prev => ({ ...prev, category: 'Core' }));
+      return;
+    }
     const category = (competencyForm.category || 'Core') as 'Core' | 'Leadership' | 'Functional';
     const missing = getMissingPredefinedCompetencyNames(category, []);
     setCompetencyNames(missing.length > 0 ? missing : ['']);
-  }, [PREDEFINED_COMPETENCIES_BY_CATEGORY, competencies, competencyForm.category, editingCompetency, isCompetencyModalOpen, isIndividualContributor, competencyNamesTouched, isExecutive]);
+  }, [MAX_FUNCTIONAL_COMPETENCIES, PREDEFINED_COMPETENCIES_BY_CATEGORY, competencies, competencyForm.category, editingCompetency, functionalCompetenciesCount, isCompetencyModalOpen, isIndividualContributor, competencyNamesTouched, isExecutive]);
 
   // Handlers for objectives
   const handleAddObjective = () => {
     if (objectives.length >= MAX_OBJECTIVES) {
-      setObjectivesUiError('Maximum of 6 objectives reached. Delete one to add more.');
       return;
     }
     setEditingObjective(null);
@@ -394,6 +398,17 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
 
     if (!editingCompetency && namesForCreate.length === 0) {
       errors.name = 'At least one name is required';
+    }
+    const selectedCategory = (competencyForm.category || 'Core') as 'Core' | 'Leadership' | 'Functional';
+    if (selectedCategory === 'Functional') {
+      if (editingCompetency) {
+        const wouldIncreaseFunctionalCount = editingCompetency.category !== 'Functional';
+        if (wouldIncreaseFunctionalCount && functionalCompetenciesCount >= MAX_FUNCTIONAL_COMPETENCIES) {
+          errors.general = `Maximum of ${MAX_FUNCTIONAL_COMPETENCIES} Functional competencies allowed.`;
+        }
+      } else if (functionalCompetenciesCount + namesForCreate.length > MAX_FUNCTIONAL_COMPETENCIES) {
+        errors.general = `Maximum of ${MAX_FUNCTIONAL_COMPETENCIES} Functional competencies allowed.`;
+      }
     }
     if (Object.keys(errors).length > 0) {
       setCompetencyErrors(errors);
@@ -1013,9 +1028,6 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                     Objectives & Goals
                   </CardTitle>
                   <p className="text-gray-600 mt-1">Performance objectives and achievements</p>
-                  {objectives.length >= MAX_OBJECTIVES && (
-                    <div className="text-red-600 text-xs font-medium mt-1">Maximum of 6 objectives reached. Delete one to add more.</div>
-                  )}
                   {objectivesUiError && (
                     <div className="text-red-600 text-xs font-medium mt-1">{objectivesUiError}</div>
                   )}
@@ -1559,9 +1571,12 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setObjectiveTitles(prev => [...prev, ''])}
-                      className="w-full sm:w-auto hover:bg-gray-50 transition-all duration-200"
-                    >
+                      onClick={() => {
+                        if (objectiveTitles.length >= Math.max(0, MAX_OBJECTIVES - objectives.length)) return;
+                        setObjectiveTitles(prev => [...prev, '']);
+                      }}
+                      disabled={objectiveTitles.length >= Math.max(0, MAX_OBJECTIVES - objectives.length)}
+                      className="w-full sm:w-auto hover:bg-gray-50 transition-all duration-200">
                       <Plus className="h-4 w-4 mr-2" />
                       Add another
                     </Button>
@@ -1728,6 +1743,12 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
             </DialogHeader>
             
             <div className="space-y-6 py-6">
+              {competencyErrors.general && (
+                <div className="text-red-600 text-sm flex items-center gap-2">
+                  <XCircle className="h-4 w-4" />
+                  <span>{competencyErrors.general}</span>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-sm font-medium text-gray-700 flex items-center gap-1">
                   Name
@@ -1786,9 +1807,27 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                       variant="outline"
                       size="sm"
                       onClick={() => {
+                        if (
+                          (competencyForm.category || 'Core') === 'Functional' &&
+                          functionalCompetenciesCount >= MAX_FUNCTIONAL_COMPETENCIES
+                        ) {
+                          return;
+                        }
+                        if (
+                          (competencyForm.category || 'Core') === 'Functional' &&
+                          !editingCompetency &&
+                          competencyNames.length >= Math.max(0, MAX_FUNCTIONAL_COMPETENCIES - functionalCompetenciesCount)
+                        ) {
+                          return;
+                        }
                         setCompetencyNamesTouched(true);
                         setCompetencyNames(prev => [...prev, '']);
                       }}
+                      disabled={
+                        (competencyForm.category || 'Core') === 'Functional' &&
+                        !editingCompetency &&
+                        competencyNames.length >= Math.max(0, MAX_FUNCTIONAL_COMPETENCIES - functionalCompetenciesCount)
+                      }
                       className="w-full sm:w-auto hover:bg-gray-50 transition-all duration-200"
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -1812,11 +1851,29 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 <Select
                   value={competencyForm.category || 'Core'}
                   onValueChange={(value) => {
+                    setCompetencyErrors(prev => {
+                      if (!prev.general) return prev;
+                      const next = { ...prev };
+                      delete next.general;
+                      return next;
+                    });
                     if (!editingCompetency && isIndividualContributor && value === 'Leadership') {
                       setCompetencyForm(prev => ({ ...prev, category: 'Core' }));
                       return;
                     }
                     if (!editingCompetency && isExecutive && value === 'Functional') {
+                      setCompetencyForm(prev => ({ ...prev, category: 'Core' }));
+                      return;
+                    }
+                    if (
+                      value === 'Functional' &&
+                      (editingCompetency ? editingCompetency.category !== 'Functional' : true) &&
+                      functionalCompetenciesCount >= MAX_FUNCTIONAL_COMPETENCIES
+                    ) {
+                      setCompetencyErrors(prev => ({
+                        ...prev,
+                        general: `Maximum of ${MAX_FUNCTIONAL_COMPETENCIES} Functional competencies allowed.`,
+                      }));
                       setCompetencyForm(prev => ({ ...prev, category: 'Core' }));
                       return;
                     }
@@ -1832,7 +1889,9 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                       <SelectItem value="Leadership">Leadership</SelectItem>
                     )}
                     {(!isExecutive || editingCompetency) && (
-                      <SelectItem value="Functional">Functional</SelectItem>
+                      (editingCompetency?.category === 'Functional' || functionalCompetenciesCount < MAX_FUNCTIONAL_COMPETENCIES) ? (
+                        <SelectItem value="Functional">Functional</SelectItem>
+                      ) : null
                     )}
                   </SelectContent>
                 </Select>
