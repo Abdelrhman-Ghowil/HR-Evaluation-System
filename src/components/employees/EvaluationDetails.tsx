@@ -148,7 +148,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
   const isExecutive = employee.managerialLevel === 'Executive';
 
   const MIN_OBJECTIVES = 4;
-  const MAX_OBJECTIVES = 4;
+  const MAX_OBJECTIVES = 6;
   const MIN_FUNCTIONAL_COMPETENCIES = 5;
   const MAX_FUNCTIONAL_COMPETENCIES = 5;
 
@@ -642,7 +642,9 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
               evaluationId: evaluation.id,
               evaluationData: { status: (newUiStatus === 'Self Evaluation' ? 'Draft' : newUiStatus) as Evaluation['status'] }
             });
-          } catch {}
+          } catch (err) {
+            void err;
+          }
         }
       });
     }
@@ -697,7 +699,11 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       return;
     }
     if (objectives.length < MIN_OBJECTIVES) {
-      setActionError('At least 4 objectives are required to approve or reject.');
+      setActionError(`Objectives must be between ${MIN_OBJECTIVES} and ${MAX_OBJECTIVES} to approve or reject.`);
+      return;
+    }
+    if (objectives.length > MAX_OBJECTIVES) {
+      setActionError(`Objectives must be between ${MIN_OBJECTIVES} and ${MAX_OBJECTIVES} to approve or reject.`);
       return;
     }
     if (currentRole === 'hod' && currentStatus === 'Pending HoD Approval') {
@@ -744,7 +750,11 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
       return;
     }
     if (objectives.length < MIN_OBJECTIVES) {
-      setActionError('At least 4 objectives are required to approve or reject.');
+      setActionError(`Objectives must be between ${MIN_OBJECTIVES} and ${MAX_OBJECTIVES} to approve or reject.`);
+      return;
+    }
+    if (objectives.length > MAX_OBJECTIVES) {
+      setActionError(`Objectives must be between ${MIN_OBJECTIVES} and ${MAX_OBJECTIVES} to approve or reject.`);
       return;
     }
     if (!commentText.trim()) {
@@ -1269,10 +1279,10 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {objectives.length < MIN_OBJECTIVES && (
+              {(objectives.length < MIN_OBJECTIVES || objectives.length > MAX_OBJECTIVES) && (
                 <div className="text-red-600 text-xs sm:text-sm flex items-center gap-2">
                   <XCircle className="h-4 w-4" />
-                  <span>At least 4 objectives are required to approve or reject.</span>
+                  <span>Objectives must be between {MIN_OBJECTIVES} and {MAX_OBJECTIVES} to approve or reject.</span>
                 </div>
               )}
               {!hasMinFunctionalCompetencies && (
@@ -1282,11 +1292,11 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 </div>
               )}
               <div className="flex items-center gap-3">
-                <Button onClick={() => { if (panelSubmitted) return; const notEnoughObj = objectives.length < MIN_OBJECTIVES; const notEnoughFunc = !hasMinFunctionalCompetencies; setPanelAction('approve'); setPanelComment(getActionPanelMessage('approve', currentStatus)); setPanelError(notEnoughObj ? 'At least 4 objectives are required to approve or reject.' : (notEnoughFunc ? 'At least 5 Functional competencies are required to approve or reject.' : '')); }} className="bg-green-600 hover:bg-green-700" disabled={isSubmittingAction || panelSubmitted}>
+                <Button onClick={() => { if (panelSubmitted) return; const invalidObjCount = objectives.length < MIN_OBJECTIVES || objectives.length > MAX_OBJECTIVES; const notEnoughFunc = !hasMinFunctionalCompetencies; setPanelAction('approve'); setPanelComment(getActionPanelMessage('approve', currentStatus)); setPanelError(invalidObjCount ? `Objectives must be between ${MIN_OBJECTIVES} and ${MAX_OBJECTIVES} to approve or reject.` : (notEnoughFunc ? 'At least 5 Functional competencies are required to approve or reject.' : '')); }} className="bg-green-600 hover:bg-green-700" disabled={isSubmittingAction || panelSubmitted}>
                   <Check className="h-4 w-4 mr-2" />
                   Approve
                 </Button>
-                <Button variant="destructive" onClick={() => { if (panelSubmitted) return; const notEnoughObj = objectives.length < MIN_OBJECTIVES; const notEnoughFunc = !hasMinFunctionalCompetencies; setPanelAction('reject'); setPanelComment(getActionPanelMessage('reject', currentStatus)); setPanelError(notEnoughObj ? 'At least 4 objectives are required to approve or reject.' : (notEnoughFunc ? 'At least 5 Functional competencies are required to approve or reject.' : '')); }} className="bg-red-600 hover:bg-red-700" disabled={isSubmittingAction || panelSubmitted}>
+                <Button variant="destructive" onClick={() => { if (panelSubmitted) return; const invalidObjCount = objectives.length < MIN_OBJECTIVES || objectives.length > MAX_OBJECTIVES; const notEnoughFunc = !hasMinFunctionalCompetencies; setPanelAction('reject'); setPanelComment(getActionPanelMessage('reject', currentStatus)); setPanelError(invalidObjCount ? `Objectives must be between ${MIN_OBJECTIVES} and ${MAX_OBJECTIVES} to approve or reject.` : (notEnoughFunc ? 'At least 5 Functional competencies are required to approve or reject.' : '')); }} className="bg-red-600 hover:bg-red-700" disabled={isSubmittingAction || panelSubmitted}>
                   <X className="h-4 w-4 mr-2" />
                   Reject
                 </Button>
@@ -1305,7 +1315,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button onClick={() => { if (panelAction === 'reject' && !panelComment.trim()) { setPanelError('Comment is required'); return; } if (!hasMinFunctionalCompetencies) { setPanelError('At least 5 Functional competencies are required to approve or reject.'); return; } if (objectives.length < MIN_OBJECTIVES) { setPanelError('At least 4 objectives are required to approve or reject.'); return; } setIsConfirmOpen(true); }} className="bg-blue-600 hover:bg-blue-700" disabled={isSubmittingAction}>
+                    <Button onClick={() => { if (panelAction === 'reject' && !panelComment.trim()) { setPanelError('Comment is required'); return; } if (!hasMinFunctionalCompetencies) { setPanelError('At least 5 Functional competencies are required to approve or reject.'); return; } if (objectives.length < MIN_OBJECTIVES || objectives.length > MAX_OBJECTIVES) { setPanelError(`Objectives must be between ${MIN_OBJECTIVES} and ${MAX_OBJECTIVES} to approve or reject.`); return; } setIsConfirmOpen(true); }} className="bg-blue-600 hover:bg-blue-700" disabled={isSubmittingAction}>
                       Submit
                     </Button>
                     <Button variant="outline" onClick={() => { setPanelAction(null); setPanelComment(''); setPanelError(''); }} disabled={isSubmittingAction}>
@@ -1351,7 +1361,7 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                 <Button onClick={async () => {
                   if (!panelAction) return;
                   if (!hasMinFunctionalCompetencies) { setPanelError('At least 5 Functional competencies are required to approve or reject.'); setIsConfirmOpen(false); return; }
-                  if (objectives.length < MIN_OBJECTIVES) { setPanelError('At least 4 objectives are required to approve or reject.'); setIsConfirmOpen(false); return; }
+                  if (objectives.length < MIN_OBJECTIVES || objectives.length > MAX_OBJECTIVES) { setPanelError(`Objectives must be between ${MIN_OBJECTIVES} and ${MAX_OBJECTIVES} to approve or reject.`); setIsConfirmOpen(false); return; }
                   const nextUiStatus = panelAction === 'approve' ? getNextWorkflowStatus(currentStatus) : getPrevWorkflowStatus(currentStatus);
                   const nextActivityKey = statusKeyMap[nextUiStatus] || 'DRAFT';
                   const payload = {
@@ -1367,7 +1377,9 @@ const EvaluationDetails: React.FC<EvaluationDetailsProps> = ({ employee, evaluat
                     setIsConfirmOpen(false);
                     setCurrentStatus(nextUiStatus);
                     await updateEvaluationMutation.mutateAsync({ evaluationId: evaluation.id, evaluationData: { status: nextUiStatus as any } });
-                  } catch {}
+                  } catch (err) {
+                    void err;
+                  }
                 }} disabled={isSubmittingAction} className="bg-green-600 hover:bg-green-700">
                   {isSubmittingAction ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                   Confirm

@@ -2,7 +2,7 @@
 import React from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, BarChart3, CheckCircle, Clock, TrendingUp, Award } from 'lucide-react';
+import { Users, CheckCircle, Clock, TrendingUp, Award } from 'lucide-react';
 
 const DashboardHome = () => {
   const { user } = useAuth();
@@ -10,50 +10,38 @@ const DashboardHome = () => {
   const stats = [
     {
       title: 'Total Employees',
-      value: '248',
-      change: '+12%',
+      value: '0',
       icon: Users,
       color: 'blue'
     },
     {
       title: 'Pending Evaluations',
-      value: '23',
-      change: '-5%',
+      value: '0',
       icon: Clock,
       color: 'yellow'
     },
     {
       title: 'Completed This Month',
-      value: '156',
-      change: '+18%',
+      value: '0',
       icon: CheckCircle,
       color: 'green'
     },
     {
       title: 'Average Score',
-      value: '8.4',
-      change: '+0.2',
+      value: '0',
       icon: Award,
       color: 'purple'
     }
   ];
 
-  const recentActivity = [
-    { name: 'Alice Johnson', action: 'completed evaluation', time: '2 hours ago', type: 'evaluation' },
-    { name: 'Bob Smith', action: 'updated profile', time: '4 hours ago', type: 'profile' },
-    { name: 'Carol Davis', action: 'submitted objectives', time: '1 day ago', type: 'objectives' },
-    { name: 'David Wilson', action: 'scheduled review', time: '2 days ago', type: 'review' }
-  ];
+  const recentActivity: Array<{ name: string; action: string; time: string; type: string }> = [];
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Dashboard Overview</h2>
         <p className="text-gray-600">
-          {user?.role === 'admin' && 'System administration and analytics'}
-          {user?.role === 'hr' && 'HR metrics and employee management'}
-          {user?.role === 'manager' && 'Team performance and evaluations'}
-          {user?.role === 'employee' && 'Your performance and goals'}
+          Dashboard is coming soon.
         </p>
       </div>
 
@@ -71,11 +59,6 @@ const DashboardHome = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
-                <p className={`text-xs ${
-                  stat.change.startsWith('+') ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {stat.change} from last month
-                </p>
               </CardContent>
             </Card>
           );
@@ -90,19 +73,23 @@ const DashboardHome = () => {
             <CardDescription>Latest updates across the system</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentActivity.map((activity, index) => (
-                <div key={index} className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900">
-                      <span className="font-medium">{activity.name}</span> {activity.action}
-                    </p>
-                    <p className="text-xs text-gray-500">{activity.time}</p>
+            {recentActivity.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">No data</div>
+            ) : (
+              <div className="space-y-4">
+                {recentActivity.map((activity, index) => (
+                  <div key={index} className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-900">
+                        <span className="font-medium">{activity.name}</span> {activity.action}
+                      </p>
+                      <p className="text-xs text-gray-500">{activity.time}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
