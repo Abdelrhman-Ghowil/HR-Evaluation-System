@@ -470,8 +470,15 @@ export interface EmployeeQueryParams {
   page_size?: number;
 }
 
+export interface CompanyQueryParams {
+  page?: number;
+  page_size?: number;
+}
+
 export interface DepartmentQueryParams {
   company_id?: string;
+  page?: number;
+  page_size?: number;
 
 }
 
