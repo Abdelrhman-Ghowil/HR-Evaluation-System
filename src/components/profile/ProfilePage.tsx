@@ -316,10 +316,15 @@ const ProfilePage: React.FC = () => {
       refetchOnMount: false,
       refetchOnWindowFocus: false,
       select: (data: unknown) => {
-        if (Array.isArray(data)) return data as ApiEvaluation[];
+        const isDraft = (evaluation: ApiEvaluation) =>
+          String((evaluation as unknown as { status?: unknown }).status ?? '')
+            .trim()
+            .toLowerCase() === 'draft';
+
+        if (Array.isArray(data)) return (data as ApiEvaluation[]).filter(e => !isDraft(e));
         if (typeof data === 'object' && data !== null && 'results' in data) {
           const results = (data as Record<string, unknown>).results;
-          if (Array.isArray(results)) return results as ApiEvaluation[];
+          if (Array.isArray(results)) return (results as ApiEvaluation[]).filter(e => !isDraft(e));
         }
         return [];
       },
