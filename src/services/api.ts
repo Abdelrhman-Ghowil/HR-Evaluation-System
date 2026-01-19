@@ -27,7 +27,6 @@ import {
   ApiError,
   AuthHeaders,
   EmployeeQueryParams,
-  CompanyQueryParams,
   DepartmentQueryParams,
   EvaluationQueryParams,
   EvaluationType,
@@ -350,18 +349,6 @@ class ApiService {
     return response.data;
   }
 
-  async deleteUser(userId: string): Promise<void> {
-    try {
-      await this.api.delete(`/api/accounts/users/${userId}/`);
-    } catch (error: any) {
-      if (error?.response?.status === 404) {
-        await this.api.delete(`/api/accounts/users/${userId}`);
-        return;
-      }
-      throw error;
-    }
-  }
-
   async changePassword(passwordData: { old_password: string; new_password: string; new_password_confirm: string }): Promise<void> {
     await this.api.post('/api/accounts/users/change-password/', passwordData);
   }
@@ -419,8 +406,8 @@ class ApiService {
   }
 
   // Company methods
-  async getCompanies(params?: CompanyQueryParams): Promise<PaginatedResponse<ApiCompany>> {
-    const response: AxiosResponse<PaginatedResponse<ApiCompany>> = await this.api.get('/api/org/companies/', { params });
+  async getCompanies(): Promise<PaginatedResponse<ApiCompany>> {
+    const response: AxiosResponse<PaginatedResponse<ApiCompany>> = await this.api.get('/api/org/companies/');
     return response.data;
   }
 
