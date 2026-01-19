@@ -1411,9 +1411,17 @@ const EmployeeList = () => {
   });
 
   const displayEmployees = React.useMemo(() => {
-    if (!lastCreatedEmployeeId) return filteredEmployees;
+    const parseJoinDate = (value?: string): number => {
+      if (!value) return 0;
+      const t = Date.parse(value);
+      return Number.isFinite(t) ? t : 0;
+    };
     const arr = filteredEmployees.slice();
     arr.sort((a, b) => {
+      const aTime = parseJoinDate(a.joinDate);
+      const bTime = parseJoinDate(b.joinDate);
+      if (aTime !== bTime) return bTime - aTime;
+      if (!lastCreatedEmployeeId) return 0;
       const aIsNew = String(a.employee_id || a.id) === String(lastCreatedEmployeeId);
       const bIsNew = String(b.employee_id || b.id) === String(lastCreatedEmployeeId);
       if (aIsNew && !bIsNew) return -1;

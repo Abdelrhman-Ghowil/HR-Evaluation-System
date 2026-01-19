@@ -650,6 +650,24 @@ const ProfilePage: React.FC = () => {
     return fromResponse ?? getOverallCompetencyScore();
   };
 
+  const [overallScoreDisplay, setOverallScoreDisplay] = useState<'percent' | 'out_of_5'>(() => {
+    if (typeof window === 'undefined') return 'percent';
+    const saved = window.localStorage.getItem('overall_score_display');
+    return saved === 'out_of_5' ? 'out_of_5' : 'percent';
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('overall_score_display', overallScoreDisplay);
+  }, [overallScoreDisplay]);
+
+  const formatOutOfFive = (percent: number, maxDecimals: number = 1): string => {
+    const raw = (percent / 100) * 5;
+    const rounded = Number(raw.toFixed(maxDecimals));
+    const isInt = Math.abs(rounded - Math.round(rounded)) < 1e-9;
+    return isInt ? String(Math.round(rounded)) : rounded.toFixed(maxDecimals).replace(/\.?0+$/, '');
+  };
+
   const getOverallObjectiveScoreForList = (list: ApiObjective[]): number => {
     if (list.length === 0) return 0;
     const totalWeight = list.reduce((sum, obj) => sum + (obj.weight || 0), 0);
@@ -782,6 +800,18 @@ const ProfilePage: React.FC = () => {
   const showAchievedAndActualFields =
     !!selectedEvaluationForPanel &&
     (isSelfEvalMode || canShowWeightsResultsScores(selectedEvaluationForPanel.status));
+
+  const overallPercent =
+    evaluations.length > 0
+      ? evaluations.reduce((sum, evaluation) => sum + (evaluation.score || 0), 0) / evaluations.length
+      : null;
+  const overallOutOfFive = overallPercent === null ? null : formatOutOfFive(overallPercent);
+  const overallDisplayValue =
+    overallPercent === null
+      ? 'N/A'
+      : overallScoreDisplay === 'out_of_5'
+        ? `${overallOutOfFive} / 5`
+        : formatPercent(overallPercent);
 
   // Password validation functions
   const validatePasswordStrength = (password: string): string | null => {
@@ -1771,16 +1801,28 @@ const ProfilePage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
                 <CardContent className="p-6 text-center">
+                  <div className="flex justify-end mb-2">
+                    <Select
+                      value={overallScoreDisplay}
+                      onValueChange={(value) => setOverallScoreDisplay(value as 'percent' | 'out_of_5')}
+                      disabled={overallPercent === null}
+                    >
+                      <SelectTrigger className="h-8 w-[140px] bg-white/80">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="percent">Percentage</SelectItem>
+                        <SelectItem value="out_of_5">Out of 5</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="flex items-center justify-center mb-4">
                     <div className="bg-blue-600 p-3 rounded-full">
                       <BarChart3 className="h-6 w-6 text-white" />
                     </div>
                   </div>
                   <h3 className="text-2xl font-bold text-blue-900">
-                    {evaluations.length > 0
-                      ? (evaluations.reduce((sum, evaluation) => sum + (evaluation.score || 0), 0) / evaluations.length).toFixed(1)
-                      : 'N/A'
-                    }
+                    {overallDisplayValue}
                   </h3>
                   <p className="text-blue-700 font-medium">Overall Rating</p>
                 </CardContent>
