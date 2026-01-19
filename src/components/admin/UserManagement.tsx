@@ -14,7 +14,6 @@ import {
   Users,
   Shield,
   Edit,
-  Trash2,
   Plus,
   Search,
   Filter,
@@ -543,15 +542,6 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
     }
   };
 
-  const handleDeleteUser = (userId: string) => {
-    if (confirm('Are you sure you want to delete this user?')) {
-      // TODO: Implement API call to delete user
-      console.log('Delete user:', userId);
-    }
-  };
-
-
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -697,15 +687,6 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                 <div className="flex items-center space-x-2">
                   <Button variant="outline" size="sm" onClick={() => handleEditUser(user)}>
                     <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleDeleteUser(user.id)}
-                    className="text-red-600 hover:text-red-700"
-                    disabled={user.id === currentUser?.id}
-                  >
-                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
