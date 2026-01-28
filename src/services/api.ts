@@ -180,7 +180,7 @@ class ApiService {
     if (error?.request) {
       // Request was made but no response received
       const errorCode = error?.code;
-      let networkMessage = 'Network error - please check your connection';
+      let networkMessage = 'Network error or no response received - please check your connection';
       
       if (errorCode === 'ENOTFOUND') {
         networkMessage = 'Cannot reach server - DNS resolution failed';

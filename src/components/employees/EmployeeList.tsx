@@ -121,10 +121,7 @@ const EmployeeList = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResults, setImportResults] = useState<ImportResponse | null>(null);
-  const [errorView, setErrorView] = useState<'summary' | 'fields' | 'rows' | 'raw'>('summary');
-  const [errorFilter, setErrorFilter] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [showImportDetails, setShowImportDetails] = useState(false);
   React.useEffect(() => {
     if (!isAddModalOpen) return;
     const keys = Object.keys(validationErrors || {});
@@ -266,34 +263,6 @@ const EmployeeList = () => {
     return () => window.removeEventListener('popstate', onPopState);
   }, [employees]);
 
-  // Build a map of field -> messages from nested error.details
-  const fieldErrors = React.useMemo(() => {
-    const map: Record<string, string[]> = {};
-    (importResults?.errors || []).forEach((err) => {
-      const walk = (obj: any, base = '') => {
-        if (!obj || typeof obj !== 'object') return;
-        Object.entries(obj).forEach(([k, v]) => {
-          const path = base ? `${base}.${k}` : k;
-          if (Array.isArray(v)) {
-            map[path] = (map[path] || []).concat(v.map((x) => String(x)));
-          } else if (typeof v === 'object' && v !== null) {
-            walk(v, path);
-          } else {
-            map[path] = (map[path] || []).concat(String(v));
-          }
-        });
-      };
-      if (err && typeof err === 'object' && (err as ApiError).details) {
-        walk((err as ApiError).details as Record<string, any>);
-      } else if (err && typeof err === 'object' && (err as ApiError).message) {
-        map['general'] = (map['general'] || []).concat((err as ApiError).message);
-      } else if (typeof err === 'string') {
-        map['general'] = (map['general'] || []).concat(String(err));
-      }
-    });
-    return map;
-  }, [importResults?.errors]);
-
   // Build user-friendly row-level messages: "Row X – Field: Message"
   const rowErrors = React.useMemo(() => {
     type RowMsg = { row: number; field?: string; message: string };
@@ -388,25 +357,32 @@ const EmployeeList = () => {
     return list.sort((a, b) => (a.row - b.row) || String(a.field || '').localeCompare(String(b.field || '')));
   }, [importResults?.errors]);
 
-  const copyErrors = () => {
-    try {
-      const text = JSON.stringify(importResults?.errors || [], null, 2);
-      navigator.clipboard?.writeText(text);
-    } catch {}
-  };
+  const uniqueRowMessages = React.useMemo(() => {
+    const set = new Set<string>();
+    rowErrors.forEach((e) => set.add(e.message));
+    return Array.from(set);
+  }, [rowErrors]);
 
-  const downloadErrors = () => {
-    try {
-      const text = JSON.stringify(importResults?.errors || [], null, 2);
-      const blob = new Blob([text], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'employee-import-errors.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {}
-  };
+  const hasImportSuccess = (importResults?.created ?? 0) > 0 || (importResults?.updated ?? 0) > 0;
+  const hasValidationSuccess = importResults?.validated_count !== undefined;
+  const hasAnySuccess = hasImportSuccess || hasValidationSuccess;
+  const inlineMessages = uniqueRowMessages.slice(0, 2);
+  const topMessages = uniqueRowMessages.slice(0, 3);
+  const shouldShowInlineMessages =
+    !hasAnySuccess &&
+    String(importResults?.message || '').toLowerCase().includes('validation failed') &&
+    inlineMessages.length > 0 &&
+    inlineMessages.length <= 2;
+  const resultTitle = hasValidationSuccess
+    ? 'Validation ready'
+    : hasImportSuccess
+    ? 'Import completed'
+    : 'Validation failed';
+  const resultSubtitle = hasValidationSuccess
+    ? 'Review the summary, then click Import to apply changes.'
+    : hasImportSuccess
+    ? 'Employees were updated successfully.'
+    : '';
 
   // Clear auto-filled form data
   const clearAutoFilledData = () => {
@@ -689,8 +665,6 @@ const EmployeeList = () => {
       setSelectedFile(file);
       // Clear previous results and error view when a new file is dropped
       setImportResults(null);
-      setErrorView('summary');
-      setErrorFilter('');
     }
   }, []);
 
@@ -706,8 +680,6 @@ const EmployeeList = () => {
       setSelectedFile(file);
       // Clear previous results and error view when a new file is selected
       setImportResults(null);
-      setErrorView('summary');
-      setErrorFilter('');
     }
   };
 
@@ -715,8 +687,6 @@ const EmployeeList = () => {
     setSelectedFile(null);
     // Clear messages and views when file is removed
     setImportResults(null);
-    setErrorView('summary');
-    setErrorFilter('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -2699,159 +2669,79 @@ const EmployeeList = () => {
             {/* Results Display */}
             {importResults && (
               <div className={`rounded-md p-3 ${
-                (importResults.created > 0 || importResults.updated > 0 || importResults.validated_count) ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                hasAnySuccess ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
               }`}>
-                <div className="flex items-start gap-2">
-                  <div className={`p-1 rounded-full ${
-                    (importResults.created > 0 || importResults.updated > 0 || importResults.validated_count) ? 'bg-green-100' : 'bg-red-100'
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-full ${
+                    hasAnySuccess ? 'bg-green-100' : 'bg-red-100'
                   }`}>
-                    {(importResults.created > 0 || importResults.updated > 0 || importResults.validated_count) ? (
+                    {hasAnySuccess ? (
                       <CheckCircle className="h-4 w-4 text-green-600" />
                     ) : (
                       <AlertCircle className="h-4 w-4 text-red-600" />
                     )}
                   </div>
-                  <div className="flex-1 text-sm">
-                    {importResults.validated_count !== undefined ? (
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-green-800">Validation successful</p>
-                        <div className="text-xs text-gray-700 flex gap-3">
-                          <span>Validated: {importResults.validated_count}</span>
-                          <span>Create: {importResults.to_create || 0}</span>
-                          <span>Update: {importResults.to_update || 0}</span>
-                        </div>
-                      </div>
-                    ) : (importResults.created > 0 || importResults.updated > 0) ? (
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-green-800">Import successful</p>
-                        <div className="text-xs text-green-700 flex gap-3">
-                          <span>Created: {importResults.created}</span>
-                          <span>Updated: {importResults.updated}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="font-medium text-red-800">{importResults.message || 'Import failed'}</p>
-                    )}
-
-                    {importResults.errors && importResults.errors.length > 0 && (
-                      <div className="mt-2">
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setShowImportDetails((v) => !v)}>
-                            {showImportDetails ? 'Hide details' : 'View details'}
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={copyErrors}><Copy className="h-4 w-4 mr-1" />Copy</Button>
-                          <Button size="sm" variant="outline" onClick={downloadErrors}><Download className="h-4 w-4 mr-1" />Download</Button>
-                        </div>
-
-                        {showImportDetails && (
-                          <div className="mt-2 space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Button size="sm" variant={errorView === 'summary' ? 'default' : 'outline'} onClick={() => setErrorView('summary')}>Summary</Button>
-                              <Button size="sm" variant={errorView === 'fields' ? 'default' : 'outline'} onClick={() => setErrorView('fields')}>By Field</Button>
-                              <Button size="sm" variant={errorView === 'rows' ? 'default' : 'outline'} onClick={() => setErrorView('rows')}>By Row</Button>
-                              <Button size="sm" variant={errorView === 'raw' ? 'default' : 'outline'} onClick={() => setErrorView('raw')}>Raw JSON</Button>
-                            </div>
-
-                            {errorView === 'summary' && (
-                              <div className="bg-gray-50 border rounded p-2">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                                  <div><span className="text-gray-600">Total errors:</span> <span className="font-medium text-gray-900">{importResults.errors.length}</span></div>
-                                  <div><span className="text-gray-600">Distinct fields:</span> <span className="font-medium text-gray-900">{Object.keys(fieldErrors).length}</span></div>
-                                  <div><span className="text-gray-600">Created:</span> <span className="font-medium text-gray-900">{importResults.created || 0}</span></div>
-                                  <div><span className="text-gray-600">Updated:</span> <span className="font-medium text-gray-900">{importResults.updated || 0}</span></div>
-                                </div>
-                                <div className="mt-2">
-                                  <div className="flex flex-wrap gap-1">
-                                    {Object.keys(fieldErrors).slice(0, 10).map((key) => (
-                                      <Badge key={key} variant="secondary" className="text-[10px]">{key} ({fieldErrors[key].length})</Badge>
-                                    ))}
-                                    {Object.keys(fieldErrors).length > 10 && (
-                                      <span className="text-[10px] text-gray-500">+{Object.keys(fieldErrors).length - 10} more</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {errorView === 'fields' && (
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <Input
-                                    value={errorFilter}
-                                    onChange={(e) => setErrorFilter(e.target.value)}
-                                    placeholder="Filter by field name"
-                                    className="h-8"
-                                  />
-                                </div>
-                                <div className="space-y-2 max-h-60 overflow-auto pr-1">
-                                  {Object.entries(fieldErrors)
-                                    .filter(([key]) => key.toLowerCase().includes(errorFilter.toLowerCase()))
-                                    .map(([key, messages]) => (
-                                      <div key={key} className="border rounded p-2 bg-white">
-                                        <div className="flex items-center justify-between">
-                                          <span className="text-xs font-semibold text-gray-800">{key}</span>
-                                          <Badge variant="outline" className="text-[10px]">{messages.length} issue{messages.length > 1 ? 's' : ''}</Badge>
-                                        </div>
-                                        <ul className="mt-2 text-xs text-red-700 list-disc list-inside space-y-1">
-                                          {messages.map((m, i) => (
-                                            <li key={i}>{m}</li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {errorView === 'rows' && (
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <Input
-                                    value={errorFilter}
-                                    onChange={(e) => setErrorFilter(e.target.value)}
-                                    placeholder="Filter by row number or field name"
-                                    className="h-8"
-                                  />
-                                </div>
-                                <div className="space-y-2 max-h-60 overflow-auto pr-1">
-                                  {rowErrors
-                                    .filter((e) => {
-                                      const q = errorFilter.toLowerCase();
-                                      if (!q) return true;
-                                      return (
-                                        String(e.row).includes(q) ||
-                                        String(e.field || '').toLowerCase().includes(q) ||
-                                        e.message.toLowerCase().includes(q)
-                                      );
-                                    })
-                                    .map((e, i) => (
-                                      <div key={`${e.row}-${e.field}-${i}`} className="border rounded p-2 bg-white">
-                                        <div className="flex items-center justify-between">
-                                          <span className="text-xs font-semibold text-gray-800">{e.row ? `Row ${e.row}` : 'General'}{e.field ? ` – ${e.field}` : ''}</span>
-                                        </div>
-                                        <p className="mt-2 text-xs text-red-700">
-                                          {e.message}
-                                        </p>
-                                      </div>
-                                    ))}
-                                  {rowErrors.length === 0 && (
-                                    <div className="text-xs text-gray-600">No row-level errors detected.</div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {errorView === 'raw' && (
-                              <div className="bg-gray-50 border rounded p-2">
-                                <pre className="text-xs font-mono text-gray-800 whitespace-pre-wrap break-words">
-{JSON.stringify(importResults.errors, null, 2)}
-                                </pre>
-                              </div>
-                            )}
-                          </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className={`text-sm font-semibold ${hasAnySuccess ? 'text-green-800' : 'text-red-800'}`}>{resultTitle}</p>
+                        {hasAnySuccess && resultSubtitle && (
+                          <p className="text-xs text-green-700">{resultSubtitle}</p>
                         )}
                       </div>
+                      <div className="flex flex-wrap gap-2 text-[11px]">
+                        {hasValidationSuccess && (
+                          <>
+                            <span className="px-2 py-1 rounded-full border bg-white/70 text-gray-700">Validated: {importResults.validated_count}</span>
+                            <span className="px-2 py-1 rounded-full border bg-white/70 text-gray-700">Create: {importResults.to_create || 0}</span>
+                            <span className="px-2 py-1 rounded-full border bg-white/70 text-gray-700">Update: {importResults.to_update || 0}</span>
+                          </>
+                        )}
+                        {hasImportSuccess && (
+                          <>
+                            <span className="px-2 py-1 rounded-full border bg-white/70 text-gray-700">Created: {importResults.created}</span>
+                            <span className="px-2 py-1 rounded-full border bg-white/70 text-gray-700">Updated: {importResults.updated}</span>
+                          </>
+                        )}
+                        {!hasAnySuccess && (
+                          <span className="px-2 py-1 rounded-full border bg-white/70 text-red-700">Issues: {uniqueRowMessages.length}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {!hasAnySuccess && (
+                      <div className="grid gap-2">
+                        {uniqueRowMessages.length > 0 ? (
+                          <div className="bg-white/70 border rounded p-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-semibold text-gray-800">Key issues to fix</span>
+                              <span className="text-[10px] text-gray-600">
+                                {Math.min(shouldShowInlineMessages ? inlineMessages.length : topMessages.length, uniqueRowMessages.length)} of {uniqueRowMessages.length}
+                              </span>
+                            </div>
+                            <ul className="mt-2 text-xs text-red-700 list-disc list-inside space-y-1">
+                              {(shouldShowInlineMessages ? inlineMessages : topMessages).map((msg, i) => (
+                                <li key={`issue-${i}`}>{msg}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <div className="bg-white/70 border rounded p-2 text-xs text-gray-700">
+                            No specific row issues were returned. Please check required columns and try Validate again.
+                          </div>
+                        )}
+                        <div className="bg-white/70 border rounded p-2">
+                          <div className="text-xs font-semibold text-gray-800">Quick tips</div>
+                          <ul className="mt-1 text-xs text-gray-700 list-disc list-inside space-y-1">
+                            <li>Fill all required fields for each employee.</li>
+                            <li>Check email format and unique employee code.</li>
+                            <li>Company and department in the file must be created in the system.</li>
+                            <li>Use the provided template and avoid extra columns.</li>
+                          </ul>
+                        </div>
+                      </div>
                     )}
+
                   </div>
                 </div>
               </div>
