@@ -357,10 +357,17 @@ const EmployeeList = () => {
     return list.sort((a, b) => (a.row - b.row) || String(a.field || '').localeCompare(String(b.field || '')));
   }, [importResults?.errors]);
 
+  const normalizeRowMessage = (message: string) => {
+    return message
+      .replace(/^row\s*\d+\s*[-–—:]?\s*/i, '')
+      .replace(/^\d+\s*[-–—:]?\s*/, '')
+      .trim();
+  };
+
   const uniqueRowMessages = React.useMemo(() => {
     const set = new Set<string>();
-    rowErrors.forEach((e) => set.add(e.message));
-    return Array.from(set);
+    rowErrors.forEach((e) => set.add(normalizeRowMessage(e.message)));
+    return Array.from(set).filter(Boolean);
   }, [rowErrors]);
 
   const hasImportSuccess = (importResults?.created ?? 0) > 0 || (importResults?.updated ?? 0) > 0;
@@ -2730,15 +2737,6 @@ const EmployeeList = () => {
                             No specific row issues were returned. Please check required columns and try Validate again.
                           </div>
                         )}
-                        <div className="bg-white/70 border rounded p-2">
-                          <div className="text-xs font-semibold text-gray-800">Quick tips</div>
-                          <ul className="mt-1 text-xs text-gray-700 list-disc list-inside space-y-1">
-                            <li>Fill all required fields for each employee.</li>
-                            <li>Check email format and unique employee code.</li>
-                            <li>Company and department in the file must be created in the system.</li>
-                            <li>Use the provided template and avoid extra columns.</li>
-                          </ul>
-                        </div>
                       </div>
                     )}
 
