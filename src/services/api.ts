@@ -186,7 +186,7 @@ class ApiService {
         networkMessage = 'Cannot reach server - DNS resolution failed';
       } else if (errorCode === 'ECONNREFUSED') {
         networkMessage = 'Connection refused - server may be down';
-      } else if (errorCode === 'ETIMEDOUT') {
+      } else if (errorCode === 'ETIMEDOUT' || errorCode === 'ECONNABORTED') {
         networkMessage = 'Request timeout - server took too long to respond';
       } else if (errorCode === 'ERR_NETWORK') {
         networkMessage = 'Network error - CORS policy or connectivity issue. Please check if the API server allows cross-origin requests.';
@@ -495,6 +495,7 @@ class ApiService {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: Math.max(API_TIMEOUT, 120000),
       });
       
       // Ensure we return the expected format even if backend returns different structure
