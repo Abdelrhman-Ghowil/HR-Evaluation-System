@@ -176,6 +176,86 @@ const leadershipCompetencies = competenciesData.filter((c) => c.type === 'leader
 
 
 // ==================== COMPONENTS ====================
+const FrameworkCard: React.FC<{
+  number: number;
+  title: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  points: string[];
+}> = ({ number, title, color, bgColor, borderColor, points }) => (
+  <div className={`relative flex flex-col rounded-2xl border-2 ${borderColor} bg-white p-6 pt-10 shadow-sm transition-all hover:shadow-md`}>
+    <div className={`absolute -top-5 left-1/2 -translate-x-1/2 flex h-10 w-10 items-center justify-center rounded-full ${bgColor} text-lg font-bold text-white shadow-lg`}>
+      {number}
+    </div>
+    <h3 className={`mb-4 text-center text-lg font-bold ${color}`}>{title}</h3>
+    <ul className="space-y-3 text-sm text-gray-600">
+      {points.map((point, idx) => (
+        <li key={idx} className="flex items-start gap-2">
+          <span className={`mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full ${bgColor}`} />
+          <span className="leading-relaxed">{point}</span>
+        </li>
+      ))}
+    </ul>
+    <div className={`absolute bottom-0 left-1/2 h-4 w-0.5 -translate-x-1/2 translate-y-full ${bgColor}`} />
+  </div>
+);
+
+const FrameworkStructure: React.FC = () => {
+  const frameworkData = [
+    {
+      number: 1,
+      title: 'Core Competencies',
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-500',
+      borderColor: 'border-blue-200',
+      points: [
+        "Directly related to Ninja's strategy, vision, values and culture.",
+        'Required from all job holders within Ninja.',
+      ],
+    },
+    {
+      number: 2,
+      title: 'Leadership Competencies',
+      color: 'text-teal-600',
+      bgColor: 'bg-teal-500',
+      borderColor: 'border-teal-200',
+      points: [
+        'Directly related to the organizational structure and the managerial levels.',
+        'Required from job holders whose jobs have a managerial aspect to their nature.',
+      ],
+    },
+    {
+      number: 3,
+      title: 'Functional Competencies',
+      color: 'text-green-600',
+      bgColor: 'bg-green-500',
+      borderColor: 'border-green-200',
+      points: [
+        'Related to the functional nature of the job.',
+        'Required from job holders that share a common functional background.',
+      ],
+    },
+  ];
+
+  return (
+    <div className="mb-8 rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-6 shadow-sm">
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-gray-900">Competencies Structure</h2>
+        <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+          The Competency Structure includes the Competency types, proficiency levels and degree of detail for each competency. The figure below illustrates the different types of Competencies identified:
+        </p>
+      </div>
+      <div className="relative grid gap-8 pt-6 md:grid-cols-3">
+        {frameworkData.map((item) => (
+          <FrameworkCard key={item.number} {...item} />
+        ))}
+        <div className="absolute bottom-0 left-[16.67%] right-[16.67%] hidden h-0.5 translate-y-8 bg-gradient-to-r from-blue-400 via-teal-400 to-green-400 md:block" />
+      </div>
+    </div>
+  );
+};
+
 const levelColors: Record<number, { bg: string; border: string; badge: string; text: string }> = {
   1: { bg: 'bg-slate-50', border: 'border-slate-200', badge: 'bg-slate-500', text: 'text-slate-700' },
   2: { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-500', text: 'text-blue-700' },
@@ -380,6 +460,8 @@ export default function CompetenciesDictionary() {
           </div>
         </CardContent>
       </Card>
+
+      <FrameworkStructure />
 
       <div className="text-sm text-gray-500">Showing {filteredCompetencies.length} competencies</div>
 
