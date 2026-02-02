@@ -16,6 +16,7 @@ import SubDepartmentsPage from '../departments/SubDepartmentsPage';
 import SectionsPage from '../departments/SectionsPage';
 import SubSectionsPage from '../departments/SubSectionsPage';
 import ReplacementPage from '../replacements/ReplacementPage';
+import CompetenciesDictionary from '../Competencies dictionary/Competenciesdictionary';
 import { OrganizationalProvider } from '../../contexts/OrganizationalContext';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
@@ -33,6 +34,7 @@ type ActiveView =
   | 'evaluations'
   | 'companies'
   | 'departments'
+  | 'competencies-dictionary'
   | 'admin'
   | 'weights-configuration'
   | 'user-management'
@@ -94,6 +96,8 @@ const Dashboard = () => {
         return 'companies';
       case '/departments':
         return 'departments';
+      case '/competencies-dictionary':
+        return 'competencies-dictionary';
       case '/sub-departments':
         return 'sub-departments';
       case '/sections':
@@ -173,6 +177,7 @@ const Dashboard = () => {
     evaluations: ['admin', 'hr', 'manager'],
     companies: ['admin', 'hr'],
     departments: ['admin', 'hr'],
+    'competencies-dictionary': ['admin', 'hr', 'manager'],
     'sub-departments': ['admin', 'hr', 'manager'],
     sections: ['admin', 'hr', 'manager'],
     'sub-sections': ['admin', 'hr', 'manager'],
@@ -233,6 +238,8 @@ const Dashboard = () => {
         return <CompanyList />;
       case 'departments':
         return <DepartmentList onViewChange={handleViewChange} />;
+      case 'competencies-dictionary':
+        return <CompetenciesDictionary />;
       case 'sub-departments':
         return <SubDepartmentsPage onViewChange={handleViewChange} />;
       case 'sections':
