@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { BookOpen, ChevronDown, ChevronUp, Crown, Search, Sparkles } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronUp, Crown, Search, Sparkles, X } from 'lucide-react';
 
 // ==================== TYPES ====================
 interface ProficiencyLevel {
@@ -391,10 +391,7 @@ export default function CompetenciesDictionary() {
           <h2 className="text-2xl font-bold text-gray-900">Competencies Dictionary</h2>
           <p className="text-gray-600">Reference guide for core and leadership competencies.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setExpandAll(!expandAll)}>
-          {expandAll ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
-          {expandAll ? 'Collapse all' : 'Expand all'}
-        </Button>
+        <div className="hidden" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -442,8 +439,18 @@ export default function CompetenciesDictionary() {
                 placeholder="Search competencies..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-9 pr-9"
               />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
               {filterButtons.map((button) => (
