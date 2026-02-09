@@ -2020,22 +2020,37 @@ const EmployeeList = () => {
       {/* Employee Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {displayEmployees.map((employee) => (
-          <Card key={employee.id} className="hover:shadow-lg transition-all duration-200 group">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4 gap-2">
-                <div className="flex items-center space-x-3 min-w-0 flex-1">
-                  <Avatar className="h-12 w-12 flex-shrink-0">
-                    <AvatarImage src={employee.avatar} alt={employee.name} />
-                    <AvatarFallback className="bg-blue-600 text-white">
-                      {employee.name.split(' ').map(n => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
+          <Card
+            key={employee.id}
+            className="group border border-gray-100 hover:border-gray-200 hover:bg-gray-50/70 hover:shadow-xl transition-all duration-200 cursor-pointer"
+            role="button"
+            tabIndex={0}
+            onClick={() => handleOpenEmployeeDetails(employee)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleOpenEmployeeDetails(employee);
+              }
+            }}
+          >
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="relative flex-shrink-0">
+                    <Avatar className="h-11 w-11 ring-2 ring-blue-50">
+                      <AvatarFallback className="bg-blue-600 text-white">
+                        {employee.name.split(' ').map(n => n[0]).join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span
+                      className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white ${employee.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`}
+                    />
+                  </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-lg truncate">{employee.name}</h3>
-                    <p className="text-sm text-gray-600 truncate">{employee.position}</p>
+                    <h3 className="font-semibold text-base text-gray-900 truncate">{employee.name}</h3>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2 flex-shrink-0">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   {statusUpdatingEmployees.has(employee.id) ? (
                     <div className="flex items-center justify-center w-11 h-6">
                       <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
@@ -2044,13 +2059,17 @@ const EmployeeList = () => {
                     <Switch
                       checked={employee.status === 'Active'}
                       onCheckedChange={() => handleToggleStatus(employee.id)}
+                      onClick={(event) => event.stopPropagation()}
                     />
                   )}
                   {(user?.role === 'admin' || user?.role === 'hr' || user?.api_role === 'HOD') && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleEditEmployee(employee)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleEditEmployee(employee);
+                      }}
                       className="h-8 w-8 p-0"
                     >
                       <Edit className="h-4 w-4" />
@@ -2058,102 +2077,20 @@ const EmployeeList = () => {
                   )}
                 </div>
               </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex gap-2 flex-wrap min-w-0 flex-1">
-                    <Badge 
-                      variant={employee.status === 'Active' ? 'default' : 'secondary'}
-                      className={employee.status === 'Active' ? 'bg-green-100 text-green-800' : ''}
-                    >
-                      {employee.status}
-                    </Badge>
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                      {employee.role}
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700">
-                      {employee.managerialLevel}
-                    </Badge>
-                    {employee.pendingEvaluationsCount > 0 ? (
-                      <Badge variant="secondary" className="text-xs bg-amber-50 text-amber-800">
-                        Pending evaluations ({employee.pendingEvaluationsCount})
-                      </Badge>
-                    ) 
-                    : (
-                      <Badge variant="secondary" className="text-xs bg-emerald-50 text-emerald-800">
-                         start evaluation
-                      </Badge>
-                    )}
-                    {employee.pendingEvaluationsCount > 0 && (
-                      <>
-                        {!employee.pending_evaluations_count_mid.startsWith('0-') && (
-                          <Badge variant="secondary" className="text-xs bg-sky-50 text-sky-800">
-                            {employee.pending_evaluations_count_mid}
-                          </Badge>
-                        )}
-                        {!employee.pending_evaluations_count_end.startsWith('0-') && (
-                          <Badge variant="secondary" className="text-xs bg-indigo-50 text-indigo-800">
-                            {employee.pending_evaluations_count_end}
-                          </Badge>
-                        )}
-                      </>
-                    )}
-                    {employee.warningsCount > 0 && (
-                        <div className="relative group">
-                          {/* Compact glow effect */}
-                          <div className="absolute inset-0 bg-gradient-to-r from-amber-400/20 to-orange-400/20 rounded-full blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                          
-                          {/* Compact modern badge */}
-                          <Badge 
-                            variant="outline" 
-                            className="relative bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-300/60 text-[10px] font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 px-1.5 py-0.5"
-                          >
-                            <div className="flex items-center space-x-1">
-                              <div className="w-1 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full animate-pulse"></div>
-                              <span>{employee.warningsCount}</span>
-                            </div>
-                          </Badge>
-                        </div>
-                      )}
-                  </div>
-                  <span className="text-sm text-gray-500 flex-shrink-0 truncate max-w-[100px]">{employee.department}</span>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <Mail className="h-4 w-4" />
-                    <a 
-                      href={`mailto:${employee.email}`}
-                      className="truncate text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                    >
-                      {employee.email}
-                    </a>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <Phone className="h-4 w-4" />
-                    <a 
-                      href={`https://wa.me/${(employee.countryCode || '+1').replace('+', '')}${employee.phone?.replace(/[^0-9]/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-green-600 hover:text-green-800 hover:underline transition-colors"
-                    >
-                      {(employee.countryCode || '+1')} {employee.phone}
-                    </a>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-gray-500 gap-2">
-                    <span className="flex-shrink-0">Joined: {formatDate(employee.joinDate)}</span>
-                    <span className="font-medium truncate">{employee.companyName}</span>
-                  </div>
-                </div>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full mt-3"
-                  onClick={() => handleOpenEmployeeDetails(employee)}
-                >
-                  View Profile
-                </Button>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700">
+                  {employee.managerialLevel === 'Individual Contributor' ? 'IC' : employee.managerialLevel}
+                </Badge>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                  {employee.department}
+                </Badge>
+                <Badge variant="secondary" className="text-xs bg-green-50 text-green-700">
+                  {employee.companyName}
+                </Badge>
               </div>
+
+              
             </CardContent>
           </Card>
         ))}
