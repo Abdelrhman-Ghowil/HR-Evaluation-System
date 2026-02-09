@@ -11,18 +11,11 @@ import NetworkDiagnostic from '../debug/NetworkDiagnostic';
 
 const LoginPage = () => {
   const { login, isLoading } = useAuth();
-  const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showDiagnostic, setShowDiagnostic] = useState(false);
-  
-  // New state for flexible authentication system
-  const [loginMethod, setLoginMethod] = useState<'email' | 'username' | 'both'>('email');
-  const [emailError, setEmailError] = useState('');
-  const [usernameError, setUsernameError] = useState('');
-  
-  // Password visibility state
+  const [identifierError, setIdentifierError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   // Email validation function
@@ -33,59 +26,47 @@ const LoginPage = () => {
 
   // Username validation function
   const validateUsername = (username: string): boolean => {
-    // Username should be at least 3 characters, alphanumeric and underscores allowed
-    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+    const usernameRegex = /^[a-zA-Z0-9._]{3,20}$/;
     return usernameRegex.test(username);
   };
 
-  // Handle input validation
-  const handleEmailChange = (value: string) => {
-    setEmail(value);
-    setEmailError('');
-    if (value && !validateEmail(value)) {
-      setEmailError('Please enter a valid email address');
-    }
-  };
-
-  const handleUsernameChange = (value: string) => {
-    setUsername(value);
-    setUsernameError('');
-    if (value && !validateUsername(value)) {
-      setUsernameError('Username must be 3-20 characters, letters, numbers, and underscores only');
+  const handleIdentifierChange = (value: string) => {
+    setIdentifier(value);
+    setIdentifierError('');
+    if (value) {
+      if (value.includes('@')) {
+        if (!validateEmail(value)) {
+          setIdentifierError('Enter a valid email address');
+        }
+      } else {
+        if (!validateUsername(value)) {
+          setIdentifierError('Username must be 3-20 characters: letters, numbers, underscores, or periods');
+        }
+      }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setEmailError('');
-    setUsernameError('');
-    
-    // Validate based on selected login method
+    setIdentifierError('');
     let hasValidEmail = false;
     let hasValidUsername = false;
     
-    if (loginMethod === 'email' || loginMethod === 'both') {
-      const trimmedEmail = email.trim();
-      if (!trimmedEmail) {
-        setEmailError('Email is required');
-        return;
-      }
-      if (!validateEmail(trimmedEmail)) {
-        setEmailError('Please enter a valid email address');
+    const trimmedIdentifier = identifier.trim();
+    if (!trimmedIdentifier) {
+      setIdentifierError('Email or username is required');
+      return;
+    }
+    if (trimmedIdentifier.includes('@')) {
+      if (!validateEmail(trimmedIdentifier)) {
+        setIdentifierError('Enter a valid email address');
         return;
       }
       hasValidEmail = true;
-    }
-    
-    if (loginMethod === 'username' || loginMethod === 'both') {
-      const trimmedUsername = username.trim();
-      if (!trimmedUsername) {
-        setUsernameError('Username is required');
-        return;
-      }
-      if (!validateUsername(trimmedUsername)) {
-        setUsernameError('Username must be 3-20 characters, letters, numbers, and underscores only');
+    } else {
+      if (!validateUsername(trimmedIdentifier)) {
+        setIdentifierError('Username must be 3-20 characters: letters, numbers, underscores, or periods');
         return;
       }
       hasValidUsername = true;
@@ -101,50 +82,24 @@ const LoginPage = () => {
       return;
     }
     
-    // Additional validation for 'both' method: ensure username and email refer to the same user
-    if (loginMethod === 'both' && hasValidEmail && hasValidUsername) {
-      // To avoid backend mismatch false-negatives, prefer a single identifier.
-      // We will send only the username when both are provided.
-    }
-    
-    // Construct credentials object based on what's provided
     const credentials: { email?: string; username?: string; password: string } = {
       password: trimmedPassword
     };
     
-    if (loginMethod === 'both') {
-      // Prefer username-only to reduce intermittent backend validation errors
-      if (hasValidUsername) credentials.username = username.trim();
-    } else {
-      if (hasValidEmail) credentials.email = email.trim().toLowerCase();
-      if (hasValidUsername) credentials.username = username.trim();
-    }
+    if (hasValidEmail) credentials.email = trimmedIdentifier.toLowerCase();
+    if (hasValidUsername) credentials.username = trimmedIdentifier;
     
     try {
       const success = await login(credentials);
       if (!success) {
-        // Enhanced error message for 'both' method
-        if (loginMethod === 'both') {
-          setError('Invalid credentials or username and email do not belong to the same user. Please try again.');
-        } else {
-          setError('Invalid credentials. Please try again.');
-        }
+        setError('Invalid credentials. Please try again.');
       }
     } catch (error) {
-      // Handle any network or other errors
-      if (loginMethod === 'both') {
-        setError('Authentication failed. Please verify that your username and email belong to the same account.');
-      } else {
-        setError('Authentication failed. Please check your credentials and try again.');
-      }
+      setError('Authentication failed. Please check your credentials and try again.');
     }
   };
 
-  const demoCredentials = [
-    { role: 'ADMIN', email: 'admin@company.com', icon: Shield },
-    { role: 'HR Manager', email: 'hr@company.com', icon: Users },
-    { role: 'Department Manager', email: 'manager@company.com', icon: BarChart3 }
-  ];
+  const isEmailLikely = identifier.includes('@');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 flex items-center justify-center p-4">
@@ -197,24 +152,7 @@ const LoginPage = () => {
             </div>
           </div> */}
 
-          {/* Demo Credentials */}
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-            <h4 className="font-semibold text-blue-900 mb-3">Demo Credentials:</h4>
-            <div className="space-y-2 text-sm text-blue-700">
-              <div>
-                <p className="font-medium">Admin:</p>
-                <p>conan@gmail.com</p>
-                <p>Username: conan</p>
-                <p>Password: #$123456</p>
-              </div>
-              <div>
-                <p className="font-medium">HR Manager:</p>
-                <p>admin@company.com</p>
-                <p>Username: admin</p>
-                <p>Password: password</p>
-              </div>
-            </div>
-          </div>
+          
         </div>
 
         {/* Right side - Login Form */}
@@ -228,120 +166,32 @@ const LoginPage = () => {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Login Method Toggle */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-gray-700">Login Method</Label>
-                  <div className="relative bg-gray-100 rounded-lg p-1 grid grid-cols-3 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setLoginMethod('email')}
-                      className={`
-                        relative flex items-center justify-center px-2 py-2 rounded-md text-xs font-medium transition-all duration-300 ease-in-out
-                        ${loginMethod === 'email' 
-                          ? 'bg-white text-blue-600 shadow-sm ring-1 ring-blue-200' 
-                          : 'text-gray-600 hover:text-gray-900'
-                        }
-                      `}
-                      aria-pressed={loginMethod === 'email'}
-                      aria-label="Login with email only"
-                    >
-                      <Mail className="h-3 w-3 mr-1" />
-                      Email
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLoginMethod('username')}
-                      className={`
-                        relative flex items-center justify-center px-2 py-2 rounded-md text-xs font-medium transition-all duration-300 ease-in-out
-                        ${loginMethod === 'username' 
-                          ? 'bg-white text-blue-600 shadow-sm ring-1 ring-blue-200' 
-                          : 'text-gray-600 hover:text-gray-900'
-                        }
-                      `}
-                      aria-pressed={loginMethod === 'username'}
-                      aria-label="Login with username only"
-                    >
-                      <User className="h-3 w-3 mr-1" />
-                      Username
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLoginMethod('both')}
-                      className={`
-                        relative flex items-center justify-center px-2 py-2 rounded-md text-xs font-medium transition-all duration-300 ease-in-out
-                        ${loginMethod === 'both' 
-                          ? 'bg-white text-blue-600 shadow-sm ring-1 ring-blue-200' 
-                          : 'text-gray-600 hover:text-gray-900'
-                        }
-                      `}
-                      aria-pressed={loginMethod === 'both'}
-                      aria-label="Login with both email and username"
-                    >
-                      <div className="flex items-center">
-                        <Mail className="h-3 w-3" />
-                        <User className="h-3 w-3 -ml-1" />
-                      </div>
-                      <span className="ml-1">Both</span>
-                    </button>
+                <div className="space-y-2">
+                  <Label htmlFor="identifier" className="text-sm font-medium text-gray-700">
+                    Email or Username *
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="identifier"
+                      type="text"
+                      placeholder="Enter your email or username"
+                      value={identifier}
+                      onChange={(e) => handleIdentifierChange(e.target.value)}
+                      disabled={isLoading}
+                      className={`h-11 pl-10 ${identifierError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
+                      aria-describedby={identifierError ? "identifier-error" : undefined}
+                      aria-invalid={!!identifierError}
+                    />
+                    {isEmailLikely ? (
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    ) : (
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    )}
                   </div>
-                </div>
-
-                {/* Dynamic Input Fields */}
-                <div className="space-y-4">
-                  {/* Email Input - Show for 'email' and 'both' methods */}
-                  {(loginMethod === 'email' || loginMethod === 'both') && (
-                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                      <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                        Email Address *
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="Enter your email address"
-                          value={email}
-                          onChange={(e) => handleEmailChange(e.target.value)}
-                          disabled={isLoading}
-                          className={`h-11 pl-10 ${emailError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
-                          aria-describedby={emailError ? "email-error" : undefined}
-                          aria-invalid={!!emailError}
-                        />
-                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      </div>
-                      {emailError && (
-                        <p id="email-error" className="text-red-600 text-sm mt-1" role="alert">
-                          {emailError}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Username Input - Show for 'username' and 'both' methods */}
-                  {(loginMethod === 'username' || loginMethod === 'both') && (
-                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                      <Label htmlFor="username" className="text-sm font-medium text-gray-700">
-                        Username *
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          id="username"
-                          type="text"
-                          placeholder="Enter your username"
-                          value={username}
-                          onChange={(e) => handleUsernameChange(e.target.value)}
-                          disabled={isLoading}
-                          className={`h-11 pl-10 ${usernameError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
-                          aria-describedby={usernameError ? "username-error" : undefined}
-                          aria-invalid={!!usernameError}
-                        />
-                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      </div>
-                      {usernameError && (
-                        <p id="username-error" className="text-red-600 text-sm mt-1" role="alert">
-                          {usernameError}
-                        </p>
-                      )}
-                    </div>
+                  {identifierError && (
+                    <p id="identifier-error" className="text-red-600 text-sm mt-1" role="alert">
+                      {identifierError}
+                    </p>
                   )}
                 </div>
 
@@ -399,19 +249,6 @@ const LoginPage = () => {
                   )}
                 </Button>
                 
-                {/* Network Diagnostic Toggle */}
-                <div className="pt-4 border-t">
-                  <Button 
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowDiagnostic(!showDiagnostic)}
-                    className="w-full text-xs"
-                  >
-                    <Settings className="mr-2 h-3 w-3" />
-                    {showDiagnostic ? 'Hide' : 'Show'} Network Diagnostic
-                  </Button>
-                </div>
               </form>
             </CardContent>
           </Card>
