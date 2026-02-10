@@ -61,6 +61,7 @@ const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT || '10000', 10);
 class ApiService {
   private api: AxiosInstance;
   private token: string | null = null;
+  private refreshPromise: Promise<string | null> | null = null;
 
   constructor() {
     this.api = axios.create({
@@ -94,37 +95,25 @@ class ApiService {
       },
       async (error) => {
         const originalRequest = error.config;
+        const isRefreshRequest = originalRequest?.url?.includes('/api/auth/refresh/');
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isRefreshRequest) {
           originalRequest._retry = true;
 
           try {
-            const refreshToken = localStorage.getItem('refresh_token');
-            if (refreshToken) {
-              console.log('Token expired, attempting refresh...');
-              const response = await axios.post(`${BASE_URL}/api/auth/refresh/`, {
-                refresh: refreshToken
+            if (!this.refreshPromise) {
+              this.refreshPromise = this.performTokenRefresh().finally(() => {
+                this.refreshPromise = null;
               });
-              const { access } = response.data;
-              this.saveToken(access);
+            }
+            const access = await this.refreshPromise;
+            if (access) {
+              originalRequest.headers = originalRequest.headers || {};
               originalRequest.headers.Authorization = `Bearer ${access}`;
-              console.log('Token refreshed successfully, retrying original request');
               return this.api(originalRequest);
-            } else {
-              console.log('No refresh token available, redirecting to login');
-              this.clearToken();
-              // Use a more graceful redirect that works with React Router
-              if (typeof window !== 'undefined') {
-                window.location.href = '/';
-              }
             }
           } catch (refreshError) {
-            console.error('Token refresh failed:', refreshError);
-            this.clearToken();
-            // Use a more graceful redirect that works with React Router
-            if (typeof window !== 'undefined') {
-              window.location.href = '/';
-            }
+            return Promise.reject(this.handleError(refreshError));
           }
         }
 
@@ -157,6 +146,37 @@ class ApiService {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('token');
     localStorage.removeItem('refresh_token');
+  }
+
+  private async performTokenRefresh(): Promise<string | null> {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) {
+      this.clearToken();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      }
+      throw new Error('No refresh token available');
+    }
+
+    try {
+      const baseUrl = (this.api.defaults.baseURL || '').replace(/\/$/, '');
+      const refreshUrl = `${baseUrl}/api/auth/refresh/`;
+      const response: AxiosResponse<{ access: string; refresh?: string }> = await axios.post(refreshUrl, {
+        refresh: refreshToken
+      });
+      const { access, refresh } = response.data;
+      this.saveToken(access);
+      if (refresh) {
+        localStorage.setItem('refresh_token', refresh);
+      }
+      return access;
+    } catch (error) {
+      this.clearToken();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      }
+      throw error;
+    }
   }
 
   // Error handling
@@ -298,23 +318,7 @@ class ApiService {
 
   // Token refresh method
   async refreshToken(): Promise<string | null> {
-    try {
-      const refreshToken = localStorage.getItem('refresh_token');
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      const response: AxiosResponse<{ access: string }> = await this.api.post('/api/auth/refresh/', {
-        refresh: refreshToken
-      });
-
-      const { access } = response.data;
-      this.saveToken(access);
-      return access;
-    } catch (error) {
-      this.clearToken();
-      throw error;
-    }
+    return this.performTokenRefresh();
   }
 
   // User management methods

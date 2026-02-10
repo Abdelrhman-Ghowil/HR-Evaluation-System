@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import apiService from '../services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiUser, UserRole } from '../types/api';
@@ -118,7 +118,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await apiService.logout();
     } catch (error) {
@@ -130,6 +130,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.removeItem('refresh_token');
       queryClient.clear();
       toast.success('Logged out successfully');
+    }
+  }, [queryClient]);
+
+  const getTokenExpiryMs = (token: string): number | null => {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (!payload?.exp) return null;
+      return payload.exp * 1000;
+    } catch (error) {
+      return null;
     }
   };
 
@@ -182,6 +192,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     initializeAuth();
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    const scheduleRefresh = () => {
+      const token = apiService.getToken();
+      if (!token) return;
+      const expiryMs = getTokenExpiryMs(token);
+      if (!expiryMs) return;
+      const refreshInMs = Math.max(expiryMs - Date.now() - 60000, 0);
+      timeoutId = setTimeout(async () => {
+        if (cancelled) return;
+        try {
+          await apiService.refreshToken();
+          if (!cancelled) {
+            scheduleRefresh();
+          }
+        } catch (error) {
+          await logout();
+        }
+      }, refreshInMs);
+    };
+
+    scheduleRefresh();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isAuthenticated, logout]);
 
   return (
     <AuthContext.Provider value={{ user, login, logout, isLoading, isAuthenticated }}>

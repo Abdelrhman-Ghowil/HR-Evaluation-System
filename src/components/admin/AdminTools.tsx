@@ -60,6 +60,7 @@ const AdminTools: React.FC<AdminToolsProps> = ({ onNavigateToWeights, onNavigate
     setOnboardingOpen(false);
   };
 
+
   const tools = [
     {
       title: 'System Configuration',
