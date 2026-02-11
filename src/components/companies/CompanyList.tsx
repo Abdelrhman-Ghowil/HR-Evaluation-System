@@ -138,6 +138,51 @@ const CompanyList = () => {
     })));
   }, [companiesData]);
 
+  const fetchDepartments = useCallback(async () => {
+    setLoadingDepartments(true);
+    setDepartmentsError(null);
+    try {
+      const response = await apiService.getDepartments();
+      if (Array.isArray(response)) {
+        setDepartments(response);
+      } else if (response && Array.isArray(response.results)) {
+        setDepartments(response.results);
+      } else {
+        setDepartments([]);
+      }
+    } catch (error: any) {
+      setDepartments([]);
+      setDepartmentsError(error?.message || 'Failed to load departments.');
+    } finally {
+      setLoadingDepartments(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDepartments();
+  }, [fetchDepartments]);
+
+  const companyEmployeeCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    departments.forEach((department) => {
+      const key = department.company_id || department.company;
+      if (!key) return;
+      const count = Number(department.employee_count) || 0;
+      map.set(key, (map.get(key) || 0) + count);
+    });
+    return map;
+  }, [departments]);
+
+  const companyDepartmentCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    departments.forEach((department) => {
+      const key = department.company_id || department.company;
+      if (!key) return;
+      map.set(key, (map.get(key) || 0) + 1);
+    });
+    return map;
+  }, [departments]);
+
   // Handle view departments navigation
   const handleViewDepartments = (company: ApiCompany) => {
     // Navigate to departments page with company_id as query parameter
@@ -472,7 +517,6 @@ const CompanyList = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Companies</h2>
-          <p className="text-gray-600">Manage your organization's companies</p>
         </div>
         <div className="flex gap-3">
           {canImport && (
@@ -722,7 +766,16 @@ const CompanyList = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCompanies.map((company) => (
+          {filteredCompanies.map((company) => {
+            const employeeCount =
+              companyEmployeeCounts.get(company.company_id) ??
+              companyEmployeeCounts.get(company.name) ??
+              0;
+            const departmentCount =
+              companyDepartmentCounts.get(company.company_id) ??
+              companyDepartmentCounts.get(company.name) ??
+              0;
+            return (
             <Card key={company.company_id} className="hover:shadow-md transition-all duration-200">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -766,6 +819,16 @@ const CompanyList = () => {
                     <span className="text-sm text-gray-600">{company.size} company</span>
                   </div>
                 )}
+
+                <div className="flex items-center space-x-2">
+                  <Building className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-gray-600">{departmentCount} departments</span>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Users className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-gray-600">{employeeCount} employees</span>
+                </div>
                 
                 {company.address && (
                   <div className="flex items-center space-x-2">
@@ -775,9 +838,6 @@ const CompanyList = () => {
                 )}
                 
                 <div className="pt-2 border-t border-gray-100 space-y-2">
-                  <p className="text-xs text-gray-500">
-                    Created: {new Date(company.created_at).toLocaleDateString()}
-                  </p>
                   <Button
                     variant="outline"
                     size="sm"
@@ -790,7 +850,8 @@ const CompanyList = () => {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
