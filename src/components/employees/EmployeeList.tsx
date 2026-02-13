@@ -2048,6 +2048,7 @@ const EmployeeList = () => {
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-semibold text-base text-gray-900 truncate">{employee.name}</h3>
+                    <p className="text-sm text-gray-600 truncate">{employee.position}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
