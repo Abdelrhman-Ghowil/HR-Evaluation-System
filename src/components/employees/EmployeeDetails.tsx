@@ -163,6 +163,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const [isCreatingEvaluation, setIsCreatingEvaluation] = useState(false);
   const [isUpdatingEvaluation, setIsUpdatingEvaluation] = useState(false);
   const [warningsExpanded, setWarningsExpanded] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
 
   const { data: evaluationsData, isLoading: evaluationsLoading, error: evaluationsError } = useEvaluations({
     employee_id: employee.id
@@ -537,40 +538,53 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
             </div>
           </div>
 
-          {/* ── Details Grid ────────────────────────────────────────────── */}
-          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-0 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
-            <div className="space-y-0 pr-0 sm:pr-6">
-              <InfoItem icon={Mail} label="Email" value={employee.email} href={`mailto:${employee.email}`} color="blue" />
-              <InfoItem icon={Phone} label="Phone" 
-                value={formatPhoneNumber(employee.phone, employee.countryCode)} 
-                href={generateWhatsAppUrl(employee.phone, employee.countryCode)} color="green" />
-              {employee.gender && (
-                <InfoItem icon={User} label="Gender" value={employee.gender} color="indigo" />
-              )}
-            </div>
+          <button
+            onClick={() => setDetailsExpanded(!detailsExpanded)}
+            className="mt-4 flex items-center gap-1 text-xs text-gray-500 font-medium"
+          >
+            <span>{detailsExpanded ? 'Collapse' : 'View details'}</span>
+            <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${detailsExpanded ? 'rotate-180' : ''}`} />
+          </button>
 
-            <div className="space-y-0 px-0 sm:px-6 pt-3 sm:pt-0">
-              <InfoItem icon={Building2} label="Company" value={employee.companyName} color="purple" />
-              <InfoItem icon={Briefcase} label="Department" value={employee.department} color="violet" />
-              <InfoItem icon={Shield} label="Managerial Level" value={employee.managerialLevel} color="slate" />
-              {employee.jobType && (
-                <InfoItem icon={Briefcase} label="Job Type" value={employee.jobType} color="gray" />
-              )}
-            </div>
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              detailsExpanded ? 'max-h-[700px] opacity-100' : 'max-h-0 opacity-0'
+            }`}
+          >
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-0 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+              <div className="space-y-0 pr-0 sm:pr-6">
+                <InfoItem icon={Mail} label="Email" value={employee.email} href={`mailto:${employee.email}`} color="blue" />
+                <InfoItem icon={Phone} label="Phone" 
+                  value={formatPhoneNumber(employee.phone, employee.countryCode)} 
+                  href={generateWhatsAppUrl(employee.phone, employee.countryCode)} color="green" />
+                {employee.gender && (
+                  <InfoItem icon={User} label="Gender" value={employee.gender} color="indigo" />
+                )}
+              </div>
 
-            <div className="space-y-0 pl-0 sm:pl-6 pt-3 sm:pt-0">
-              <InfoItem icon={Calendar} label="Join Date" value={formatDate(employee.joinDate)} color="amber" />
-              {employee.directManager && (
-                <InfoItem icon={Users} label="Direct Manager" value={employee.directManager} color="orange" />
-              )}
-              {employee.location && (
-                <InfoItem icon={MapPin} label="Location" 
-                  value={employee.branch ? `${employee.location} · ${employee.branch}` : employee.location} 
-                  color="rose" />
-              )}
-              {employee.orgPath && (
-                <InfoItem icon={Building2} label="Org Path" value={employee.orgPath} color="gray" />
-              )}
+              <div className="space-y-0 px-0 sm:px-6 pt-3 sm:pt-0">
+                <InfoItem icon={Building2} label="Company" value={employee.companyName} color="purple" />
+                <InfoItem icon={Briefcase} label="Department" value={employee.department} color="violet" />
+                <InfoItem icon={Shield} label="Managerial Level" value={employee.managerialLevel} color="slate" />
+                {employee.jobType && (
+                  <InfoItem icon={Briefcase} label="Job Type" value={employee.jobType} color="gray" />
+                )}
+              </div>
+
+              <div className="space-y-0 pl-0 sm:pl-6 pt-3 sm:pt-0">
+                <InfoItem icon={Calendar} label="Join Date" value={formatDate(employee.joinDate)} color="amber" />
+                {employee.directManager && (
+                  <InfoItem icon={Users} label="Direct Manager" value={employee.directManager} color="orange" />
+                )}
+                {employee.location && (
+                  <InfoItem icon={MapPin} label="Location" 
+                    value={employee.branch ? `${employee.location} · ${employee.branch}` : employee.location} 
+                    color="rose" />
+                )}
+                {employee.orgPath && (
+                  <InfoItem icon={Building2} label="Org Path" value={employee.orgPath} color="gray" />
+                )}
+              </div>
             </div>
           </div>
         </div>
