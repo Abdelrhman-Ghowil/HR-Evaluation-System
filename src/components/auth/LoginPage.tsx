@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Building2, Users, Shield, BarChart3, Loader2, Settings, Mail, User, Eye, EyeOff } from 'lucide-react';
+import { Building2, Loader2, Settings, Mail, User, Eye, EyeOff } from 'lucide-react';
 import NetworkDiagnostic from '../debug/NetworkDiagnostic';
 
 const LoginPage = () => {
@@ -102,41 +102,24 @@ const LoginPage = () => {
   const isEmailLikely = identifier.includes('@');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-teal-50 flex items-center justify-center px-4 py-8 sm:py-10">
+      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start lg:items-center">
         {/* Left side - Branding & Features */}
-        <div className="space-y-8 text-center lg:text-left">
+        <div className="space-y-6 sm:space-y-8 text-center lg:text-left">
           <div className="space-y-4">
             <div className="flex items-center justify-center lg:justify-start space-x-3">
               <img 
                 src="/logo.png" 
                 alt="Company Logo" 
-                className="h-10 w-auto"
+                className="h-8 sm:h-10 w-auto"
               />
-              <h1 className="text-3xl font-bold text-gray-900">HR System</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">HR System</h1>
             </div>
-            <p className="text-xl text-gray-600 max-w-lg">
+            <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-lg mx-auto lg:mx-0">
               Streamline your employee evaluation process with our comprehensive management platform
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-              <Users className="h-6 w-6 text-blue-600 mb-2" />
-              <h3 className="font-semibold text-gray-900">Employee Management</h3>
-              <p className="text-sm text-gray-600">Manage employee data and profiles</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-              <BarChart3 className="h-6 w-6 text-teal-600 mb-2" />
-              <h3 className="font-semibold text-gray-900">Performance Tracking</h3>
-              <p className="text-sm text-gray-600">Track evaluations and objectives</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-              <Shield className="h-6 w-6 text-purple-600 mb-2" />
-              <h3 className="font-semibold text-gray-900">Role-based Access</h3>
-              <p className="text-sm text-gray-600">Secure, permission-based system</p>
-            </div>
-          </div>
 
           {/* API Integration Info */}
           {/* <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
@@ -156,16 +139,16 @@ const LoginPage = () => {
         </div>
 
         {/* Right side - Login Form */}
-        <div className="flex justify-center">
-          <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+        <div className="flex justify-center lg:justify-end">
+          <Card className="w-full max-w-sm sm:max-w-md shadow-xl border-0 bg-white/80 backdrop-blur-sm">
             <CardHeader className="space-y-1 text-center">
-              <CardTitle className="text-2xl font-bold text-gray-900">Welcome Back</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl font-bold text-gray-900">Welcome Back</CardTitle>
               <CardDescription className="text-gray-600">
                 Sign in to your account to continue
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="identifier" className="text-sm font-medium text-gray-700">
                     Email or Username *
@@ -178,7 +161,7 @@ const LoginPage = () => {
                       value={identifier}
                       onChange={(e) => handleIdentifierChange(e.target.value)}
                       disabled={isLoading}
-                      className={`h-11 pl-10 ${identifierError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
+                      className={`h-10 sm:h-11 pl-10 ${identifierError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
                       aria-describedby={identifierError ? "identifier-error" : undefined}
                       aria-invalid={!!identifierError}
                     />
@@ -207,7 +190,7 @@ const LoginPage = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       disabled={isLoading}
-                      className="h-11 pr-10"
+                      className="h-10 sm:h-11 pr-10"
                       aria-describedby={error ? "form-error" : undefined}
                     />
                     <button
@@ -236,7 +219,7 @@ const LoginPage = () => {
 
                 <Button 
                   type="submit" 
-                  className="w-full h-11 bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 transition-all duration-200"
+                  className="w-full h-10 sm:h-11 bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 transition-all duration-200"
                   disabled={isLoading}
                 >
                   {isLoading ? (

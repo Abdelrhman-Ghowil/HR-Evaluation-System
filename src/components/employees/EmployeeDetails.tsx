@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -153,7 +153,6 @@ const EvaluationCard = ({ evaluation, onSelect, onEdit, onDelete, isDeleting }: 
 
 const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const [selectedEvaluation, setSelectedEvaluation] = useState<EvaluationInput | null>(null);
-  const [isAddEvaluationOpen, setIsAddEvaluationOpen] = useState(false);
   const [isEditEvaluationOpen, setIsEditEvaluationOpen] = useState(false);
   const [editingEvaluation, setEditingEvaluation] = useState<EvaluationInput | null>(null);
   const [newEvaluation, setNewEvaluation] = useState<NewEvaluation>({
@@ -164,6 +163,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const [isCreatingEvaluation, setIsCreatingEvaluation] = useState(false);
   const [isUpdatingEvaluation, setIsUpdatingEvaluation] = useState(false);
   const [warningsExpanded, setWarningsExpanded] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
 
   const { data: evaluationsData, isLoading: evaluationsLoading, error: evaluationsError } = useEvaluations({
     employee_id: employee.id
@@ -346,7 +346,6 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
       setIsCreatingEvaluation(false);
     }
     setNewEvaluation({ type: 'Annual', year: new Date().getFullYear(), status: 'Draft' });
-    setIsAddEvaluationOpen(false);
   };
 
   const handleEditEvaluation = (evaluation: EvaluationInput) => {
@@ -499,7 +498,7 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
         <div className="px-6 sm:px-8 pb-8 pt-6 relative z-10">
           <div className="flex flex-col sm:flex-row items-start gap-5">
             <Avatar className="h-24 w-24 ring-4 ring-white shadow-xl shrink-0">
-              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-2xl font-bold">
+              <AvatarFallback className="bg-[#2563EB] text-white text-2xl font-bold">
                 {employee.name.split(' ').map(n => n[0]).join('')}
               </AvatarFallback>
             </Avatar>
@@ -539,40 +538,53 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
             </div>
           </div>
 
-          {/* ── Details Grid ────────────────────────────────────────────── */}
-          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-0 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
-            <div className="space-y-0 pr-0 sm:pr-6">
-              <InfoItem icon={Mail} label="Email" value={employee.email} href={`mailto:${employee.email}`} color="blue" />
-              <InfoItem icon={Phone} label="Phone" 
-                value={formatPhoneNumber(employee.phone, employee.countryCode)} 
-                href={generateWhatsAppUrl(employee.phone, employee.countryCode)} color="green" />
-              {employee.gender && (
-                <InfoItem icon={User} label="Gender" value={employee.gender} color="indigo" />
-              )}
-            </div>
+          <button
+            onClick={() => setDetailsExpanded(!detailsExpanded)}
+            className="mt-4 flex items-center gap-1 text-xs text-gray-500 font-medium"
+          >
+            <span>{detailsExpanded ? 'Collapse' : 'View details'}</span>
+            <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${detailsExpanded ? 'rotate-180' : ''}`} />
+          </button>
 
-            <div className="space-y-0 px-0 sm:px-6 pt-3 sm:pt-0">
-              <InfoItem icon={Building2} label="Company" value={employee.companyName} color="purple" />
-              <InfoItem icon={Briefcase} label="Department" value={employee.department} color="violet" />
-              <InfoItem icon={Shield} label="Managerial Level" value={employee.managerialLevel} color="slate" />
-              {employee.jobType && (
-                <InfoItem icon={Briefcase} label="Job Type" value={employee.jobType} color="gray" />
-              )}
-            </div>
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              detailsExpanded ? 'max-h-[700px] opacity-100' : 'max-h-0 opacity-0'
+            }`}
+          >
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-0 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+              <div className="space-y-0 pr-0 sm:pr-6">
+                <InfoItem icon={Mail} label="Email" value={employee.email} href={`mailto:${employee.email}`} color="blue" />
+                <InfoItem icon={Phone} label="Phone" 
+                  value={formatPhoneNumber(employee.phone, employee.countryCode)} 
+                  href={generateWhatsAppUrl(employee.phone, employee.countryCode)} color="green" />
+                {employee.gender && (
+                  <InfoItem icon={User} label="Gender" value={employee.gender} color="indigo" />
+                )}
+              </div>
 
-            <div className="space-y-0 pl-0 sm:pl-6 pt-3 sm:pt-0">
-              <InfoItem icon={Calendar} label="Join Date" value={formatDate(employee.joinDate)} color="amber" />
-              {employee.directManager && (
-                <InfoItem icon={Users} label="Direct Manager" value={employee.directManager} color="orange" />
-              )}
-              {employee.location && (
-                <InfoItem icon={MapPin} label="Location" 
-                  value={employee.branch ? `${employee.location} · ${employee.branch}` : employee.location} 
-                  color="rose" />
-              )}
-              {employee.orgPath && (
-                <InfoItem icon={Building2} label="Org Path" value={employee.orgPath} color="gray" />
-              )}
+              <div className="space-y-0 px-0 sm:px-6 pt-3 sm:pt-0">
+                <InfoItem icon={Building2} label="Company" value={employee.companyName} color="purple" />
+                <InfoItem icon={Briefcase} label="Department" value={employee.department} color="violet" />
+                <InfoItem icon={Shield} label="Managerial Level" value={employee.managerialLevel} color="slate" />
+                {employee.jobType && (
+                  <InfoItem icon={Briefcase} label="Job Type" value={employee.jobType} color="gray" />
+                )}
+              </div>
+
+              <div className="space-y-0 pl-0 sm:pl-6 pt-3 sm:pt-0">
+                <InfoItem icon={Calendar} label="Join Date" value={formatDate(employee.joinDate)} color="amber" />
+                {employee.directManager && (
+                  <InfoItem icon={Users} label="Direct Manager" value={employee.directManager} color="orange" />
+                )}
+                {employee.location && (
+                  <InfoItem icon={MapPin} label="Location" 
+                    value={employee.branch ? `${employee.location} · ${employee.branch}` : employee.location} 
+                    color="rose" />
+                )}
+                {employee.orgPath && (
+                  <InfoItem icon={Building2} label="Org Path" value={employee.orgPath} color="gray" />
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -721,81 +733,21 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
             <p className="text-xs text-gray-400 mt-0.5">Click any evaluation to view details</p>
           </div>
 
-          <Dialog open={isAddEvaluationOpen} onOpenChange={setIsAddEvaluationOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg gap-1.5 shadow-sm">
+          <Button
+            size="sm"
+            onClick={handleCreateEvaluation}
+            disabled={!isFormValid() || isCreatingEvaluation}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg gap-1.5 shadow-sm"
+          >
+            {isCreatingEvaluation ? (
+              <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating...</>
+            ) : (
+              <>
                 <Plus className="h-3.5 w-3.5" />
                 New Evaluation
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md rounded-2xl">
-              <DialogHeader>
-                <DialogTitle className="text-lg">Create Evaluation</DialogTitle>
-                <p className="text-sm text-gray-500 mt-1">Set up a new evaluation cycle for this employee.</p>
-              </DialogHeader>
-
-              <div className="space-y-5 py-2">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</Label>
-                  <Select value={newEvaluation.type} disabled>
-                    <SelectTrigger disabled className="rounded-lg"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Quarterly">Quarterly</SelectItem>
-                      <SelectItem value="Annual">Annual</SelectItem>
-                      <SelectItem value="Optional">Optional</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Year</Label>
-                  <Select value={newEvaluation.year.toString()} onValueChange={(v) => setNewEvaluation(p => ({ ...p, year: parseInt(v) }))}>
-                    <SelectTrigger className="rounded-lg"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {yearOptions.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {newEvaluation.type === 'Optional' && (
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Quarter</Label>
-                    <Select value={newEvaluation.quarter?.toString() || ''} onValueChange={(v) => setNewEvaluation(p => ({ ...p, quarter: parseInt(v) }))}>
-                      <SelectTrigger className="rounded-lg"><SelectValue placeholder="Select quarter" /></SelectTrigger>
-                      <SelectContent>
-                        {quarterOptions.map(q => <SelectItem key={q} value={q.toString()}>Q{q}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-3 p-4 bg-indigo-50/70 rounded-xl border border-indigo-100">
-                  <FileText className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-indigo-800 mb-0.5">Will create:</p>
-                    <p className="text-sm text-indigo-700">
-                      {newEvaluation.type === 'Quarterly' && '4 quarterly records (Q1 – Q4)'}
-                      {newEvaluation.type === 'Annual' && '2 records (Mid-Year & End-Year)'}
-                      {newEvaluation.type === 'Optional' && newEvaluation.quarter && `1 optional record (Q${newEvaluation.quarter})`}
-                      {newEvaluation.type === 'Optional' && !newEvaluation.quarter && 'Select a quarter first'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <DialogFooter className="gap-2 sm:gap-0">
-                <Button variant="ghost" onClick={() => setIsAddEvaluationOpen(false)} className="rounded-lg">Cancel</Button>
-                <Button onClick={handleCreateEvaluation} disabled={!isFormValid() || isCreatingEvaluation}
-                  className="bg-indigo-600 hover:bg-indigo-700 rounded-lg gap-2">
-                  {isCreatingEvaluation ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" />Creating...</>
-                  ) : (
-                    `Create${newEvaluation.type !== 'Optional' ? 's' : ''}`
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </>
+            )}
+          </Button>
         </div>
 
         <div className="p-4 sm:p-6">
