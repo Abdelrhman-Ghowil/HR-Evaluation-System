@@ -115,7 +115,7 @@ const CompanyList = () => {
   useEffect(() => {
     if (companiesQueryError) {
       // Map query error to local error message for UI
-      // @ts-ignore – error may be unknown type, ensure safe message
+      // @ts-expect-error – error may be unknown type, ensure safe message
       const msg = companiesQueryError?.message || 'Failed to load companies. Please try again.';
       setError(msg);
     } else {
