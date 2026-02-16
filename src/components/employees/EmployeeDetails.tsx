@@ -163,7 +163,8 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
   const [isCreatingEvaluation, setIsCreatingEvaluation] = useState(false);
   const [isUpdatingEvaluation, setIsUpdatingEvaluation] = useState(false);
   const [warningsExpanded, setWarningsExpanded] = useState(false);
-  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const [personalExpanded, setPersonalExpanded] = useState(false);
+  const [workExpanded, setWorkExpanded] = useState(false);
 
   const { data: evaluationsData, isLoading: evaluationsLoading, error: evaluationsError } = useEvaluations({
     employee_id: employee.id
@@ -493,66 +494,51 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
         <p className="text-sm text-gray-400">Employee Profile</p>
       </div>
 
-      {/* ─── Hero Card ──────────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm">
-        <div className="px-6 sm:px-8 pb-8 pt-6 relative z-10">
-          <div className="flex flex-col sm:flex-row items-start gap-5">
-            <Avatar className="h-24 w-24 ring-4 ring-white shadow-xl shrink-0">
-              <AvatarFallback className="bg-[#2563EB] text-white text-2xl font-bold">
-                {employee.name.split(' ').map(n => n[0]).join('')}
-              </AvatarFallback>
-            </Avatar>
-
-            <div className="flex-1 min-w-0 pt-2 sm:pt-6">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{employee.name}</h1>
-                  <p className="text-base text-gray-500 font-medium mt-0.5">{employee.position}</p>
-                  <div className="flex items-center flex-wrap gap-2 mt-3">
-                    <Badge variant="outline" className="bg-white border-gray-200 text-gray-600 font-mono text-xs gap-1">
-                      <Hash className="h-3 w-3" />{employee.employeeCode}
-                    </Badge>
-                    <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-50">{employee.role}</Badge>
-                    <Badge className={`border ${
-                      employee.status === 'Active' 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                        : 'bg-gray-50 text-gray-600 border-gray-200'
-                    }`}>
-                      {employee.status}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 shrink-0">
-                  <a href={`mailto:${employee.email}`}
-                    className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
-                    <Mail className="h-4 w-4" />
-                  </a>
-                  <a href={generateWhatsAppUrl(employee.phone, employee.countryCode)}
-                    target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
-                    <Phone className="h-4 w-4" />
-                  </a>
-                </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+        <div className="space-y-4">
+          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-12 w-12 ring-2 ring-white shadow-sm shrink-0">
+                <AvatarFallback className="bg-[#2563EB] text-white text-lg font-bold">
+                  {employee.name.split(' ').map(n => n[0]).join('')}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <h1 className="text-lg font-semibold text-gray-900 truncate">{employee.name}</h1>
+                <p className="text-sm text-gray-500 truncate">{employee.position}</p>
               </div>
             </div>
-          </div>
 
-          <button
-            onClick={() => setDetailsExpanded(!detailsExpanded)}
-            className="mt-4 flex items-center gap-1 text-xs text-gray-500 font-medium"
-          >
-            <span>{detailsExpanded ? 'Collapse' : 'View details'}</span>
-            <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${detailsExpanded ? 'rotate-180' : ''}`} />
-          </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge variant="outline" className="bg-white border-gray-200 text-gray-600 font-mono text-xs gap-1">
+                <Hash className="h-3 w-3" />{employee.employeeCode}
+              </Badge>
+              <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-50">{employee.role}</Badge>
+              <Badge className={`border ${
+                employee.status === 'Active' 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : 'bg-gray-50 text-gray-600 border-gray-200'
+              }`}>
+                {employee.status}
+              </Badge>
+            </div>
 
-          <div
-            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              detailsExpanded ? 'max-h-[700px] opacity-100' : 'max-h-0 opacity-0'
-            }`}
-          >
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-0 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
-              <div className="space-y-0 pr-0 sm:pr-6">
+            <div className="mt-4 border-t border-gray-100 pt-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Personal Details</h3>
+                <button
+                  onClick={() => setPersonalExpanded(!personalExpanded)}
+                  className="sm:hidden flex items-center gap-1 text-xs text-gray-500 font-medium"
+                >
+                  <span>{personalExpanded ? 'Collapse' : 'View details'}</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${personalExpanded ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+              <div
+                className={`divide-y divide-gray-100 overflow-hidden transition-all duration-300 ease-in-out ${
+                  personalExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+                } sm:max-h-none sm:opacity-100`}
+              >
                 <InfoItem icon={Mail} label="Email" value={employee.email} href={`mailto:${employee.email}`} color="blue" />
                 <InfoItem icon={Phone} label="Phone" 
                   value={formatPhoneNumber(employee.phone, employee.countryCode)} 
@@ -560,285 +546,282 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
                 {employee.gender && (
                   <InfoItem icon={User} label="Gender" value={employee.gender} color="indigo" />
                 )}
-              </div>
-
-              <div className="space-y-0 px-0 sm:px-6 pt-3 sm:pt-0">
-                <InfoItem icon={Building2} label="Company" value={employee.companyName} color="purple" />
-                <InfoItem icon={Briefcase} label="Department" value={employee.department} color="violet" />
-                <InfoItem icon={Shield} label="Managerial Level" value={employee.managerialLevel} color="slate" />
-                {employee.jobType && (
-                  <InfoItem icon={Briefcase} label="Job Type" value={employee.jobType} color="gray" />
-                )}
-              </div>
-
-              <div className="space-y-0 pl-0 sm:pl-6 pt-3 sm:pt-0">
                 <InfoItem icon={Calendar} label="Join Date" value={formatDate(employee.joinDate)} color="amber" />
-                {employee.directManager && (
-                  <InfoItem icon={Users} label="Direct Manager" value={employee.directManager} color="orange" />
-                )}
-                {employee.location && (
-                  <InfoItem icon={MapPin} label="Location" 
-                    value={employee.branch ? `${employee.location} · ${employee.branch}` : employee.location} 
-                    color="rose" />
-                )}
-                {employee.orgPath && (
-                  <InfoItem icon={Building2} label="Org Path" value={employee.orgPath} color="gray" />
-                )}
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* ─── Stats Row + Warnings (4 cards) ─────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Overall Rating */}
-        <div className="relative overflow-hidden rounded-2xl bg-white border border-blue-100 p-5 hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Overall Rating</p>
-              <p className="text-3xl font-bold text-blue-700 tracking-tight">
-                {yearEvaluations.length > 0
-                  ? (yearEvaluations.reduce((sum, e) => sum + (e.score || 0), 0) / yearEvaluations.length).toFixed(1)
-                  : 'N/A'}
-              </p>
+          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Work Information</h3>
+              <button
+                onClick={() => setWorkExpanded(!workExpanded)}
+                className="sm:hidden flex items-center gap-1 text-xs text-gray-500 font-medium"
+              >
+                <span>{workExpanded ? 'Collapse' : 'View details'}</span>
+                <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${workExpanded ? 'rotate-180' : ''}`} />
+              </button>
             </div>
-            <div className="p-2.5 rounded-xl bg-blue-50">
-              <TrendingUp className="h-5 w-5 text-blue-500" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <Select value={ratingYear.toString()} onValueChange={(v) => setRatingYear(parseInt(v))}>
-              <SelectTrigger className="h-7 w-20 text-xs border-blue-200 bg-blue-50/50">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-blue-50 opacity-50" />
-        </div>
-
-        {/* Card 2: Completed */}
-        <div className="relative overflow-hidden rounded-2xl bg-white border border-emerald-100 p-5 hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Completed</p>
-              <p className="text-3xl font-bold text-emerald-700 tracking-tight">
-                {evaluationList.filter(e => e.status === 'Completed').length}
-              </p>
-            </div>
-            <div className="p-2.5 rounded-xl bg-emerald-50">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-            </div>
-          </div>
-          <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-emerald-50 opacity-50" />
-        </div>
-
-        {/* Card 3: Pending Review */}
-        <div className="relative overflow-hidden rounded-2xl bg-white border border-violet-100 p-5 hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Pending Review</p>
-              <p className="text-3xl font-bold text-violet-700 tracking-tight">
-                {evaluationList.filter(e => e.status === 'Employee Review' || e.status === 'Pending HR Approval').length}
-              </p>
-            </div>
-            <div className="p-2.5 rounded-xl bg-violet-50">
-              <Clock className="h-5 w-5 text-violet-500" />
-            </div>
-          </div>
-          <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-violet-50 opacity-50" />
-        </div>
-
-        {/* Card 4: Warnings — clickable to expand */}
-        <div
-          className={`relative overflow-hidden rounded-2xl border p-5 transition-all duration-300 cursor-pointer
-            ${hasWarnings
-              ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 hover:shadow-md hover:border-amber-300'
-              : 'bg-white border-emerald-100 hover:shadow-md'
-            }`}
-          onClick={() => hasWarnings && setWarningsExpanded(!warningsExpanded)}
-        >
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Warnings</p>
-              <p className={`text-3xl font-bold tracking-tight ${hasWarnings ? 'text-amber-700' : 'text-emerald-700'}`}>
-                {warningsCount}
-              </p>
-            </div>
-            <div className={`p-2.5 rounded-xl ${hasWarnings ? 'bg-amber-100/80' : 'bg-emerald-50'}`}>
-              {hasWarnings ? (
-                <AlertTriangle className="h-5 w-5 text-amber-600" />
-              ) : (
-                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+            <div
+              className={`divide-y divide-gray-100 overflow-hidden transition-all duration-300 ease-in-out ${
+                workExpanded ? 'max-h-[700px] opacity-100' : 'max-h-0 opacity-0'
+              } sm:max-h-none sm:opacity-100`}
+            >
+              <InfoItem icon={Building2} label="Company" value={employee.companyName} color="purple" />
+              <InfoItem icon={Briefcase} label="Department" value={employee.department} color="violet" />
+              <InfoItem icon={Shield} label="Managerial Level" value={employee.managerialLevel} color="slate" />
+              {employee.jobType && (
+                <InfoItem icon={Briefcase} label="Job Type" value={employee.jobType} color="gray" />
+              )}
+              {employee.directManager && (
+                <InfoItem icon={Users} label="Direct Manager" value={employee.directManager} color="orange" />
+              )}
+              {employee.location && (
+                <InfoItem icon={MapPin} label="Location" 
+                  value={employee.branch ? `${employee.location} · ${employee.branch}` : employee.location} 
+                  color="rose" />
+              )}
+              {employee.orgPath && (
+                <InfoItem icon={Building2} label="Org Path" value={employee.orgPath} color="gray" />
               )}
             </div>
           </div>
-          {/* Subtitle */}
-          {hasWarnings ? (
-            <div className="mt-2 flex items-center gap-1 text-xs text-amber-600 font-medium">
-              <span>View details</span>
-              <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${warningsExpanded ? 'rotate-180' : ''}`} />
-            </div>
-          ) : (
-            <p className="mt-2 text-xs text-emerald-600 font-medium">Clean record</p>
-          )}
-          <div className={`absolute -bottom-6 -right-6 w-24 h-24 rounded-full opacity-50 ${hasWarnings ? 'bg-amber-100' : 'bg-emerald-50'}`} />
-        </div>
-      </div>
 
-      {/* ─── Warnings Expanded Drawer (slides in below stats) ───────────── */}
-      <div
-        className={`overflow-hidden transition-all duration-300 ease-in-out ${
-          warningsExpanded && hasWarnings ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
-        }`}
-      >
-        <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/80 to-orange-50/50 p-5 -mt-2">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <h4 className="text-sm font-semibold text-amber-900">Active Warnings</h4>
-            </div>
-            <button
-              onClick={() => setWarningsExpanded(false)}
-              className="text-xs text-amber-600 hover:text-amber-800 font-medium transition-colors flex items-center gap-1"
-            >
-              Collapse
-              <ChevronDown className="h-3 w-3 rotate-180" />
-            </button>
-          </div>
-          <div className="space-y-2">
-            {(employee.warnings || []).map((warning, index) => (
-              <div
-                key={index}
-                className="flex items-start gap-3 p-3 rounded-xl bg-white/70 border border-amber-100/80 backdrop-blur-sm"
-              >
-                <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-amber-200/60 text-amber-800 text-xs font-bold mt-0.5">
-                  {index + 1}
-                </span>
-                <p className="text-sm text-gray-700 leading-relaxed">{warning}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Evaluations List ───────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900">Evaluation History</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Click any evaluation to view details</p>
-          </div>
-
-          <Button
-            size="sm"
-            onClick={handleCreateEvaluation}
-            disabled={!isFormValid() || isCreatingEvaluation}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg gap-1.5 shadow-sm"
+          <div
+            className={`rounded-2xl border p-4 transition-all duration-300 ${
+              hasWarnings
+                ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200'
+                : 'bg-white border-emerald-100'
+            }`}
           >
-            {isCreatingEvaluation ? (
-              <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating...</>
-            ) : (
-              <>
-                <Plus className="h-3.5 w-3.5" />
-                New Evaluation
-              </>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Warning History</p>
+                <p className={`text-sm font-semibold ${hasWarnings ? 'text-amber-700' : 'text-emerald-700'}`}>
+                  {hasWarnings ? `${warningsCount} warning${warningsCount === 1 ? '' : 's'}` : 'No warnings'}
+                </p>
+              </div>
+              <Badge className={`${hasWarnings ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                {hasWarnings ? 'Required' : 'Clean'}
+              </Badge>
+            </div>
+            {hasWarnings && (
+              <div className="mt-2 flex justify-end">
+                <button
+                  onClick={() => setWarningsExpanded(!warningsExpanded)}
+                  className="flex items-center gap-1 text-xs text-[rgb(217_119_6/var(--tw-text-opacity,1))] font-medium"
+                >
+                  <span>{warningsExpanded ? 'Collapse' : 'View details'}</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${warningsExpanded ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
             )}
-          </Button>
+          </div>
+
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              warningsExpanded && hasWarnings ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+            }`}
+          >
+            <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/80 to-orange-50/50 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <h4 className="text-sm font-semibold text-amber-900">Active Warnings</h4>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {(employee.warnings || []).map((warning, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start gap-3 p-3 rounded-xl bg-white/70 border border-amber-100/80 backdrop-blur-sm"
+                  >
+                    <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-amber-200/60 text-amber-800 text-xs font-bold mt-0.5">
+                      {index + 1}
+                    </span>
+                    <p className="text-sm text-gray-700 leading-relaxed">{warning}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="p-4 sm:p-6">
-          {evaluationsLoading ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-              <Loader2 className="h-8 w-8 animate-spin mb-3" />
-              <p className="text-sm">Loading evaluations…</p>
-            </div>
-          ) : evaluationsError ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="p-3 bg-red-50 rounded-full mb-3">
-                <AlertTriangle className="h-6 w-6 text-red-400" />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="relative overflow-hidden rounded-2xl bg-white border border-blue-100 p-5 hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Overall Rating</p>
+                  <p className="text-3xl font-bold text-blue-700 tracking-tight">
+                    {yearEvaluations.length > 0
+                      ? (yearEvaluations.reduce((sum, e) => sum + (e.score || 0), 0) / yearEvaluations.length).toFixed(1)
+                      : 'N/A'}
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-blue-50">
+                  <TrendingUp className="h-5 w-5 text-blue-500" />
+                </div>
               </div>
-              <p className="text-sm font-medium text-gray-900">Failed to load evaluations</p>
-              <p className="text-xs text-gray-400 mt-1">{evaluationsError.message}</p>
-            </div>
-          ) : evaluationList.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-              <div className="p-4 bg-gray-50 rounded-2xl mb-4">
-                <BarChart3 className="h-8 w-8" />
+              <div className="mt-3">
+                <Select value={ratingYear.toString()} onValueChange={(v) => setRatingYear(parseInt(v))}>
+                  <SelectTrigger className="h-7 w-20 text-xs border-blue-200 bg-blue-50/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yearOptions.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-              <p className="text-sm font-medium text-gray-600">No evaluations yet</p>
-              <p className="text-xs text-gray-400 mt-1">Create one to get started</p>
+              <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-blue-50 opacity-50" />
             </div>
-          ) : (
-            <Tabs defaultValue="managerEval" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-gray-50 p-1 rounded-xl h-11">
-                <TabsTrigger value="selfEval" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm gap-2">
-                  Self Evaluation
-                  <span className="text-[10px] bg-gray-200 data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-700 px-1.5 py-0.5 rounded-full font-semibold">
-                    {selfEvaluationList.length}
-                  </span>
-                </TabsTrigger>
-                <TabsTrigger value="managerEval" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm gap-2">
-                  Manager Evaluation
-                  <span className="text-[10px] bg-gray-200 data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-700 px-1.5 py-0.5 rounded-full font-semibold">
-                    {evaluationList.filter(e => e.status !== 'Self Evaluation').length}
-                  </span>
-                </TabsTrigger>
-              </TabsList>
 
-              <TabsContent value="selfEval" className="mt-4 space-y-2.5">
-                {selfEvaluationsLoading ? (
-                  <div className="flex items-center justify-center py-12 text-gray-400">
-                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                    <span className="text-sm">Loading…</span>
-                  </div>
-                ) : selfEvaluationsError ? (
-                  <div className="text-center py-12">
-                    <p className="text-sm text-red-500">Failed to load self evaluations</p>
-                  </div>
-                ) : selfEvaluationList.length === 0 ? (
-                  <div className="text-center py-12 text-gray-400">
-                    <BarChart3 className="h-8 w-8 mx-auto mb-2" />
-                    <p className="text-sm">No self evaluations</p>
-                  </div>
-                ) : (
-                  selfEvaluationList.map(evaluation => (
-                    <EvaluationCard
-                      key={evaluation.id}
-                      evaluation={evaluation}
-                      onSelect={() => setSelectedEvaluation(evaluation)}
-                      onEdit={() => handleEditEvaluation(evaluation)}
-                      onDelete={() => handleDeleteEvaluation(evaluation.id)}
-                      isDeleting={deletingEvaluationId === evaluation.id}
-                    />
-                  ))
-                )}
-              </TabsContent>
+            <div className="relative overflow-hidden rounded-2xl bg-white border border-emerald-100 p-5 hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Completed</p>
+                  <p className="text-3xl font-bold text-emerald-700 tracking-tight">
+                    {evaluationList.filter(e => e.status === 'Completed').length}
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-emerald-50">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                </div>
+              </div>
+              <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-emerald-50 opacity-50" />
+            </div>
 
-              <TabsContent value="managerEval" className="mt-4 space-y-2.5">
-                {evaluationList.filter(e => e.status !== 'Self Evaluation').length === 0 ? (
-                  <div className="text-center py-12 text-gray-400">
-                    <BarChart3 className="h-8 w-8 mx-auto mb-2" />
-                    <p className="text-sm">No manager evaluations</p>
-                  </div>
+            <div className="relative overflow-hidden rounded-2xl bg-white border border-violet-100 p-5 hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Pending Review</p>
+                  <p className="text-3xl font-bold text-violet-700 tracking-tight">
+                    {evaluationList.filter(e => e.status === 'Employee Review' || e.status === 'Pending HR Approval').length}
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-violet-50">
+                  <Clock className="h-5 w-5 text-violet-500" />
+                </div>
+              </div>
+              <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-violet-50 opacity-50" />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Evaluation History</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Click any evaluation to view details</p>
+              </div>
+
+              <Button
+                size="sm"
+                onClick={handleCreateEvaluation}
+                disabled={!isFormValid() || isCreatingEvaluation}
+                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-lg gap-1.5 shadow-sm"
+              >
+                {isCreatingEvaluation ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating...</>
                 ) : (
-                  evaluationList.filter(e => e.status !== 'Self Evaluation').map(evaluation => (
-                    <EvaluationCard
-                      key={evaluation.id}
-                      evaluation={evaluation}
-                      onSelect={() => setSelectedEvaluation(evaluation)}
-                      onEdit={() => handleEditEvaluation(evaluation)}
-                      onDelete={() => handleDeleteEvaluation(evaluation.id)}
-                      isDeleting={deletingEvaluationId === evaluation.id}
-                    />
-                  ))
+                  <>
+                    <Plus className="h-3.5 w-3.5" />
+                    New Evaluation
+                  </>
                 )}
-              </TabsContent>
-            </Tabs>
-          )}
+              </Button>
+            </div>
+
+            <div className="p-4 sm:p-6">
+              {evaluationsLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <Loader2 className="h-8 w-8 animate-spin mb-3" />
+                  <p className="text-sm">Loading evaluations…</p>
+                </div>
+              ) : evaluationsError ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="p-3 bg-red-50 rounded-full mb-3">
+                    <AlertTriangle className="h-6 w-6 text-red-400" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-900">Failed to load evaluations</p>
+                  <p className="text-xs text-gray-400 mt-1">{evaluationsError.message}</p>
+                </div>
+              ) : evaluationList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <div className="p-4 bg-gray-50 rounded-2xl mb-4">
+                    <BarChart3 className="h-8 w-8" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-600">No evaluations yet</p>
+                  <p className="text-xs text-gray-400 mt-1">Create one to get started</p>
+                </div>
+              ) : (
+                <Tabs defaultValue="managerEval" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 bg-gray-50 p-1 rounded-xl h-11">
+                    <TabsTrigger value="selfEval" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm gap-2">
+                      Self Evaluation
+                      <span className="text-[10px] bg-gray-200 data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-700 px-1.5 py-0.5 rounded-full font-semibold">
+                        {selfEvaluationList.length}
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value="managerEval" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm gap-2">
+                      Manager Evaluation
+                      <span className="text-[10px] bg-gray-200 data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-700 px-1.5 py-0.5 rounded-full font-semibold">
+                        {evaluationList.filter(e => e.status !== 'Self Evaluation').length}
+                      </span>
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="selfEval" className="mt-4 space-y-2.5">
+                    {selfEvaluationsLoading ? (
+                      <div className="flex items-center justify-center py-12 text-gray-400">
+                        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                        <span className="text-sm">Loading…</span>
+                      </div>
+                    ) : selfEvaluationsError ? (
+                      <div className="text-center py-12">
+                        <p className="text-sm text-red-500">Failed to load self evaluations</p>
+                      </div>
+                    ) : selfEvaluationList.length === 0 ? (
+                      <div className="text-center py-12 text-gray-400">
+                        <BarChart3 className="h-8 w-8 mx-auto mb-2" />
+                        <p className="text-sm">No self evaluations</p>
+                      </div>
+                    ) : (
+                      selfEvaluationList.map(evaluation => (
+                        <EvaluationCard
+                          key={evaluation.id}
+                          evaluation={evaluation}
+                          onSelect={() => setSelectedEvaluation(evaluation)}
+                          onEdit={() => handleEditEvaluation(evaluation)}
+                          onDelete={() => handleDeleteEvaluation(evaluation.id)}
+                          isDeleting={deletingEvaluationId === evaluation.id}
+                        />
+                      ))
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="managerEval" className="mt-4 space-y-2.5">
+                    {evaluationList.filter(e => e.status !== 'Self Evaluation').length === 0 ? (
+                      <div className="text-center py-12 text-gray-400">
+                        <BarChart3 className="h-8 w-8 mx-auto mb-2" />
+                        <p className="text-sm">No manager evaluations</p>
+                      </div>
+                    ) : (
+                      evaluationList.filter(e => e.status !== 'Self Evaluation').map(evaluation => (
+                        <EvaluationCard
+                          key={evaluation.id}
+                          evaluation={evaluation}
+                          onSelect={() => setSelectedEvaluation(evaluation)}
+                          onEdit={() => handleEditEvaluation(evaluation)}
+                          onDelete={() => handleDeleteEvaluation(evaluation.id)}
+                          isDeleting={deletingEvaluationId === evaluation.id}
+                        />
+                      ))
+                    )}
+                  </TabsContent>
+                </Tabs>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
