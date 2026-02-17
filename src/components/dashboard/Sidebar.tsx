@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { Building2, Users, BarChart3, Building, Settings, Home, ChevronLeft, ChevronRight, User, ChevronDown, UserCheck, BookOpen } from 'lucide-react';
+import { Building2, Users, BarChart3, Building, Settings, Home, ChevronLeft, ChevronRight, User, ChevronDown, UserCheck, BookOpen, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +23,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const navigation = [
     { id: 'dashboard', name: 'Dashboard', icon: Home, roles: ['admin', 'hr', 'manager', 'employee'] },
+    { id: 'ramadan', name: 'رمضان 🌙', icon: Moon, roles: ['admin', 'hr', 'manager', 'employee'] },
     { id: 'competencies-dictionary', name: 'Competencies Dictionary', icon: BookOpen, roles: ['admin', 'hr', 'manager'] },
     { id: 'employees', name: 'Employees', icon: Users, roles: ['admin', 'hr', 'manager'] },
     { id: 'companies', name: 'Companies', icon: Building, roles: ['admin', 'hr'] },

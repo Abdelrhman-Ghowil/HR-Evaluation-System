@@ -17,6 +17,7 @@ import SectionsPage from '../departments/SectionsPage';
 import SubSectionsPage from '../departments/SubSectionsPage';
 import ReplacementPage from '../replacements/ReplacementPage';
 import CompetenciesDictionary from '../Competencies dictionary/Competenciesdictionary';
+import RamadanDashboard from '../ramadan/RamadanDashboard';
 import { OrganizationalProvider } from '../../contexts/OrganizationalContext';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
@@ -44,7 +45,8 @@ type ActiveView =
   | 'sections'
   | 'sub-sections'
   | 'replacements'
-  | 'help';
+  | 'help'
+  | 'ramadan';
 
 type Announcement = {
   id: string;
@@ -106,6 +108,8 @@ const Dashboard = () => {
         return 'sub-sections';
       case '/replacements':
         return 'replacements';
+      case '/ramadan':
+        return 'ramadan';
       case '/admin':
         return 'admin';
       case '/admin/weights-configuration':
@@ -182,6 +186,7 @@ const Dashboard = () => {
     sections: ['admin', 'hr', 'manager'],
     'sub-sections': ['admin', 'hr', 'manager'],
     replacements: ['admin', 'hr'],
+    ramadan: ['admin', 'hr', 'manager', 'employee'],
     admin: ['admin'],
     'weights-configuration': ['admin'],
     'user-management': ['admin'],
@@ -248,6 +253,8 @@ const Dashboard = () => {
         return <SubSectionsPage onViewChange={handleViewChange} />;
       case 'replacements':
         return <ReplacementPage />;
+      case 'ramadan':
+        return <RamadanDashboard />;
       case 'admin':
         return <AdminTools onNavigateToWeights={handleNavigateToWeights} onNavigateToUserManagement={handleNavigateToUserManagement} />;
       case 'weights-configuration':
