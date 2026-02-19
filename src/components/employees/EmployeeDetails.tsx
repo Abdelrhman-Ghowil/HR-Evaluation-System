@@ -132,11 +132,6 @@ const EvaluationCard = ({ evaluation, onSelect, onEdit, onDelete, isDeleting }: 
           )}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button variant="ghost" size="sm"
-              onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="h-8 w-8 p-0 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
-              <Edit className="h-3.5 w-3.5" />
-            </Button>
-            <Button variant="ghost" size="sm"
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
               className="h-8 w-8 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
               disabled={isDeleting}>
@@ -624,12 +619,6 @@ const EmployeeDetails = ({ employee, onBack }: EmployeeDetailsProps) => {
             }`}
           >
             <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/80 to-orange-50/50 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <h4 className="text-sm font-semibold text-amber-900">Active Warnings</h4>
-                </div>
-              </div>
               <div className="space-y-2">
                 {(employee.warnings || []).map((warning, index) => (
                   <div
