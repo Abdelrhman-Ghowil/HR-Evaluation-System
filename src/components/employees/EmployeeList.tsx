@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, Plus, Edit, Mail, Phone, X, Search, Filter, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle, Copy, Download } from 'lucide-react';
+import { Users, Plus, Edit, Mail, Phone, X, Search, Filter, Trash2, FileSpreadsheet, Upload, Loader2, CheckCircle, AlertCircle, Copy, Download, Building, Building2, MoreHorizontal } from 'lucide-react';
 import EmployeeDetails from './EmployeeDetails';
 import { apiService } from '@/services/api';
 import { useEmployees } from '@/hooks/useApi';
@@ -1408,6 +1408,49 @@ const EmployeeList = () => {
     return arr;
   }, [filteredEmployees, lastCreatedEmployeeId]);
 
+  const stats = React.useMemo(() => {
+    const totalEmployees = employees.length;
+    const activeEmployees = employees.filter((employee) => employee.status === 'Active').length;
+    const departmentsCount = new Set(employees.map((employee) => employee.department).filter(Boolean)).size;
+    const pendingReviews = employees.reduce((sum, employee) => sum + (employee.pendingEvaluationsCount || 0), 0);
+    return { totalEmployees, activeEmployees, departmentsCount, pendingReviews };
+  }, [employees]);
+
+  const handleExportEmployees = React.useCallback(() => {
+    if (!displayEmployees.length) return;
+    const headers = [
+      'Name',
+      'Email',
+      'Department',
+      'Position',
+      'Status',
+      'Company',
+      'PendingReviews',
+      'EmployeeCode',
+    ];
+    const escapeValue = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const rows = displayEmployees.map((employee) => [
+      employee.name,
+      employee.email,
+      employee.department,
+      employee.position,
+      employee.status,
+      employee.companyName,
+      employee.pendingEvaluationsCount || 0,
+      employee.employeeCode,
+    ]);
+    const csv = [headers, ...rows].map((row) => row.map(escapeValue).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'employees.csv');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, [displayEmployees]);
+
   if (selectedEmployee) {
     return (
       <EmployeeDetails 
@@ -1428,27 +1471,28 @@ const EmployeeList = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Employee Management</h2>
-          <p className="text-gray-600">Manage employee profiles and information</p>
+          <h2 className="text-2xl font-semibold text-gray-900">Employees</h2>
+          <p className="text-sm text-gray-500">Manage your team members and reviews</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {canImport && (
-            <Button 
-              variant="outline" 
-              className="border-blue-600 text-blue-600 hover:bg-blue-50"
-              onClick={() => setIsImportModalOpen(true)}
-            >
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Import Excel/CSV
+            <Button variant="outline" className="gap-2" onClick={handleExportEmployees}>
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+          )}
+          {canImport && (
+            <Button variant="outline" className="gap-2" onClick={() => setIsImportModalOpen(true)}>
+              <FileSpreadsheet className="h-4 w-4" />
+              Import
             </Button>
           )}
           {canAddEmployee && (
             <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700">
+                <Button className="bg-blue-600 hover:bg-blue-700">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Employee
                 </Button>
@@ -1951,21 +1995,84 @@ const EmployeeList = () => {
         </div>
       </div>
 
-      {/* Enhanced Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search employees..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-            <SelectTrigger className="w-[180px]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <Card className="border border-gray-100 shadow-sm">
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-xs text-gray-500">Total Employees</p>
+              <p className="text-2xl font-semibold text-gray-900">{stats.totalEmployees}</p>
+            </div>
+            <div className="h-9 w-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Users className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border border-gray-100 shadow-sm">
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-xs text-gray-500">Active Employees</p>
+              <p className="text-2xl font-semibold text-gray-900">{stats.activeEmployees}</p>
+            </div>
+            <div className="h-9 w-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <CheckCircle className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border border-gray-100 shadow-sm">
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-xs text-gray-500">Departments</p>
+              <p className="text-2xl font-semibold text-gray-900">{stats.departmentsCount}</p>
+            </div>
+            <div className="h-9 w-9 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center">
+              <Building2 className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border border-gray-100 shadow-sm">
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-xs text-gray-500">Pending Reviews</p>
+              <p className="text-2xl font-semibold text-gray-900">{stats.pendingReviews}</p>
+            </div>
+            <div className="h-9 w-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <AlertCircle className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Search by name, role, or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 h-11"
+            />
+          </div>
+          <Select
+            value={selectedEvaluationState}
+            onValueChange={(v) => setSelectedEvaluationState(v as 'all' | 'pending' | 'pending-mid' | 'pending-end' | 'can-start')}
+          >
+            <SelectTrigger className="h-11 w-full lg:w-[220px]">
               <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="pending">Pending Reviews</SelectItem>
+              <SelectItem value="pending-mid">Mid Pending Reviews</SelectItem>
+              <SelectItem value="pending-end">End Pending Reviews</SelectItem>
+              <SelectItem value="can-start">Ready to Start</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+            <SelectTrigger className="h-11 w-full lg:w-[200px]">
+              <SelectValue placeholder="All Departments" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Departments</SelectItem>
@@ -1983,8 +2090,8 @@ const EmployeeList = () => {
               if (open && companies.length === 0) void fetchCompanies();
             }}
           >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
+            <SelectTrigger className="h-11 w-full lg:w-[200px]">
+              <SelectValue placeholder="All Companies" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Companies</SelectItem>
@@ -1995,106 +2102,104 @@ const EmployeeList = () => {
               ))}
             </SelectContent>
           </Select>
-          <Select
-            value={selectedEvaluationState}
-            onValueChange={(v) => setSelectedEvaluationState(v as 'all' | 'pending' | 'pending-mid' | 'pending-end' | 'can-start')}
-          >
-            <SelectTrigger className="w-[220px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Evaluation States</SelectItem>
-              <SelectItem value="pending">Pending Evaluations</SelectItem>
-              <SelectItem value="pending-mid">Mid Pending Evaluations</SelectItem>
-              <SelectItem value="pending-end">End Pending Evaluations</SelectItem>
-              <SelectItem value="can-start">Start Evaluation</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" onClick={clearFilters}>
-            <X className="h-4 w-4 mr-2" />
-            Clear
+          <Button variant="outline" onClick={clearFilters} className="h-11 gap-2 lg:ml-auto">
+            <Filter className="h-4 w-4" />
+            Clear Filters
           </Button>
         </div>
       </div>
 
-      {/* Employee Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {displayEmployees.map((employee) => (
-          <Card
-            key={employee.id}
-            className="group border border-gray-100 hover:border-gray-200 hover:bg-gray-50/70 hover:shadow-xl transition-all duration-200 cursor-pointer"
-            role="button"
-            tabIndex={0}
-            onClick={() => handleOpenEmployeeDetails(employee)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                handleOpenEmployeeDetails(employee);
-              }
-            }}
-          >
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="relative flex-shrink-0">
-                    <Avatar className="h-11 w-11 ring-2 ring-blue-50">
-                      <AvatarFallback className="bg-blue-600 text-white">
-                        {employee.name.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span
-                      className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white ${employee.status === 'Active' ? 'bg-green-500' : 'bg-gray-400'}`}
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-base text-gray-900 truncate">{employee.name}</h3>
-                    <p className="text-sm text-gray-600 truncate">{employee.position}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {statusUpdatingEmployees.has(employee.id) ? (
-                    <div className="flex items-center justify-center w-11 h-6">
-                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {displayEmployees.map((employee) => {
+          const pendingCount = employee.pendingEvaluationsCount || 0;
+          return (
+            <Card
+              key={employee.id}
+              className="border border-gray-100 hover:border-gray-200 hover:shadow-lg transition-all duration-200 cursor-pointer"
+              role="button"
+              tabIndex={0}
+              onClick={() => handleOpenEmployeeDetails(employee)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  handleOpenEmployeeDetails(employee);
+                }
+              }}
+            >
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative flex-shrink-0">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={employee.avatar} alt={employee.name} />
+                        <AvatarFallback className="bg-blue-600 text-white">
+                          {employee.name.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white ${employee.status === 'Active' ? 'bg-emerald-500' : 'bg-gray-400'}`}
+                      />
                     </div>
-                  ) : (
-                    <Switch
-                      checked={employee.status === 'Active'}
-                      onCheckedChange={() => handleToggleStatus(employee.id)}
-                      onClick={(event) => event.stopPropagation()}
-                    />
-                  )}
-                  {(user?.role === 'admin' || user?.role === 'hr' || user?.api_role === 'HOD') && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleEditEmployee(employee);
-                      }}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate">{employee.name}</h3>
+                      <p className="text-sm text-gray-500 truncate">{employee.position}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {statusUpdatingEmployees.has(employee.id) ? (
+                      <div className="flex items-center justify-center w-10 h-10">
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                      </div>
+                    ) : (
+                      <Switch
+                        checked={employee.status === 'Active'}
+                        onCheckedChange={() => handleToggleStatus(employee.id)}
+                        onClick={(event) => event.stopPropagation()}
+                      />
+                    )}
+                    {(user?.role === 'admin' || user?.role === 'hr' || user?.api_role === 'HOD') && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleEditEmployee(employee);
+                        }}
+                        className="h-9 w-9 p-0"
+                      >
+                        <MoreHorizontal className="h-4 w-4 text-gray-500" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Building2 className="h-4 w-4 text-gray-400" />
+                    <span className="truncate">{employee.department}</span>
+                    <span className="text-gray-300">•</span>
+                    <span className="truncate">{employee.companyName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Building className="h-4 w-4 text-gray-400" />
+                    <span className="truncate">{employee.managerialLevel}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Badge className={employee.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-gray-100 text-gray-600 border-gray-100'}>
+                    {employee.status}
+                  </Badge>
+                  {pendingCount > 0 && (
+                    <Badge className="bg-amber-50 text-amber-700 border-amber-100">
+                      {pendingCount} Pending Reviews
+                    </Badge>
                   )}
                 </div>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700">
-                  {employee.managerialLevel === 'Individual Contributor' ? 'IC' : employee.managerialLevel}
-                </Badge>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                  {employee.department}
-                </Badge>
-                <Badge variant="secondary" className="text-xs bg-green-50 text-green-700">
-                  {employee.companyName}
-                </Badge>
-              </div>
-
-              
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Edit Employee Modal */}
