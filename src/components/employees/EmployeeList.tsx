@@ -78,6 +78,7 @@ const EmployeeList = () => {
   const [createError, setCreateError] = useState<string | null>(null);
   const [createErrorItems, setCreateErrorItems] = useState<string[]>([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [editErrorItems, setEditErrorItems] = useState<string[]>([]);
@@ -960,6 +961,7 @@ const EmployeeList = () => {
   const handleSaveEdit = async () => {
     if (editingEmployee && originalEmployee && validateEditForm()) {
       try {
+        setIsSavingEdit(true);
         setEditError(null);
         setEditErrorItems([]);
         // Prepare the update payload with only changed fields
@@ -1163,6 +1165,8 @@ const EmployeeList = () => {
         setEditErrorItems(items);
         const message = apiError?.message || items[0] || 'Failed to update employee. Please review the fields and try again.';
         setEditError(message);
+      } finally {
+        setIsSavingEdit(false);
       }
     }
   };
@@ -2595,8 +2599,17 @@ const EmployeeList = () => {
                   setEditingEmployee(null);
                   setOriginalEmployee(null);
                   setEditValidationErrors({});
-                }}>Cancel</Button>
-                <Button onClick={handleSaveEdit}>Save Changes</Button>
+                }} disabled={isSavingEdit}>Cancel</Button>
+                <Button onClick={handleSaveEdit} disabled={isSavingEdit}>
+                  {isSavingEdit ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </Button>
               </div>
             </div>)}
         </DialogContent>
@@ -2676,9 +2689,8 @@ const EmployeeList = () => {
                 </div>
                 <Button asChild variant="link" size="sm" className="text-indigo-700">
                   <a
-                    href="https://docs.google.com/spreadsheets/d/1aNv4iMchQJR_Qa4HjOUTAaWeIBPoOvyT/edit?gid=774914515#gid=774914515"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href="https://docs.google.com/spreadsheets/d/1uQGLNDbIFDEzhKwlJRXhTVL3_GhZoPvfb-5xsN7hD9Q/export?format=xlsx&gid=774914515"
+                    download
                   >
                     <Download className="h-3 w-3 mr-1" />
                     Template

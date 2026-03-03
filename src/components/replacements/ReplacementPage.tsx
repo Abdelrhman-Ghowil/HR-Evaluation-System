@@ -610,9 +610,8 @@ const handleSubSectionChange = (subSectionId: string) => {
               </div>
               <Button asChild variant="link" size="sm" className="text-indigo-700">
                 <a
-                  href="https://docs.google.com/spreadsheets/d/1rYIqOMGAfAC8Ae60P5cPNa1kDB7gWJ5_/edit?gid=1553600812#gid=1553600812"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="https://docs.google.com/spreadsheets/d/1rYIqOMGAfAC8Ae60P5cPNa1kDB7gWJ5_/export?format=xlsx&gid=1553600812"
+                  download
                 >
                   <Download className="h-3 w-3 mr-1" />
                   Template

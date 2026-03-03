@@ -909,9 +909,8 @@ const DepartmentList: React.FC<DepartmentListProps> = ({ onViewChange }) => {
           </div>
           <Button asChild variant="link" size="sm" className="text-indigo-700">
             <a
-              href="https://docs.google.com/spreadsheets/d/1qv6M6dlaggBvkVkEJJWV0IjhOcSqOcSa/edit?usp=drive_web&ouid=102577459244863862882&rtpof=true"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="https://docs.google.com/spreadsheets/d/1qv6M6dlaggBvkVkEJJWV0IjhOcSqOcSa/export?format=xlsx"
+              download
             >
               <Download className="h-3 w-3 mr-1" />
               Template
