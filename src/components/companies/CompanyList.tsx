@@ -1085,9 +1085,8 @@ const CompanyList = () => {
                   className="text-indigo-700"
                 >
                   <a
-                    href="https://docs.google.com/spreadsheets/d/1rWkpqGAKIpdGqIvdIk6rwp6luwafNVAV/edit?usp=sharing&ouid=102577459244863862882&rtpof=true&sd=true"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href="https://docs.google.com/spreadsheets/d/1rWkpqGAKIpdGqIvdIk6rwp6luwafNVAV/export?format=xlsx"
+                    download
                   >
                     <Download className="h-3 w-3 mr-1" />
                     Template
