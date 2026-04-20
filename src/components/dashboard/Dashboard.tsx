@@ -21,6 +21,7 @@ import { OrganizationalProvider } from '../../contexts/OrganizationalContext';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from '@/components/ui/use-toast';
 import HelpCenter from '@/components/help/HelpCenter';
+import DatabaseChat from '@/components/chat/DatabaseChat';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -44,7 +45,8 @@ type ActiveView =
   | 'sections'
   | 'sub-sections'
   | 'replacements'
-  | 'help';
+  | 'help'
+  | 'database-chat';
 
 type Announcement = {
   id: string;
@@ -116,6 +118,8 @@ const Dashboard = () => {
         return 'profile';
       case '/help':
         return 'help';
+      case '/database-chat':
+        return 'database-chat';
       case '/dashboard':
       case '/':
       default:
@@ -188,6 +192,7 @@ const Dashboard = () => {
     profile: ['admin', 'hr', 'manager', 'employee'],
     'employee-profile': ['admin', 'hr', 'manager', 'employee'],
     help: ['admin', 'hr', 'manager', 'employee'],
+    'database-chat': ['admin', 'hr', 'manager', 'employee'],
   };
 
   // Redirect away from unauthorized routes when role changes or path changes
@@ -258,6 +263,8 @@ const Dashboard = () => {
         return <ProfilePage />;
       case 'help':
         return <HelpCenter />;
+      case 'database-chat':
+        return <DatabaseChat />;
       default:
         return <DashboardHome />;
     }
