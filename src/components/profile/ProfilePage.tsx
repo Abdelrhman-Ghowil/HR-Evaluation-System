@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { 
   User, 
   Mail, 
@@ -40,7 +41,7 @@ import {
   Clock,
   MapIcon
 } from 'lucide-react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Download, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/api';
 import { ApiEmployee, ApiEvaluation, ApiObjective, ApiCompetency, ApiMyProfile, ApiError, ObjectiveStatus, CompetencyCategory, CreateObjectiveRequest, CreateCompetencyRequest, UpdateObjectiveRequest, UpdateCompetencyRequest } from '../../types/api';
@@ -938,6 +939,23 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  const handleCvDownload = async (language: 'ar' | 'en') => {
+    try {
+      const blob = await apiService.downloadMyCv(language);
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${profileData.name || 'profile'}-cv-${language}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success(`CV download started (${language.toUpperCase()})`);
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, `Failed to download ${language.toUpperCase()} CV`));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 md:p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -948,10 +966,28 @@ const ProfilePage: React.FC = () => {
             <p className="text-gray-600 mt-1">Manage your personal information and preferences</p>
           </div>
           {!loading && !isEditing ? (
-            <Button onClick={handleEdit} className="bg-blue-600 hover:bg-blue-700">
-              <Edit3 className="h-4 w-4 mr-2" />
-              Edit Profile
-            </Button>
+            <div className="flex gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download CV
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleCvDownload('en')}>
+                    Download CV (EN)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleCvDownload('ar')}>
+                    Download CV (AR)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button onClick={handleEdit} className="bg-blue-600 hover:bg-blue-700">
+                <Edit3 className="h-4 w-4 mr-2" />
+                Edit Profile
+              </Button>
+            </div>
           ) : !loading && isEditing ? (
             <div className="flex gap-2">
               <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700">

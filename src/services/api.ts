@@ -372,6 +372,18 @@ class ApiService {
     return response.data;
   }
 
+  async downloadMyCv(language: 'ar' | 'en'): Promise<Blob> {
+    const response = await this.api.get('/api/my-profile/cv/download/', {
+      params: { language },
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/pdf',
+      },
+    });
+
+    return response.data as Blob;
+  }
+
   // Employee methods
   async getEmployees(params?: EmployeeQueryParams): Promise<PaginatedResponse<ApiEmployee>> {
     const response: AxiosResponse<PaginatedResponse<ApiEmployee>> = await this.api.get('/api/employees/', {
