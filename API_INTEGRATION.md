@@ -15,9 +15,9 @@ cp .env.example .env
 Edit `.env` and set your backend API URL:
 
 ```env
-VITE_API_BASE_URL=https://hr-eval-sys-dev.replit.app/
+VITE_API_BASE_URL=https://hr-eval-sys.vercel.app/
 # or your production API URL
-# VITE_API_BASE_URL=https://hr-eval-sys-dev.replit.app/
+# VITE_API_BASE_URL=https://hr-eval-sys.vercel.app/
 ```
 
 ### 2. Backend API Requirements
