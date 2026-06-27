@@ -58,7 +58,7 @@ const InfoItem = ({ icon: Icon, label, value, href, color = 'gray' }: {
     <div className="min-w-0 flex-1">
       <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">{label}</p>
       {href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer"
+        <a href={href}
           className={`text-sm font-medium text-${color}-600 hover:text-${color}-800 hover:underline transition-colors truncate block`}>
           {value}
         </a>
