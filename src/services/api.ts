@@ -48,6 +48,8 @@ import {
   ApiPlacement,
   CreatePlacementRequest,
   ImportResponse,
+  DatabaseChatRequest,
+  DatabaseChatResponse,
   ApiMyProfile,
   ApiActivityLog,
   CreateActivityLogRequest,
@@ -910,6 +912,11 @@ class ApiService {
 
   async deletePlacement(placementId: string): Promise<void> {
     await this.api.delete(`/api/org/placements/${placementId}`);
+  }
+
+  async askDatabase(payload: DatabaseChatRequest): Promise<DatabaseChatResponse> {
+    const response: AxiosResponse<DatabaseChatResponse> = await this.api.post('/api/chat/db/', payload);
+    return response.data;
   }
 }
 

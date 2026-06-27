@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { Building2, Users, BarChart3, Building, Settings, Home, ChevronLeft, ChevronRight, User, ChevronDown, UserCheck, BookOpen } from 'lucide-react';
+import { Building2, Users, Building, Settings, Home, ChevronLeft, ChevronRight, User, ChevronDown, UserCheck, BookOpen, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'companies', name: 'Companies', icon: Building, roles: ['admin', 'hr'] },
     { id: 'departments', name: 'Departments', icon: Building2, roles: ['admin', 'hr', 'manager'] },
     { id: 'replacements', name: 'Replacements', icon: UserCheck, roles: ['admin', 'hr', 'manager'] },
+    { id: 'database-chat', name: 'Database Chat', icon: MessageSquare, roles: ['admin', 'hr', 'manager', 'employee'] },
     { id: 'profile', name: 'Profile', icon: User, roles: ['admin', 'hr', 'manager','employee'] },
     { id: 'admin', name: 'Admin Tools', icon: Settings, roles: ['admin'] },
   ];

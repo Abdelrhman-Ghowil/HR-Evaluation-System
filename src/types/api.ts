@@ -512,6 +512,19 @@ export interface UpdateWeightsConfigurationRequest {
   objective_weight: number;
 }
 
+// Database Chat Types
+export interface DatabaseChatRequest {
+  question: string;
+  db_url?: string;
+}
+
+export interface DatabaseChatResponse {
+  answer: string;
+  sql_query?: string;
+  confidence?: number;
+  sources?: string[];
+}
+
 // Organizational Structure Types
 export interface ApiSubDepartment {
   sub_department_id: string;
